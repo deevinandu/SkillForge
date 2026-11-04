@@ -268,6 +268,11 @@ class MujocoEnv:
         m.actuator_biasprm[:] = n["actuator_biasprm"]
         m.actuator_gainprm[:, 0] *= k
         m.actuator_biasprm[:, 1:3] *= k
+        # Derived constants (body/dof invweight0, used to scale constraint regularisation) are
+        # computed from mass and inertia at compile time. Without recomputing them, a cube whose
+        # mass was scaled gets a mismatched contact impedance and the solver can fling it at
+        # many m/s on a corner/edge landing: this was the 'object_ejected' artifact.
+        mujoco.mj_setConst(m, d)
 
         mujoco.mj_resetData(m, d)
         d.qpos[self._arm_q] = self._home
@@ -525,8 +530,9 @@ class MujocoEnv:
         elif self._held is None and not self._miss_reported and self._gripper_width() < 0.004:
             events.append("grasp_miss")  # closed all the way on nothing
             self._miss_reported = True
-        # Known artifact: a cube pinched on its edges after a slip can be squeezed out at
-        # unphysical speed. Flag it so failure analysis can tell it from an honest drop.
+        # Safety net for solver artifacts: a tabletop object faster than EJECT_SPEED was flung by
+        # the solver, not the skill. The known cause (stale invweight0 after mass randomization,
+        # fixed in reset) is gone; keep flagging so a new one is tagged sim_artifact, not a drop.
         for name, adr in self._obj_dof.items():
             if name not in self._ejected and np.linalg.norm(self.data.qvel[adr : adr + 3]) > EJECT_SPEED:
                 self._ejected.add(name)

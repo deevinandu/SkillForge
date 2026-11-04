@@ -382,9 +382,46 @@ def test_obs_cameras_fill_images_when_gl_works(plain_task):
 def test_object_ejection_is_flagged(env):
     obs = env.reset(0)
     a = env.model.joint("cube_free").dofadr[0]
-    env.data.qvel[a : a + 3] = [0.0, 0.0, 6.0]  # what the edge-pinch artifact looks like
+    env.data.qvel[a : a + 3] = [0.0, 0.0, 6.0]  # what a solver ejection looks like
     _, _, events = hold(env, obs, 1)
     assert "object_ejected:cube" in events
+
+
+@pytest.mark.parametrize("scale", [0.7, 1.5])
+def test_mass_randomization_updates_derived_constants(task, scale):
+    # body_invweight0 scales constraint regularisation; it must follow the randomized mass
+    nominal = MujocoEnv(with_randomization(task))
+    env = MujocoEnv(with_randomization(task, mass_scale=Range.fixed(scale)))
+    env.reset(3)
+    b = env.model.body("cube").id
+    assert env.model.body_invweight0[b] == pytest.approx(nominal.model.body_invweight0[b] / scale, rel=1e-6)
+
+
+def test_tumbling_cube_lands_without_ejection(task):
+    """Regression for the object_ejected artifact: random tumbling drops onto the table.
+
+    Before mj_setConst ran after mass randomization, ~30% of these drops flung the cube
+    faster than EJECT_SPEED (often to NaN). Now none may.
+    """
+    from skillforge.sim.mujoco_env import EJECT_SPEED
+
+    env = MujocoEnv(with_randomization(task, mass_scale=Range(lo=0.7, hi=1.5)))
+    m, d = env.model, env.data
+    qa, va = env._obj_free["cube"], env._obj_dof["cube"]
+    worst = 0.0
+    for i in range(30):
+        rng = np.random.default_rng(100 + i)
+        env.reset(i)
+        q = rng.normal(size=4)
+        d.qpos[qa : qa + 3] = [0.5, -0.15, 0.05 + 0.08 * rng.random()]
+        d.qpos[qa + 3 : qa + 7] = q / np.linalg.norm(q)
+        d.qvel[va : va + 3] = rng.normal(0, 0.5, 3)
+        d.qvel[va + 3 : va + 6] = rng.normal(0, 15, 3)
+        for _ in range(500):
+            mujoco.mj_step(m, d)
+            if d.xpos[m.body("cube").id][2] < 0.06:
+                worst = max(worst, float(np.linalg.norm(d.qvel[va : va + 3])))
+    assert np.isfinite(worst) and worst < EJECT_SPEED, worst
 
 
 def test_mesh_and_primitive_objects_build(plain_task, tmp_path):
