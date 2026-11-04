@@ -11,8 +11,6 @@ from collections.abc import Callable
 from pydantic import BaseModel
 
 from skillforge.contracts import EvalReport, SimEnv, SkillImprover, SkillSource, TaskSpec
-from skillforge.eval import evaluate
-from skillforge.skills import load_skill
 
 
 class ForgeRound(BaseModel):
@@ -30,14 +28,14 @@ def forge(
     rollouts: int = 50,
     target: float = 0.9,
 ) -> list[ForgeRound]:
-    """Every round evaluates on the SAME seeds, so a change in success rate is the skill, not luck."""
-    history: list[ForgeRound] = []
-    src = seed_skill
-    seeds = range(rollouts)
-    for r in range(rounds):
-        report, _ = evaluate(make_env, load_skill(src), task, seeds)
-        history.append(ForgeRound(round=r, source=src, report=report))
-        if report.success_rate >= target:
-            break
-        src = improver.propose(task, src, report)
-    return history
+    """Every round evaluates on the SAME seeds, so a change in success rate is the skill, not luck.
+
+    Skill code runs only in a subprocess sandbox (T3), never in this process, so `make_env` must
+    be importable by reference (a module-level function or class). A candidate is kept only if
+    it passes the keep-the-best gate; rejected candidates still appear in the history.
+    For the library, history.json, critic and budget, use `skillforge.agents.run_loop`.
+    """
+    from skillforge.agents.loop import run_loop  # lazy: agents imports eval/sim, not forge
+
+    result = run_loop(task, seed_skill, improver, make_env, rounds=rounds, rollouts=rollouts, target=target)
+    return [ForgeRound(round=h.round, source=h.source, report=h.report) for h in result.rounds]

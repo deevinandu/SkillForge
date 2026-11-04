@@ -9,9 +9,12 @@ description = "CI/CD for robot behaviors: agents write, harden and learn robot s
 requires-python = ">=3.10"
 dependencies = ["pydantic>=2.6", "numpy>=1.26"]
 
+[project.scripts]
+skillforge = "skillforge.cli:main"
+
 [project.optional-dependencies]
 sim = ["mujoco>=3.2"]
-agents = ["anthropic>=0.40", "claude-agent-sdk"]
+agents = ["anthropic>=2.5", "claude-agent-sdk"]
 learning = ["torch>=2.3"]
 video = ["imageio>=2.31", "pillow>=10"]
 dev = ["pytest>=8", "ruff>=0.5", "imageio>=2.31", "pillow>=10"]
