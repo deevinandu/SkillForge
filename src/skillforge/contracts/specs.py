@@ -81,8 +81,9 @@ class Region(Spec):
 class RandomizationSpec(Spec):
     """Domain randomization. Every field is sampled per episode from its Range."""
 
-    object_xy_jitter: Range = Range.fixed(0.0)  # metres, uniform in a square
-    object_yaw_jitter: Range = Range.fixed(0.0)  # radians
+    # Jitter fields are magnitudes: per episode m ~ U(lo, hi), then the offset ~ U(-m, m).
+    object_xy_jitter: Range = Range.fixed(0.0)  # metres, per axis (a square)
+    object_yaw_jitter: Range = Range.fixed(0.0)  # radians, about world z
     friction_scale: Range = Range.fixed(1.0)
     mass_scale: Range = Range.fixed(1.0)
     actuator_gain_scale: Range = Range.fixed(1.0)

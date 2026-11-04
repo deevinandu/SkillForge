@@ -30,7 +30,7 @@ class Observation:
     qvel: np.ndarray
     ee_pos: np.ndarray  # (3,)
     ee_quat: np.ndarray  # (4,)
-    gripper_width: float  # metres, 0 = closed
+    gripper_width: float  # metres: MEASURED finger opening (stays > 0 while holding), 0 = fully closed
     objects: dict[str, ObjectState] = field(default_factory=dict)
     images: dict[str, np.ndarray] = field(default_factory=dict)  # camera name -> HxWx3 uint8
     contact_force: np.ndarray | None = None  # (3,) at the EE, if the env provides it
@@ -123,6 +123,7 @@ FailureTag = Literal[
     "ik_failure",
     "exception",
     "terminated",
+    "sim_artifact",  # the simulator failed (NaN reset, object flung by the solver), not the skill
     "other",
 ]
 

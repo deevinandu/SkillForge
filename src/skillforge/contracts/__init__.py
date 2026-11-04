@@ -1,6 +1,6 @@
 """Frozen interface contracts. See CLAUDE.md before changing anything here."""
 
-from .agents import SkillImprover, SkillSource
+from .agents import SkillCritic, SkillImprover, SkillSource
 from .runtime import (
     Action,
     Episode,
@@ -46,6 +46,7 @@ __all__ = [
     "SceneSpec",
     "SimEnv",
     "Skill",
+    "SkillCritic",
     "SkillImprover",
     "SkillSource",
     "StepInfo",

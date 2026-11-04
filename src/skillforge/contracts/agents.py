@@ -27,3 +27,18 @@ class SkillSource(BaseModel):
 class SkillImprover(Protocol):
     def propose(self, task: TaskSpec, current: SkillSource, report: EvalReport) -> SkillSource:
         """Return a new version of the skill aimed at the failures in `report`."""
+
+
+@runtime_checkable
+class SkillCritic(Protocol):
+    """Optional second hook: veto a candidate after it is evaluated. Improvers may implement both."""
+
+    def review(
+        self,
+        task: TaskSpec,
+        parent: SkillSource,
+        parent_report: EvalReport,
+        candidate: SkillSource,
+        candidate_report: EvalReport,
+    ) -> tuple[bool, str]:
+        """Return (accept, reason)."""
