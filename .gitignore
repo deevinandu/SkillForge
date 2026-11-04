@@ -6,3 +6,5 @@ runs/
 *.mp4
 *.npz
 .ruff_cache/
+assets/cache/
+MUJOCO_LOG.TXT

@@ -1,0 +1,29 @@
+{
+  "id": "franka_lift_cube",
+  "instruction": "Pick up the red cube and lift it off the table.",
+  "scene": {
+    "robot": {
+      "name": "franka_panda",
+      "source": "menagerie:franka_emika_panda",
+      "ee_site": "tcp",
+      "gripper": "parallel",
+      "max_gripper_width": 0.08
+    },
+    "objects": [
+      {"name": "cube", "shape": "box", "size": [0.02, 0.02, 0.02], "mass": 0.05, "friction": 1.0,
+       "pose": {"pos": [0.5, 0.0, 0.02]}}
+    ],
+    "randomization": {
+      "object_xy_jitter": {"lo": 0.0, "hi": 0.05},
+      "object_yaw_jitter": {"lo": 0.0, "hi": 0.6},
+      "friction_scale": {"lo": 0.6, "hi": 1.2},
+      "mass_scale": {"lo": 0.7, "hi": 1.5},
+      "actuator_gain_scale": {"lo": 0.8, "hi": 1.2},
+      "obs_noise_std": {"lo": 0.0, "hi": 0.003},
+      "action_latency_steps": {"lo": 0, "hi": 2}
+    }
+  },
+  "success": {"kind": "object_lifted", "object": "cube", "min_height": 0.08},
+  "max_steps": 200,
+  "control_hz": 20
+}
