@@ -469,3 +469,18 @@ def test_mesh_and_primitive_objects_build(plain_task, tmp_path):
     for name, z in rest.items():  # resting objects stay put on the table
         assert abs(obs.objects[name].pos[2] - z) < 2e-3, name
     assert obs.objects["wedge"].pos[2] > -0.01  # mesh collides with the table
+
+
+def test_hard_task_is_wider_than_the_base_task(task):
+    hard = load("franka_pick_cube_to_bin_hard")
+    rb, rh = task.scene.randomization, hard.scene.randomization
+    assert rh.object_xy_jitter.hi > rb.object_xy_jitter.hi
+    assert rh.friction_scale.lo < rb.friction_scale.lo
+    assert rh.obs_noise_std.hi > rb.obs_noise_std.hi
+    assert rh.action_latency_steps.hi > rb.action_latency_steps.hi
+    assert hard.scene.object("cube").mass > task.scene.object("cube").mass
+    assert hard.scene.region("bin").half_extents[0] < task.scene.region("bin").half_extents[0]
+    env = MujocoEnv(hard)
+    obs = env.reset(5)
+    _, info = env.step(Action(ee_pos=obs.ee_pos, ee_quat=DOWN))
+    assert set(obs.objects) == {"cube"} and not info.terminated
