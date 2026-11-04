@@ -16,6 +16,7 @@ and `np.random.default_rng([seed, 1])` (observation noise stream), nothing else.
 
 from __future__ import annotations
 
+import math
 import os
 import sys
 import warnings
@@ -54,6 +55,12 @@ TABLE_THICKNESS = 0.04
 DROP_Z = TABLE_TOP_Z - 0.05  # an object below this has fallen off the table: episode terminated
 EJECT_SPEED = 3.0  # m/s; a tabletop object moving faster than this was flung by the solver
 TCP_OFFSET = 0.1034  # metres from the hand frame to the fingertip pad centre, along hand z
+MAX_TIMESTEP = 0.0035  # s; physics step is the largest dt / n <= this (20 Hz control: 15 x 3.33 ms)
+# Gripper servo on the finger tendon (menagerie: kp 100, kv 10, i.e. ~1 N per finger on a 4 cm
+# cube, which let a 50-75 g cube slip out under transport accelerations). kp 1000 gives ~10 N
+# per finger on a 4 cm object, still well under the real Franka Hand's 70 N continuous force.
+GRIP_KP = 1000.0
+GRIP_KV = 20.0
 OBJECT_COLORS = [(0.85, 0.15, 0.15, 1), (0.15, 0.35, 0.85, 1), (0.95, 0.75, 0.1, 1), (0.2, 0.7, 0.3, 1)]
 
 
@@ -127,9 +134,10 @@ class MujocoEnv:
             raise NotImplementedError(
                 f"{rs.source}: only Franka-Panda-structured models (menagerie panda.xml naming) are supported"
             )
-        # Physics: 2 ms step. Elliptic friction cones + impratio 10 make grasps behave (pyramidal
-        # cones let a squeezed cube spin up until the sim blows up); larger steps lose grasps.
-        spec.option.timestep = 0.002
+        # Physics: the step divides the control period exactly (see MAX_TIMESTEP). Elliptic friction
+        # cones + impratio 10 make grasps behave.
+        dt = 1.0 / self.task.control_hz
+        spec.option.timestep = dt / int(np.ceil(dt / MAX_TIMESTEP - 1e-9))
         spec.option.cone = mujoco.mjtCone.mjCONE_ELLIPTIC
         spec.option.impratio = 10.0
         spec.option.tolerance = 1e-6
@@ -139,6 +147,17 @@ class MujocoEnv:
         for b in spec.bodies:  # gravity compensation on every robot body (the real arm has it)
             b.gravcomp = 1.0
         spec.add_exclude(bodyname1=p.base_body, bodyname2="world")  # base bolted to the table
+        # Fingertips: menagerie has the finger mesh, one 17 x 17 mm pad box and four 6 mm knob boxes
+        # per finger. The knobs doubled the contact count on a grasp (~16 -> ~8 contacts) for no
+        # behavioural gain we could measure, so only the mesh and the pad collide.
+        for fb in p.finger_bodies:
+            for g in spec.body(fb).geoms:
+                if g.type == mujoco.mjtGeom.mjGEOM_BOX and g.size[0] < 0.008 and g.contype:
+                    g.contype = g.conaffinity = 0
+        grip = spec.actuator(p.gripper_actuator)
+        lo, hi = grip.ctrlrange  # menagerie: 0..255 -> tendon length 0..0.04 m
+        grip.gainprm[0] = 0.04 * GRIP_KP / (hi - lo)
+        grip.biasprm[1], grip.biasprm[2] = -GRIP_KP, -GRIP_KV
         hand = spec.body(p.hand_body)
         if spec.site(rs.ee_site) is None:
             hand.add_site(name=rs.ee_site, pos=[0, 0, TCP_OFFSET], size=[0.004, 0, 0], rgba=[1, 0, 1, 0.6], group=4)
@@ -392,7 +411,7 @@ class MujocoEnv:
             return []
         # speed-limited reference toward the commanded pose
         delta = np.asarray(act.ee_pos, dtype=float) - self._ref_pos
-        n = np.linalg.norm(delta)
+        n = math.sqrt(delta @ delta)
         step = self.max_ee_speed * self.dt
         self._ref_pos = self._ref_pos + (delta if n <= step else delta / n * step)
         if act.ee_quat is not None:
@@ -402,7 +421,7 @@ class MujocoEnv:
                 target = -target
             err = np.zeros(3)
             mujoco.mju_subQuat(err, target, self._ref_quat)  # local-frame rotation ref -> target
-            ang = np.linalg.norm(err)
+            ang = math.sqrt(err @ err)
             lim = self.max_ee_ang_speed * self.dt
             if ang > lim:
                 err *= lim / ang
@@ -423,10 +442,10 @@ class MujocoEnv:
         return events
 
     def _fk(self, q: np.ndarray) -> None:
+        """Kinematics only (site poses) on the scratch data; mj_jacSite also needs mj_comPos."""
         s = self._scratch
         s.qpos[self._arm_q] = q
         mujoco.mj_kinematics(self.model, s)
-        mujoco.mj_comPos(self.model, s)
 
     def _ik(self, pos: np.ndarray, quat: np.ndarray, q0: np.ndarray) -> tuple[np.ndarray, float, float]:
         """Damped least squares on the tcp site, from seed q0. Returns (q, pos_err, rot_err)."""
@@ -446,9 +465,10 @@ class MujocoEnv:
             if qerr[0] < 0:
                 qerr *= -1  # shortest way round
             mujoco.mju_quat2Vel(e[3:], qerr, 1.0)
-            pe, re = float(np.linalg.norm(e[:3])), float(np.linalg.norm(e[3:]))
+            pe, re = math.sqrt(e[:3] @ e[:3]), math.sqrt(e[3:] @ e[3:])
             if (pe < 2e-4 and re < 2e-3) or it == self.ik_iters:
                 break
+            mujoco.mj_comPos(m, s)  # only when a Jacobian is needed (most solves stop at it 0-1)
             mujoco.mj_jacSite(m, s, self._jacp, self._jacr, site)
             J = np.concatenate([self._jacp[:, dofs], self._jacr[:, dofs]])
             # null-space pull toward home posture, first iteration only: the damped projector leaks

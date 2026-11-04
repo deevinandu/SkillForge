@@ -79,7 +79,8 @@ def test_model_loads_and_satisfies_protocol(env, plain_task):
     assert obs.gripper_width == pytest.approx(0.08, abs=1e-6)
     assert set(obs.objects) == {"cube"}
     assert obs.contact_force is not None and obs.contact_force.shape == (3,)
-    assert env.n_substeps == 25  # 20 Hz control on a 2 ms physics step
+    assert env.n_substeps == 15  # 20 Hz control on a 3.33 ms physics step
+    assert env.n_substeps * env.model.opt.timestep == pytest.approx(env.dt)  # exact control period
 
 
 def test_home_pose_holds_still(env):
