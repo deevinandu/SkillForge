@@ -44,8 +44,12 @@ def _classify(events: list[str], terminated: bool, timed_out: bool) -> tuple[Fai
     (ik_failure) explains a collision, a collision explains a slip, a slip explains a drop.
     Event names follow StepInfo's convention: 'ik_failure[:...]', 'collision[:a-b]',
     'grasp_slip[:obj]', 'grasp:<obj>', 'grasp_miss', 'release:<obj>'.
+    A sim artifact ('sim_unstable', 'object_ejected[:obj]': the physics, not the skill, is at
+    fault) outranks everything, so an improver is never told its skill caused it.
     Returns (tag, the event that decided it or '').
     """
+    if e := _first(events, lambda e: e == "sim_unstable" or e == "object_ejected" or e.startswith("object_ejected:")):
+        return "sim_artifact", e
     if e := _first(events, lambda e: e == "ik_failure" or e.startswith("ik_failure:")):
         return "ik_failure", e
     if e := _first(events, lambda e: e == "collision" or e.startswith("collision:")):
