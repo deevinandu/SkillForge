@@ -20,7 +20,7 @@ Edit = str | tuple[str, str] | Callable[[str], str]
 
 # Used by `skillforge forge --improver fake`: small, harmless tweaks to the scripted PickPlace.
 DEFAULT_SCRIPT: tuple[Edit, ...] = (
-    ("tol = 0.008", "tol = 0.006"),
+    ("tol = 0.006", "tol = 0.005"),
     ("settle_steps = 4", "settle_steps = 5"),
     ("hover = 0.10", "hover = 0.08"),
 )

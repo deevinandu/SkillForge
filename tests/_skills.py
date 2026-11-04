@@ -3,7 +3,7 @@
 from skillforge.contracts import SkillSource
 
 GOOD = '''
-from skillforge.skills.pick_place import PickPlace as _Base
+from skillforge.skills.pick_place_v01 import PickPlaceV01 as _Base
 
 class Skill(_Base):
     name = "t"
@@ -14,7 +14,7 @@ class Skill(_Base):
 PARTIAL = '''
 import numpy as np
 from skillforge.contracts import Action
-from skillforge.skills.pick_place import PickPlace as _Base
+from skillforge.skills.pick_place_v01 import PickPlaceV01 as _Base
 
 class Skill(_Base):
     name = "t"

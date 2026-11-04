@@ -14,7 +14,7 @@ from collections.abc import Sequence
 from datetime import datetime, timezone
 from pathlib import Path
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, model_validator
 
 from skillforge.contracts import EvalReport, SkillSource
 
@@ -41,6 +41,25 @@ class HistoryRound(BaseModel):
     round: int
     source: SkillSource
     report: EvalReport
+
+    @model_validator(mode="before")
+    @classmethod
+    def _from_agents_loop(cls, data: object) -> object:
+        """Accept agents.loop rounds, which carry version/rationale instead of the full source."""
+        if isinstance(data, dict) and "source" not in data and "version" in data and "report" in data:
+            rep = data["report"]
+            data = {
+                **data,
+                "source": {
+                    "name": rep.get("skill", "skill") if isinstance(rep, dict) else "skill",
+                    "version": data["version"],
+                    "code": "",
+                    "entrypoint": "",
+                    "rationale": data.get("rationale", ""),
+                    "parent_version": data.get("parent_version"),
+                },
+            }
+        return data
 
 
 def load_history(path_or_data: str | Path | Sequence[object]) -> list[HistoryRound]:

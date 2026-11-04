@@ -87,3 +87,28 @@ def test_dashboard_accepts_forge_rounds(stub_task):
     hist = forge(stub_task, pick_place_source(), NullImprover(), make_env, rounds=2, rollouts=5, target=1.01)
     html = render_dashboard(history=hist)
     assert "r0" in html and "r1" in html and "5/5" in html
+
+
+def test_dashboard_reads_agents_loop_history(tmp_path, stub_task):
+    """history.json written by agents.loop (version/rationale, no source) renders."""
+    from skillforge.eval.dashboard import load_history, render_dashboard
+    from skillforge.eval.harness import evaluate
+    from skillforge.sim import StubEnv
+    from skillforge.skills import PickPlace
+
+    rep, _ = evaluate(StubEnv, PickPlace(), stub_task, range(3))
+    doc = {
+        "schema": 1,
+        "rounds": [
+            {"round": 0, "version": "0.2.0", "parent_version": None, "rationale": "seed",
+             "accepted": True, "report": rep.model_dump(mode="json")},
+            {"round": 1, "version": "0.2.1", "parent_version": "0.2.0", "rationale": "tweak tol",
+             "accepted": True, "report": rep.model_dump(mode="json")},
+        ],
+    }
+    p = tmp_path / "history.json"
+    p.write_text(__import__("json").dumps(doc))
+    rounds = load_history(p)
+    assert [r.source.version for r in rounds] == ["0.2.0", "0.2.1"]
+    assert rounds[1].source.rationale == "tweak tol"
+    assert "0.2.1" in render_dashboard(history=p)

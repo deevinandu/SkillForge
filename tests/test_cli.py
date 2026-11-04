@@ -17,7 +17,7 @@ def test_cli_forge_with_fake_improver(tmp_path, capsys):
     (hist,) = (tmp_path / "forge").glob("*/history.json")
     doc = json.loads(hist.read_text())
     assert doc["meta"]["improver"] == "fake" and len(doc["rounds"]) == 2
-    assert (tmp_path / "lib" / "stub_pick_cube_to_bin" / "0.1.0" / "skill.py").exists()
+    assert (tmp_path / "lib" / "stub_pick_cube_to_bin" / "0.2.0" / "skill.py").exists()
 
 
 def test_cli_claude_without_key_exits_cleanly(tmp_path, monkeypatch, capsys):
@@ -29,7 +29,9 @@ def test_cli_claude_without_key_exits_cleanly(tmp_path, monkeypatch, capsys):
 
 def test_seed_skill_resolution(tmp_path):
     s = load_seed_skill("pick_place")
-    assert (s.name, s.version, s.entrypoint) == ("pick_place", "0.1.0", "PickPlace")
+    assert (s.name, s.version, s.entrypoint) == ("pick_place", "0.2.0", "PickPlace")
+    s = load_seed_skill("pick_place_v01")
+    assert (s.name, s.version, s.entrypoint) == ("pick_place", "0.1.0", "PickPlaceV01")
     f = tmp_path / "my_skill.py"
     f.write_text("class A:\n    def reset(self, t): pass\n    def act(self, o): pass\n")
     assert load_seed_skill(str(f)).entrypoint == "A"
