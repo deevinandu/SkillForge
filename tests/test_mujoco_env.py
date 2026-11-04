@@ -17,6 +17,7 @@ from skillforge.eval import evaluate  # noqa: E402
 from skillforge.sim import is_success, make_env  # noqa: E402
 from skillforge.sim.assets import AssetError, resolve_robot_source  # noqa: E402
 from skillforge.skills import PickPlace  # noqa: E402
+from skillforge.skills.pick_place_v01 import PickPlaceV01  # noqa: E402
 
 TASKS = Path(__file__).parent.parent / "tasks"
 
@@ -298,7 +299,7 @@ def test_ik_failure_event_on_unreachable_target(env):
 
 
 def test_grasp_slip_when_object_pulled_away(env, plain_task):
-    sk = PickPlace()
+    sk = PickPlaceV01()  # uses the v0.1 phase attribute
     obs = env.reset(0)
     sk.reset(plain_task)
     events = []
