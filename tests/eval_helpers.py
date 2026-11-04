@@ -9,12 +9,15 @@ from skillforge.sim import StubEnv
 
 
 def pick_place_source(version: str = "0.1.0", **overrides) -> SkillSource:
-    """PickPlace as a SkillSource; `overrides` patch class attributes (e.g. tol=0.03)."""
-    code = inspect.getsource(skills.pick_place)
+    """PickPlace v0.1 as a SkillSource; `overrides` patch class attributes (e.g. tol=0.03).
+
+    v0.1 is the simple scripted skill, so tests can perturb it predictably.
+    """
+    code = inspect.getsource(skills.pick_place_v01)
     code = code.replace('version = "0.1.0"', f'version = "{version}"')
     for k, v in overrides.items():
-        code += f"\nPickPlace.{k} = {v!r}\n"
-    return SkillSource(name="pick_place", version=version, code=code, entrypoint="PickPlace")
+        code += f"\nPickPlaceV01.{k} = {v!r}\n"
+    return SkillSource(name="pick_place", version=version, code=code, entrypoint="PickPlaceV01")
 
 
 def noisy(task: TaskSpec, noise_hi: float = 0.015) -> TaskSpec:

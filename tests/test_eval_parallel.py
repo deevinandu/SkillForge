@@ -48,7 +48,7 @@ def test_pool_reuse_across_tasks_and_skills(stub_task):
 
 def test_crashing_skill_in_workers_is_a_failure(stub_task):
     src = pick_place_source()
-    boom = src.model_copy(update={"code": src.code + "\nPickPlace.act = lambda self, obs: 1 / 0\n"})
+    boom = src.model_copy(update={"code": src.code + "\nPickPlaceV01.act = lambda self, obs: 1 / 0\n"})
     report, _ = evaluate_parallel(StubEnv, boom, stub_task, range(6), workers=2)
     assert report.failure_counts == {"exception": 6}
 

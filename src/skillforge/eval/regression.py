@@ -221,6 +221,10 @@ def source_of(cls: type) -> SkillSource:
     )
 
 
+def _version_key(v: str) -> tuple:
+    return tuple(int(p) if p.isdigit() else p for p in v.split("."))
+
+
 def library_sources() -> dict[str, SkillSource]:
     """Skills currently exported by `skillforge.skills`, keyed by skill name.
 
@@ -238,7 +242,9 @@ def library_sources() -> dict[str, SkillSource]:
                 continue
             if isinstance(inst, Skill):
                 src = source_of(obj)
-                out[src.name] = src
+                prev = out.get(src.name)
+                if prev is None or _version_key(src.version) > _version_key(prev.version):
+                    out[src.name] = src  # several classes may share a name; keep the newest
     return out
 
 
