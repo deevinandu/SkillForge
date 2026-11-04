@@ -9,11 +9,16 @@
 Seed plan (disjoint on purpose): teacher data 0.., DAgger round r at 100000*r.., evaluation at
 1000000.. by default. Typical run on a 4-CPU box::
 
-  python -m skillforge.learning collect --name franka_v02 --seeds 600
-  python -m skillforge.learning collect --name franka_v02 --seeds 600 --seed-start 50000 --dart 0.015
-  python -m skillforge.learning train --data franka_v02 --out runs/policies/bc/policy.pt
-  python -m skillforge.learning dagger --data franka_v02 --policy runs/policies/bc/policy.pt --rounds 3
-  python -m skillforge.learning eval --policy runs/policies/bc_dagger_r3/policy.pt --seeds 200
+  python -m skillforge.learning collect --name franka_v02 --seeds 1000
+  python -m skillforge.learning collect --name franka_v02_dart --seeds 1000 --seed-start 50000 --dart 0.015
+  python -m skillforge.learning train --data franka_v02 --out runs/policies/bc_plain/policy.pt
+  python -m skillforge.learning train --data franka_v02 franka_v02_dart --out runs/policies/bc_dart/policy.pt
+  cp -r runs/datasets/franka_v02 runs/datasets/franka_v02_dagger   # DAgger aggregates into a copy
+  python -m skillforge.learning dagger --data franka_v02_dagger --policy runs/policies/bc_plain/policy.pt --rounds 2 --seeds 300
+  python -m skillforge.learning eval --policy runs/policies/bc_plain/policy.pt --seeds 500 --seed-start 2000000
+
+`eval` caches the teacher's results under runs/compare_cache/ (keyed on teacher code, task,
+seeds and the sim backend's source), so comparing several policies re-runs only the learner.
 """
 
 from __future__ import annotations
