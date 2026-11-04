@@ -1,0 +1,21 @@
+{
+  "id": "stub_pick_cube_to_bin",
+  "instruction": "Pick up the red cube and put it in the bin.",
+  "scene": {
+    "robot": {"name": "point_gripper", "source": "stub"},
+    "objects": [
+      {"name": "cube", "shape": "box", "size": [0.02, 0.02, 0.02], "pose": {"pos": [0.5, -0.1, 0.02]}}
+    ],
+    "regions": [
+      {"name": "bin", "center": [0.5, 0.2, 0.02], "half_extents": [0.05, 0.05, 0.03]}
+    ],
+    "randomization": {
+      "object_xy_jitter": {"lo": 0.0, "hi": 0.05},
+      "obs_noise_std": {"lo": 0.0, "hi": 0.004},
+      "action_latency_steps": {"lo": 0, "hi": 2}
+    }
+  },
+  "success": {"kind": "object_in_region", "object": "cube", "region": "bin"},
+  "max_steps": 300,
+  "control_hz": 20
+}
