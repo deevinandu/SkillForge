@@ -1,7 +1,7 @@
 """`skillforge` command line. Currently one subcommand:
 
     skillforge forge tasks/X.json --seed-skill pick_place --rounds 8 --rollouts 100 \\
-        --improver claude|fake|null [--budget-usd 5]
+        --improver claude|claude-code|fake|null [--budget-usd 5]
 
 Prints one line per round and writes runs/forge/<timestamp>/history.json (schema in
 skillforge.agents.loop) plus every evaluated version under runs/library/<task_id>/.
@@ -53,6 +53,17 @@ def make_improver(kind: str, args: argparse.Namespace):
         return NullImprover()
     if kind == "fake":
         return FakeImprover()
+    if kind == "claude-code":
+        from skillforge.agents.claude_code import ClaudeCodeImprover
+
+        return ClaudeCodeImprover(
+            model=args.model,
+            budget_usd=args.budget_usd,
+            per_call_budget_usd=args.per_call_budget_usd,
+            make_env=args.env,
+            dev_seeds=args.dev_seeds,
+            workdir=Path(args.out).parent / "claude_code",
+        )
     return ClaudeImprover(model=args.model, budget_usd=args.budget_usd, make_env=args.env)
 
 
@@ -90,7 +101,7 @@ def cmd_forge(args: argparse.Namespace) -> int:
         "task_file": str(args.task),
         "seed_skill": args.seed_skill,
         "improver": args.improver,
-        "model": args.model if args.improver == "claude" else None,
+        "model": args.model if args.improver in ("claude", "claude-code") else None,
         "rounds": args.rounds,
         "rollouts": args.rollouts,
         "target": args.target,
@@ -134,9 +145,12 @@ def build_parser() -> argparse.ArgumentParser:
     f.add_argument("--rounds", type=int, default=8, help="evaluations, seed included")
     f.add_argument("--rollouts", type=int, default=100, help="seeds per evaluation (the same seeds every round)")
     f.add_argument("--target", type=float, default=0.9, help="stop once an accepted version reaches this success rate")
-    f.add_argument("--improver", choices=("claude", "fake", "null"), default="claude")
+    f.add_argument("--improver", choices=("claude", "claude-code", "fake", "null"), default="claude",
+                   help="claude: Anthropic API (needs ANTHROPIC_API_KEY); claude-code: headless Claude Code CLI, no API key")
     f.add_argument("--model", default="claude-opus-5-5")
     f.add_argument("--budget-usd", type=float, default=None, help="hard cap on estimated API spend")
+    f.add_argument("--per-call-budget-usd", type=float, default=5.0, help="claude-code: cap per agent session")
+    f.add_argument("--dev-seeds", type=int, default=30, help="claude-code: dev seeds the agent may evaluate on (disjoint from gate seeds)")
     f.add_argument("--timeout", type=float, default=600.0, help="sandbox wall-clock limit per evaluation, seconds")
     f.add_argument("--env", default="skillforge.sim:make_env", help="env factory as module:attr")
     f.add_argument("--library", default="runs/library")
