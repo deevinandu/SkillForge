@@ -278,6 +278,29 @@ def test_grasp_event_and_scripted_pick(env, plain_task):
     assert not [e for e in events if e.startswith("collision") or e == "ik_failure"]
 
 
+def test_grip_force_is_realistic(env, plain_task):
+    # ~10 N per finger on the 4 cm cube (menagerie default was ~1 N; the real hand does 70 N)
+    sk = PickPlace()
+    obs = env.reset(0)
+    sk.reset(plain_task)
+    for _ in range(plain_task.max_steps):
+        obs, info = env.step(sk.act(obs))
+        if any(e.startswith("grasp:") for e in info.events):
+            break
+    _, _, _ = hold(env, obs, 4, gripper=1.0)
+    m, d = env.model, env.data
+    f = np.zeros(6)
+    normal = {b: 0.0 for b in env._finger_bodies}
+    for i in range(d.ncon):
+        b1, b2 = m.geom_bodyid[d.contact.geom[i]]
+        fb = b1 if b1 in normal else b2 if b2 in normal else None
+        if fb is not None and m.body("cube").id in (b1, b2):
+            mujoco.mj_contactForce(m, d, i, f)
+            normal[fb] += f[0]
+    print("finger normal forces (N):", normal)
+    assert all(5.0 < n < 30.0 for n in normal.values()), normal
+
+
 def test_collision_event_when_pushing_into_table(env):
     obs = env.reset(0)
     target = np.array([0.45, 0.25, -0.05])  # below the table top, away from the cube
