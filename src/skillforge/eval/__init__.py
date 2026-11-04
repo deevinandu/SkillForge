@@ -1,5 +1,10 @@
-"""T4: evaluation, robustness and regression."""
+"""T4: evaluation, robustness and regression.
 
-from .harness import evaluate, run_episode, wilson
+Light imports only: `parallel`, `robustness`, `regression`, `video`, `dashboard` are
+submodules, imported on use (forge.py imports this package).
+"""
 
-__all__ = ["evaluate", "run_episode", "wilson"]
+from .harness import evaluate, run_episode, summarize, wilson
+from .parallel import EvalPool, evaluate_parallel
+
+__all__ = ["EvalPool", "evaluate", "evaluate_parallel", "run_episode", "summarize", "wilson"]

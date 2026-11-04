@@ -13,13 +13,17 @@ dependencies = ["pydantic>=2.6", "numpy>=1.26"]
 sim = ["mujoco>=3.2"]
 agents = ["anthropic>=0.40", "claude-agent-sdk"]
 learning = ["torch>=2.3"]
-dev = ["pytest>=8", "ruff>=0.5"]
+video = ["imageio>=2.31", "pillow>=10"]
+dev = ["pytest>=8", "ruff>=0.5", "imageio>=2.31", "pillow>=10"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = [
+    "regression: pinned-seed regression suite against stored baselines (tests/regression/baselines)",
+]
 
 [tool.ruff]
 line-length = 100
