@@ -91,8 +91,9 @@ def main(req_path: str, out_path: str) -> int:
         write({"ok": True, "stage": "check"})
         return 0
 
-    report, _ = evaluate(make_env, skill, task, req["seeds"], max_failures=int(req.get("max_failures", 20)))
-    write({"ok": True, "stage": "eval", "report": json.loads(report.model_dump_json())})
+    report, eps = evaluate(make_env, skill, task, req["seeds"], max_failures=int(req.get("max_failures", 20)))
+    outcomes = [[int(e.seed), bool(e.success)] for e in eps]  # per seed, for the paired gate
+    write({"ok": True, "stage": "eval", "report": json.loads(report.model_dump_json()), "outcomes": outcomes})
     return 0
 
 

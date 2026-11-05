@@ -1,5 +1,14 @@
 """The full forge loop: sandboxed eval, keep-the-best gate, optional critic, library, budget.
 
+Gate (`gate=`): every round is scored on the SAME gate seeds 0..rollouts-1, so a candidate is
+compared with the best version seed by seed.
+- 'paired' (default): accept only if the candidate solves more gate seeds than the best AND a
+  one-sided exact McNemar test on the discordant seeds gives p < `alpha` (default 0.1). See
+  `library.passes_paired_gate`.
+- 'ci' (legacy): accept unless the candidate's rate is below the best's 95% CI lower bound. It
+  let no-gain versions through (hard task 2026-11-04, round 1: +11/-7 seeds, p 0.24, accepted).
+Paired counts are recorded for every evaluated round under either rule.
+
 `skillforge.forge.forge()` delegates here; the CLI calls it directly to get the extras.
 
 history.json schema (read by T4's dashboard), written after every round:
@@ -9,13 +18,19 @@ history.json schema (read by T4's dashboard), written after every round:
   "stopped": "target" | "rounds" | "budget" | null (still running),
   "best_version", "best_success_rate",
   "usage_total": {input_tokens, output_tokens, cache_creation_input_tokens, cache_read_input_tokens, usd, calls},
+  "gate": {"rule": "paired" | "ci", "alpha"},
   "rounds": [{
     "round", "version", "parent_version", "rationale", "accepted", "reason", "critic",
     "sandbox_stage", "sandbox_error", "eval_wall_s",
     "report": EvalReport,
+    "success_seeds": [gate seeds this version solved] | null (not evaluated this round),
+    "paired": {"vs_version", "n", "both", "best_only", "cand_only", "neither", "p_value"} | null
+              (candidate vs the best at the time; null for the seed and unevaluated rounds),
     "usage": {...same keys as usage_total, this round only}, "usd_total"
   }]
 }
+"gate" and the per-round "success_seeds"/"paired" were added after schema /1 shipped; readers
+must treat them as optional.
 """
 
 from __future__ import annotations
@@ -31,7 +46,15 @@ from pydantic import BaseModel, Field
 from skillforge.contracts import EvalReport, SimEnv, SkillImprover, SkillSource, TaskSpec
 
 from .budget import BudgetExceeded
-from .library import SkillLibrary, bump_version, passes_gate
+from .library import (
+    DEFAULT_ALPHA,
+    GATE_RULES,
+    PairedComparison,
+    SkillLibrary,
+    bump_version,
+    passes_gate,
+    passes_paired_gate,
+)
 from .sandbox import evaluate_source
 
 _ZERO = {
@@ -56,6 +79,8 @@ class RoundRecord(BaseModel):
     eval_wall_s: float = 0.0
     usage: dict[str, float] = Field(default_factory=lambda: dict(_ZERO))
     usd_total: float = 0.0
+    outcomes: dict[int, bool] | None = None  # gate seed -> success; None if not evaluated this round
+    paired: dict | None = None  # PairedComparison.as_dict() + vs_version, vs the best at the time
 
 
 class LoopResult(BaseModel):
@@ -87,8 +112,15 @@ def run_loop(
     history_path: str | Path | None = None,
     on_round: Callable[[RoundRecord], None] | None = None,
     meta: dict | None = None,
+    gate: str = "paired",
+    alpha: float = DEFAULT_ALPHA,
 ) -> LoopResult:
-    """`rounds` counts evaluations, seed included. Every round uses the SAME seeds."""
+    """`rounds` counts evaluations, seed included. Every round uses the SAME seeds.
+
+    `gate` is 'paired' (default) or 'ci' (legacy); `alpha` is the paired gate's significance level.
+    """
+    if gate not in GATE_RULES:
+        raise ValueError(f"gate must be one of {GATE_RULES}, got {gate!r}")
     seeds = list(range(rollouts))
     started = datetime.now(timezone.utc).isoformat(timespec="seconds")
     used: set[str] = set()
@@ -113,6 +145,7 @@ def run_loop(
             "best_version": best.source.version if best else None,
             "best_success_rate": best.report.success_rate if best else None,
             "usage_total": _usage(improver),
+            "gate": {"rule": gate, "alpha": alpha},
             "rounds": [
                 {
                     "round": h.round,
@@ -126,6 +159,8 @@ def run_loop(
                     "sandbox_error": h.sandbox_error,
                     "eval_wall_s": h.eval_wall_s,
                     "report": json.loads(h.report.model_dump_json()),
+                    "success_seeds": None if h.outcomes is None else sorted(s for s, ok in h.outcomes.items() if ok),
+                    "paired": h.paired,
                     "usage": h.usage,
                     "usd_total": h.usd_total,
                 }
@@ -144,6 +179,12 @@ def run_loop(
         history.append(rec)
         if store and library is not None:
             library.add(rec.source, rec.report, rec.accepted, note=rec.reason)
+        tell = getattr(improver, "record_outcome", None)  # optional: lets an improver learn the verdict
+        if store and rec.round > 0 and callable(tell):
+            try:
+                tell(rec.source.version, rec.accepted, rec.reason)
+            except Exception:
+                pass
         write(None)
         if on_round:
             on_round(rec)
@@ -158,7 +199,7 @@ def run_loop(
     finish(
         RoundRecord(
             round=0, source=seed, report=res.report, accepted=True, reason="seed",
-            sandbox_stage=res.stage, sandbox_error=res.error, eval_wall_s=res.wall_s,
+            sandbox_stage=res.stage, sandbox_error=res.error, eval_wall_s=res.wall_s, outcomes=res.outcomes,
         ),
         u0,
     )
@@ -193,15 +234,26 @@ def run_loop(
         res = evaluate(cand)
         rec = RoundRecord(
             round=r, source=cand, report=res.report, accepted=False, reason="",
-            sandbox_stage=res.stage, sandbox_error=res.error, eval_wall_s=res.wall_s,
+            sandbox_stage=res.stage, sandbox_error=res.error, eval_wall_s=res.wall_s, outcomes=res.outcomes,
         )
+        paired_ok, cmp = passes_paired_gate(best.outcomes, res.outcomes, alpha) if best.outcomes else (False, None)
+        if cmp is not None:
+            rec.paired = {"vs_version": best.source.version, **cmp.as_dict()}
         if not res.ok:
             rec.reason = f"sandbox {res.stage}"
-        elif not passes_gate(best.report, res.report):
-            lo = best.report.ci95[0]
-            rec.reason = f"regression: {res.report.success_rate:.0%} < best {best.source.version} CI lower bound {lo:.0%}"
+        elif gate == "ci":
+            if not passes_gate(best.report, res.report):
+                lo = best.report.ci95[0]
+                rec.reason = f"regression: {res.report.success_rate:.0%} < best {best.source.version} CI lower bound {lo:.0%}"
+            else:
+                rec.accepted, rec.reason = True, "passes keep-the-best gate (ci)"
+        elif cmp is None:
+            raise RuntimeError("paired gate needs per-seed outcomes for the best version")
+        elif not paired_ok:
+            rec.reason = _paired_reject(cmp, best.source.version, alpha)
         else:
-            rec.accepted, rec.reason = True, "passes keep-the-best gate"
+            rec.accepted, rec.reason = True, f"passes paired gate vs {best.source.version}: {cmp.short()} < {alpha:g}"
+        if rec.accepted:
             if review is not None:
                 try:
                     ok, why = review(task, current, cur_report, cand, res.report)
@@ -226,6 +278,12 @@ def run_loop(
 
     write(stopped)
     return LoopResult(task_id=task.id, rounds=history, best=best, stopped=stopped)
+
+
+def _paired_reject(cmp: PairedComparison, vs: str, alpha: float) -> str:
+    if cmp.cand_only < cmp.best_only:
+        return f"regression: {cmp.short()} seeds vs best {vs}"
+    return f"no significant gain vs {vs}: {cmp.short()} (alpha {alpha:g})"
 
 
 def _best(history: list[RoundRecord]) -> RoundRecord | None:

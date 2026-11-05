@@ -1,7 +1,7 @@
 """`skillforge` command line. Currently one subcommand:
 
     skillforge forge tasks/X.json --seed-skill pick_place --rounds 8 --rollouts 100 \\
-        --improver claude|claude-code|fake|null [--budget-usd 5]
+        --improver claude|claude-code|fake|null [--budget-usd 5] [--gate paired|ci --gate-alpha 0.1]
 
 Prints one line per round and writes runs/forge/<timestamp>/history.json (schema in
 skillforge.agents.loop) plus every evaluated version under runs/library/<task_id>/.
@@ -73,11 +73,13 @@ def _fmt_round(rec) -> str:
     top = ", ".join(f"{k}={v}" for k, v in sorted(rep.failure_counts.items(), key=lambda kv: -kv[1])[:3]) or "none"
     mark = "ACCEPT" if rec.accepted else "reject"
     u = rec.usage
+    pc = rec.paired
+    pair = f"  paired vs {pc['vs_version']} +{pc['cand_only']}/-{pc['best_only']} p={pc['p_value']:.3g}" if pc else ""
     tok = f" tok in/out {int(u['input_tokens'] + u['cache_read_input_tokens'] + u['cache_creation_input_tokens'])}/{int(u['output_tokens'])}" if u.get("calls") else ""
     return (
         f"round {rec.round:>2}  {rec.source.version:<12} {rep.n_success:>4}/{rep.n_rollouts:<4} "
         f"{rep.success_rate:>4.0%} [{lo:.0%}-{hi:.0%}]  {mark:<6} {rec.reason[:60]:<60} "
-        f"fails: {top}{tok}  ${rec.usd_total:.4f}"
+        f"fails: {top}{pair}{tok}  ${rec.usd_total:.4f}"
     )
 
 
@@ -108,6 +110,9 @@ def cmd_forge(args: argparse.Namespace) -> int:
         "budget_usd": args.budget_usd,
         "timeout_s": args.timeout,
         "env": args.env,
+        "gate": args.gate,
+        "gate_alpha": args.gate_alpha,
+        "per_call_budget_usd": args.per_call_budget_usd if args.improver == "claude-code" else None,
     }
     print(f"forge {task.id}: seed {seed.name}@{seed.version}, improver {args.improver}, -> {out}/history.json")
     result = run_loop(
@@ -123,6 +128,8 @@ def cmd_forge(args: argparse.Namespace) -> int:
         history_path=out / "history.json",
         on_round=lambda rec: print(_fmt_round(rec), flush=True),
         meta=meta,
+        gate=args.gate,
+        alpha=args.gate_alpha,
     )
     b = result.best
     print(f"stopped: {result.stopped}; best {b.source.version}: {b.report.summary()}")
@@ -151,6 +158,10 @@ def build_parser() -> argparse.ArgumentParser:
     f.add_argument("--budget-usd", type=float, default=None, help="hard cap on estimated API spend")
     f.add_argument("--per-call-budget-usd", type=float, default=5.0, help="claude-code: cap per agent session")
     f.add_argument("--dev-seeds", type=int, default=30, help="claude-code: dev seeds the agent may evaluate on (disjoint from gate seeds)")
+    f.add_argument("--gate", choices=("paired", "ci"), default="paired",
+                   help="paired: more gate seeds solved than the best AND one-sided exact McNemar p < --gate-alpha; "
+                        "ci: legacy, accept unless below the best's 95%% CI lower bound")
+    f.add_argument("--gate-alpha", type=float, default=0.1, help="significance level of the paired gate")
     f.add_argument("--timeout", type=float, default=600.0, help="sandbox wall-clock limit per evaluation, seconds")
     f.add_argument("--env", default="skillforge.sim:make_env", help="env factory as module:attr")
     f.add_argument("--library", default="runs/library")

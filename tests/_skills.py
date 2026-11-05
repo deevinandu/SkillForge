@@ -32,6 +32,10 @@ class Skill(_Base):
         return super().act(obs)
 '''
 
+# Like PARTIAL but gives up on a different half of the seeds (first observed x below nominal): about
+# the same success rate, different seeds. A rate-only gate cannot tell it from PARTIAL; a paired one can.
+SWAPPED = PARTIAL.replace("obs.objects[self.obj].pos[1] < -0.1", "obs.objects[self.obj].pos[0] < 0.5")
+
 NOOP = '''
 from skillforge.contracts import Action
 

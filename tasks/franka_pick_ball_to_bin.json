@@ -1,0 +1,31 @@
+{
+  "id": "franka_pick_ball_to_bin",
+  "instruction": "Pick up the ball and put it in the bin.",
+  "scene": {
+    "robot": {
+      "name": "franka_panda",
+      "source": "menagerie:franka_emika_panda",
+      "ee_site": "tcp",
+      "gripper": "parallel",
+      "max_gripper_width": 0.08
+    },
+    "objects": [
+      {"name": "ball", "shape": "sphere", "size": [0.022, 0.0, 0.0], "mass": 0.1, "friction": 1.0,
+       "pose": {"pos": [0.5, -0.15, 0.022]}}
+    ],
+    "regions": [
+      {"name": "bin", "center": [0.6, 0.25, 0.03], "half_extents": [0.04, 0.04, 0.03]}
+    ],
+    "randomization": {
+      "object_xy_jitter": {"lo": 0.0, "hi": 0.12},
+      "friction_scale": {"lo": 0.4, "hi": 1.0},
+      "mass_scale": {"lo": 0.7, "hi": 1.5},
+      "actuator_gain_scale": {"lo": 0.6, "hi": 1.4},
+      "obs_noise_std": {"lo": 0.0, "hi": 0.012},
+      "action_latency_steps": {"lo": 0, "hi": 5}
+    }
+  },
+  "success": {"kind": "object_in_region", "object": "ball", "region": "bin"},
+  "max_steps": 300,
+  "control_hz": 20
+}

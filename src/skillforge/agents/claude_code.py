@@ -203,7 +203,10 @@ class ClaudeCodeImprover:
     def _workspace(self, task: TaskSpec, current: SkillSource) -> Path:
         stamp = time.strftime("%Y%m%dT%H%M%S")
         if self.workdir:
-            ws = self.workdir / task.id / f"{stamp}-{current.version}"
+            base = self.workdir / task.id / f"{stamp}-{current.version}"
+            ws, n = base, 1
+            while ws.exists():  # a rejected round re-proposes from the same version, maybe within a second
+                ws, n = base.with_name(f"{base.name}-{n}"), n + 1
             ws.mkdir(parents=True, exist_ok=False)
         else:
             ws = Path(tempfile.mkdtemp(prefix=f"sf-{task.id}-{current.version}-"))
@@ -233,7 +236,7 @@ class ClaudeCodeImprover:
         script.chmod(0o755)
         notes = ""
         if self.notes:
-            notes = "\nEarlier attempts in this run (learn from them):\n" + "\n".join(f"- {n}" for n in self.notes[-6:]) + "\n"
+            notes = "\nEarlier attempts in this run (learn from them):\n" + "\n".join(f"- {n}" for n in self.notes[-10:]) + "\n"
         return INSTRUCTIONS.format(
             name=current.name,
             version=current.version,
@@ -289,6 +292,10 @@ class ClaudeCodeImprover:
         return res
 
     # -- SkillImprover ---------------------------------------------------------
+
+    def record_outcome(self, version: str, accepted: bool, reason: str) -> None:
+        """Called by `run_loop` after the gate: the verdict goes into the next round's notes."""
+        self.notes.append(f"{version} gate verdict: {'ACCEPTED' if accepted else 'REJECTED'} ({reason[:200]})")
 
     def propose(self, task: TaskSpec, current: SkillSource, report: EvalReport) -> SkillSource:
         new_version = bump_version(current.version)

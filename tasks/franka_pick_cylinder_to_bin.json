@@ -1,0 +1,32 @@
+{
+  "id": "franka_pick_cylinder_to_bin",
+  "instruction": "Pick up the tall red cylinder and put it in the small bin.",
+  "scene": {
+    "robot": {
+      "name": "franka_panda",
+      "source": "menagerie:franka_emika_panda",
+      "ee_site": "tcp",
+      "gripper": "parallel",
+      "max_gripper_width": 0.08
+    },
+    "objects": [
+      {"name": "can", "shape": "cylinder", "size": [0.02, 0.04, 0.0], "mass": 0.15, "friction": 1.0,
+       "pose": {"pos": [0.5, -0.15, 0.04]}}
+    ],
+    "regions": [
+      {"name": "bin", "center": [0.62, 0.25, 0.04], "half_extents": [0.035, 0.035, 0.04]}
+    ],
+    "randomization": {
+      "object_xy_jitter": {"lo": 0.0, "hi": 0.12},
+      "object_yaw_jitter": {"lo": 0.0, "hi": 0.785},
+      "friction_scale": {"lo": 0.3, "hi": 0.8},
+      "mass_scale": {"lo": 0.7, "hi": 1.5},
+      "actuator_gain_scale": {"lo": 0.6, "hi": 1.4},
+      "obs_noise_std": {"lo": 0.0, "hi": 0.012},
+      "action_latency_steps": {"lo": 0, "hi": 5}
+    }
+  },
+  "success": {"kind": "object_in_region", "object": "can", "region": "bin"},
+  "max_steps": 300,
+  "control_hz": 20
+}

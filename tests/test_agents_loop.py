@@ -1,6 +1,7 @@
 import json
 
-from _skills import BROKEN, GOOD, HANG, NOOP, PARTIAL, src
+import pytest
+from _skills import BROKEN, GOOD, HANG, NOOP, PARTIAL, SWAPPED, src
 
 from skillforge.agents import BudgetExceeded, FakeImprover, SkillLibrary, run_loop
 from skillforge.agents.fake import DEFAULT_SCRIPT
@@ -47,7 +48,7 @@ def test_loop_respects_sandbox_timeout(stub_task):
         rounds=3, rollouts=5, target=1.01, timeout_s=3,
     )
     assert res.rounds[1].sandbox_stage == "timeout" and not res.rounds[1].accepted
-    assert res.rounds[2].accepted  # the loop carried on after the timeout
+    assert res.rounds[2].sandbox_stage == "eval" and res.rounds[2].report.n_success == 5  # carried on
 
 
 def test_critic_can_revert(stub_task):
@@ -87,6 +88,44 @@ def test_forge_spine_is_sandboxed_and_gated(stub_task):
     assert [h.source.version for h in hist] == ["0.1.0", "0.1.1", "0.1.2"]
     assert hist[1].report.success_rate == 0.0 and hist[2].report.success_rate == 1.0
     assert hist[2].source.parent_version == "0.1.0"  # NOOP was rejected, so GOOD grew from the seed
+
+
+def test_paired_gate_rejects_a_same_rate_different_seeds_candidate(stub_task, tmp_path):
+    kw = dict(rounds=3, rollouts=40, target=1.01)
+    hist = tmp_path / "h.json"
+    res = run_loop(stub_task, src(PARTIAL), FakeImprover([SWAPPED, GOOD]), make_env, history_path=hist, **kw)
+    r = res.rounds
+    assert not r[1].accepted and r[1].paired["best_only"] > 0 and r[1].paired["cand_only"] > 0
+    assert r[1].paired["p_value"] >= 0.1 and r[1].reason.startswith(("no significant gain", "regression"))
+    assert r[2].accepted and r[2].reason.startswith("passes paired gate vs 0.1.0")
+    assert r[2].paired["best_only"] == 0 and r[2].paired["vs_version"] == "0.1.0"
+    doc = json.loads(hist.read_text())
+    assert doc["gate"] == {"rule": "paired", "alpha": 0.1}
+    assert doc["rounds"][0]["paired"] is None and len(doc["rounds"][0]["success_seeds"]) == r[0].report.n_success
+    assert doc["rounds"][1]["paired"]["cand_only"] == r[1].paired["cand_only"]
+
+    # the legacy rule lets the same no-gain candidate through, and still records the paired counts
+    legacy = run_loop(stub_task, src(PARTIAL), FakeImprover([SWAPPED]), make_env, gate="ci", **{**kw, "rounds": 2})
+    assert legacy.rounds[1].accepted and legacy.rounds[1].paired["p_value"] >= 0.1
+
+
+def test_loop_rejects_unknown_gate(stub_task):
+    with pytest.raises(ValueError, match="gate"):
+        run_loop(stub_task, src(PARTIAL), FakeImprover([]), make_env, gate="vibes")
+
+
+def test_loop_tells_the_improver_the_verdict(stub_task):
+    class Listening(FakeImprover):
+        def __init__(self, script):
+            super().__init__(script)
+            self.heard = []
+
+        def record_outcome(self, version, accepted, reason):
+            self.heard.append((version, accepted))
+
+    imp = Listening([NOOP, GOOD])
+    run_loop(stub_task, src(PARTIAL), imp, make_env, rounds=3, rollouts=10, target=1.01)
+    assert imp.heard == [("0.1.1", False), ("0.1.2", True)]
 
 
 def test_default_fake_script_applies_to_pick_place():

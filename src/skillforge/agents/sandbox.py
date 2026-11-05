@@ -46,6 +46,7 @@ class SandboxResult:
     error: str = ""
     report: EvalReport | None = None
     wall_s: float = 0.0
+    outcomes: dict[int, bool] | None = None  # eval only: seed -> success, every seed (not a sample)
 
 
 def env_ref(make_env: Callable[[TaskSpec], SimEnv] | str) -> str:
@@ -100,7 +101,8 @@ def _run(req: dict, timeout_s: float) -> SandboxResult:
             return SandboxResult(False, "crash", f"sandbox exited {proc.returncode} without a result:\n{tail}", wall_s=wall)
         res = json.loads(out_path.read_text())
     report = EvalReport.model_validate(res["report"]) if res.get("report") else None
-    return SandboxResult(res["ok"], res["stage"], res.get("error", ""), report, wall)
+    outcomes = {int(s): bool(ok) for s, ok in res["outcomes"]} if res.get("outcomes") is not None else None
+    return SandboxResult(res["ok"], res["stage"], res.get("error", ""), report, wall, outcomes)
 
 
 def _kill(proc: subprocess.Popen) -> None:
@@ -143,12 +145,15 @@ def evaluate_source(
     max_failures: int = 20,
     max_memory: int | None = DEFAULT_MAX_MEMORY,
 ) -> SandboxResult:
-    """Run T4's `evaluate` on the skill in a subprocess. `result.report` is always set."""
+    """Run T4's `evaluate` on the skill in a subprocess. `result.report` is always set, and so is
+    `result.outcomes` (seed -> success; all False when the sandbox failed)."""
     seeds = list(seeds)
     req = _request("eval", task, src, make_env, max_memory, seeds=seeds, max_failures=max_failures)
     res = _run(req, timeout_s)
     if res.report is None:
         res.report = failure_report(task, src, seeds, f"sandbox {res.stage}: {res.error}")
+    if res.outcomes is None or not res.ok:
+        res.outcomes = {s: False for s in seeds}
     return res
 
 

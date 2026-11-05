@@ -17,6 +17,8 @@ def test_cli_forge_with_fake_improver(tmp_path, capsys):
     (hist,) = (tmp_path / "forge").glob("*/history.json")
     doc = json.loads(hist.read_text())
     assert doc["meta"]["improver"] == "fake" and len(doc["rounds"]) == 2
+    assert doc["meta"]["gate"] == "paired" and doc["gate"]["alpha"] == 0.1
+    assert "paired vs 0.2.0 +" in out and " p=" in out  # the round line shows the paired counts
     assert (tmp_path / "lib" / "stub_pick_cube_to_bin" / "0.2.0" / "skill.py").exists()
 
 
