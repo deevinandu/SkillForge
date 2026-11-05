@@ -324,6 +324,12 @@ def test_phase_sync_follows_a_learner_that_skipped_phases(stub_task):
     _closed(ex, 30)
     a = ex.act(_obs(cube + [0, 0, 0.005], 0.04, cube))
     assert ex.phase in ("lift", "transport") and a.gripper == 1.0 and ex.ctx.monitor.armed
+    if ex.phase == "lift":
+        # lift freezes its xy; a learner already moving sideways must not be pulled back there
+        a = ex.act(_obs(cube + [0, 0, 0.03], 0.04, cube + [0, 0, 0.025]))
+        a = ex.act(_obs(cube + [0, 0.05, 0.06], 0.04, cube + [0, 0.05, 0.055]))
+        assert ex.phase == "transport" and a.ee_pos[1] > cube[1] + 0.05
+        ex.jumps.pop()
     # ... then carried it over the bin and is already lowering: place, not "go to hover"
     _closed(ex, 30)
     over = np.array([0.5, 0.2, 0.08])

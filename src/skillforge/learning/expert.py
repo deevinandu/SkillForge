@@ -130,6 +130,19 @@ class PhaseSyncExpert:
             if n_offs is not None:
                 del self.ctx.bb["offsets"][n_offs:]
 
+    def _off_vertical(self, name: str, obs: Observation) -> bool:
+        """True when a straight-up move (lift, retreat) is aimed at an xy the ee has left.
+
+        Those nodes freeze their xy at the first tick; a learner that drifts sideways while
+        rising would get labels pulling it back to that point for the rest of the phase.
+        """
+        nd = self.node[name]
+        mv = nd.nodes[0] if hasattr(nd, "nodes") else nd
+        if getattr(mv, "n", 0) == 0:
+            return False  # not ticked yet: its start point is not frozen
+        tgt = np.asarray(mv.target(obs, self.ctx), float)
+        return float(np.linalg.norm(np.asarray(obs.ee_pos)[:2] - tgt[:2])) > self.on_axis
+
     def _ensure_plan(self, obs: Observation) -> None:
         """Plan a grasp if the teacher has none, or if the object was moved (knocked) since."""
         c = self.ctx
@@ -175,6 +188,8 @@ class PhaseSyncExpert:
                 return "lift" if ee[2] < above[2] - 0.02 and xy > 0.05 else "transport"
             if have != "place" and placing and ee[2] < above[2] - 0.02:
                 return "place"  # the learner cut the corner and is already lowering
+            if have == "lift" and self._off_vertical("lift", obs):
+                return "transport"  # lift aims straight up from where it started; the learner left
             if have == "place" and xy > 1.5 * self.off_axis:
                 return "transport"
             return None
@@ -196,6 +211,8 @@ class PhaseSyncExpert:
             if lined_up:
                 return "descend"
             return "disarm" if ee[2] < g[2] + 0.04 and xy > self.off_axis else "approach"
+        if have == "clear" and "clear" in self.node and self._off_vertical("clear", obs):
+            return "approach"  # clear rises straight up from where it started; the learner left
         if have == "approach" and xy < self.off_axis and ee[2] < h[2] - 0.02:
             return "descend"  # the learner cut the corner and is already going down
         if have == "descend" and (xy > 2 * self.off_axis or ee[2] > h[2] + 0.03):
