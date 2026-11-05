@@ -40,6 +40,7 @@ from .dataset import (
     Dataset,
     collect_to,
     default_dataset_dir,
+    resolve_spec,
 )
 
 REPO = Path(__file__).resolve().parents[3]
@@ -53,6 +54,15 @@ def load_task(path_or_id: str) -> TaskSpec:
     if not p.is_file():
         p = REPO / "tasks" / f"{path_or_id}.json"
     return TaskSpec.model_validate(json.loads(p.read_text()))
+
+
+def stressed(task: TaskSpec, factor: float | None) -> TaskSpec:
+    """`task` under T4's stress randomization (`stress_spec` x factor); unchanged for None/0."""
+    if not factor:
+        return task
+    from skillforge.eval.robustness import stress_spec, with_randomization
+
+    return with_randomization(task, stress_spec(task.scene.randomization, factor))
 
 
 def _ds_path(name: str) -> Path:
@@ -77,7 +87,7 @@ def _progress(label: str):
 
 
 def cmd_collect(a: argparse.Namespace) -> dict:
-    task = load_task(a.task)
+    task = stressed(load_task(a.task), a.collect_stress)
     dart = DartNoise(pos_std=a.dart, p=a.dart_p) if a.dart else None
     cfg = CollectConfig(
         source="dart" if dart else "teacher",
@@ -115,22 +125,26 @@ def cmd_train(a: argparse.Namespace) -> dict:
 def cmd_dagger(a: argparse.Namespace) -> list[dict]:
     from .policy import train
 
-    task = load_task(a.task)
+    task = stressed(load_task(a.task), a.collect_stress)
     root = _ds_path(a.data)
+    extra = [Dataset(_ds_path(n)) for n in a.extra_data]
     policy = Path(a.policy)
     out_dir = Path(a.out_dir) if a.out_dir else policy.parent.parent
     log = []
     for r in range(a.start_round, a.start_round + a.rounds):
         cfg = CollectConfig(source=f"dagger:r{r}", teacher=a.teacher, make_env=a.make_env,
                             learner_checkpoint=str(policy.resolve()), beta=a.beta,
-                            learner_overrides={"ensemble_m": a.ensemble_m},
-                            sync_tol=a.sync_tol, sync_patience=a.sync_patience)
-        seeds = range(DAGGER_SEED_STRIDE * r, DAGGER_SEED_STRIDE * r + a.seeds)
+                            learner_overrides={"ensemble_m": a.ensemble_m}, relabel=a.relabel,
+                            sync_tol=None if a.relabel == "phase_sync" and a.sync_tol == "auto" else
+                            (0.03 if a.sync_tol == "auto" else a.sync_tol),
+                            sync_patience=a.sync_patience)
+        start = DAGGER_SEED_STRIDE * r + a.seed_offset
+        seeds = range(start, start + a.seeds)
         _, summ = collect_to(root, task, seeds, cfg, workers=a.workers, progress=_progress(f"dagger r{r}"))
         print(f"round {r}: learner {summ['success']}/{summ['rolled']} on its own rollouts; "
               f"{summ['frames_rolled']} frames relabeled in {summ['seconds']}s", flush=True)
         policy = out_dir / f"{a.prefix}_r{r}" / "policy.pt"
-        meta = train([Dataset(root)], policy, _train_cfg(a))
+        meta = train([Dataset(root), *extra], policy, _train_cfg(a))
         log.append({"round": r, "rollouts": summ, "checkpoint": str(policy), "train_seconds": meta["train_seconds"],
                     "n_frames": meta["n_frames"]})
         print(json.dumps(log[-1]), flush=True)
@@ -246,12 +260,17 @@ def _ensemble(v: str) -> float | None:
     return None if v.lower() in ("none", "off") else float(v)
 
 
+def _sync_tol(v: str) -> float | str | None:
+    return "auto" if v == "auto" else _ensemble(v)
+
+
 def parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="python -m skillforge.learning", description=__doc__,
                                 formatter_class=argparse.RawDescriptionHelpFormatter)
     common = argparse.ArgumentParser(add_help=False)
     common.add_argument("--task", default="franka_pick_cube_to_bin")
-    common.add_argument("--teacher", default=DEFAULT_TEACHER)
+    common.add_argument("--teacher", default=DEFAULT_TEACHER, type=resolve_spec,
+                        help="'module:Class' or 'path/to/skill.py[:Class]' (default: %(default)s)")
     common.add_argument("--make-env", default=DEFAULT_ENV)
     common.add_argument("--workers", type=int, default=4)
 
@@ -275,6 +294,8 @@ def parser() -> argparse.ArgumentParser:
     c.add_argument("--dart-p", type=float, default=0.3)
     c.add_argument("--success-only", action=argparse.BooleanOptionalAction, default=True)
     c.add_argument("--overwrite", action="store_true")
+    c.add_argument("--collect-stress", type=float, default=None,
+                   help="collect under T4's stress randomization x this factor (a different task sha: own dataset)")
 
     t = sub.add_parser("train", parents=[tr])
     t.add_argument("--data", nargs="+", required=True)
@@ -287,12 +308,19 @@ def parser() -> argparse.ArgumentParser:
     d.add_argument("--start-round", type=int, default=1)
     d.add_argument("--seeds", type=int, default=200, help="learner rollouts per round")
     d.add_argument("--beta", type=float, default=0.0)
-    d.add_argument("--sync-tol", type=_ensemble, default=0.03,
-                   help="metres; labels after teacher/learner disagree longer than --sync-patience are dropped ('none' keeps all)")
+    d.add_argument("--relabel", choices=("shadow", "phase_sync"), default="shadow",
+                   help="shadow: unsynced shadow teacher (+ sync gate); phase_sync: expert.PhaseSyncExpert")
+    d.add_argument("--sync-tol", type=_sync_tol, default="auto",
+                   help="metres; labels after teacher/learner disagree longer than --sync-patience are dropped "
+                        "('none' keeps all; 'auto': 0.03 for shadow, none for phase_sync)")
+    d.add_argument("--extra-data", nargs="*", default=[], help="more datasets to train on (not appended to)")
+    d.add_argument("--seed-offset", type=int, default=0, help="round r rolls out seeds 100000*r + offset ..")
     d.add_argument("--sync-patience", type=int, default=3)
     d.add_argument("--ensemble-m", type=_ensemble, default=0.1)
     d.add_argument("--out-dir", default=None)
     d.add_argument("--prefix", default="bc_dagger")
+    d.add_argument("--collect-stress", type=float, default=None,
+                   help="roll the learner out under stress randomization x this factor (dataset must match)")
 
     e = sub.add_parser("eval", parents=[common], aliases=["compare"])
     e.add_argument("--policy", required=True)

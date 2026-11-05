@@ -239,6 +239,152 @@ def test_cli_parses_every_subcommand():
     assert p.parse_args(["train", "--data", "a", "b", "--out", "o.pt"]).data == ["a", "b"]
     assert p.parse_args(["dagger", "--data", "a", "--policy", "p.pt", "--ensemble-m", "none"]).ensemble_m is None
     assert p.parse_args(["compare", "--policy", "p.pt"]).seed_start == 1_000_000
+    d = p.parse_args(["dagger", "--data", "a", "--policy", "p.pt", "--relabel", "phase_sync",
+                      "--extra-data", "b", "c", "--collect-stress", "2"])
+    assert d.relabel == "phase_sync" and d.extra_data == ["b", "c"] and d.collect_stress == 2.0
+    assert d.sync_tol == "auto" and p.parse_args(["dagger", "--data", "a", "--policy", "p", "--sync-tol", "none"]).sync_tol is None
+    t = p.parse_args(["collect", "--name", "x", "--teacher", "some/dir/skill.py:Cls"])
+    assert t.teacher.endswith("some/dir/skill.py:Cls") and t.teacher.startswith("/")  # made absolute
+
+
+# ---------------------------------------------------------------- teacher from a file
+
+_FILE_SKILL = '''
+from skillforge.skills.pick_place import PickPlace as _Base
+
+
+class Helper:
+    pass
+
+
+class FilePickPlace(_Base):
+    version = "9.9.9"
+'''
+
+
+def test_load_object_accepts_a_file_path(tmp_path):
+    from skillforge.eval.regression import source_of
+    from skillforge.learning.dataset import load_object, resolve_spec
+
+    f = tmp_path / "my_skill_0.1.py"  # dots in the stem: not importable as a module name
+    f.write_text(_FILE_SKILL)
+    cls = load_object(str(f))
+    assert cls.__name__ == "FilePickPlace" and cls.version == "9.9.9"
+    assert load_object(f"{f}:FilePickPlace") is cls  # same module object, loaded once
+    assert load_object(f"{f}:Helper").__name__ == "Helper"
+    src = source_of(cls)  # what compare() ships to worker processes
+    assert src.code == _FILE_SKILL and src.entrypoint == "FilePickPlace"
+    two = tmp_path / "two.py"
+    two.write_text(_FILE_SKILL + "\n\nclass Other(_Base):\n    pass\n")
+    with pytest.raises(ValueError, match="exactly one"):
+        load_object(str(two))
+    with pytest.raises(FileNotFoundError):
+        load_object(str(tmp_path / "missing.py"))
+    assert load_object("skillforge.skills.pick_place:PickPlace").version == "0.2.0"
+    assert resolve_spec("skillforge.skills.pick_place:PickPlace") == "skillforge.skills.pick_place:PickPlace"
+    assert resolve_spec(f"{f}:FilePickPlace") == f"{f.resolve()}:FilePickPlace"
+
+
+def test_collect_with_a_file_teacher_in_worker_processes(stub_task, tmp_path):
+    f = tmp_path / "skill.py"
+    f.write_text(_FILE_SKILL)
+    cfg = _cfg(teacher=str(f))
+    ds, s = collect_to(tmp_path / "ds", stub_task, range(2), cfg, workers=2)
+    assert s["kept"] == 2 and ds.info["teacher"]["version"] == "9.9.9"
+    serial = collect(stub_task, range(2), cfg)
+    assert np.array_equal(serial[1][1]["action"], ds.load(1)["action"])
+
+
+# ---------------------------------------------------------------- phase-synchronised expert
+
+
+def _obs(ee, width, cube, t=0.0):
+    from skillforge.contracts import ObjectState, Observation
+
+    return Observation(t=t, qpos=np.zeros(3), qvel=np.zeros(3), ee_pos=np.asarray(ee, float),
+                       ee_quat=np.array([0.0, 1.0, 0.0, 0.0]), gripper_width=width,
+                       objects={"cube": ObjectState(pos=np.asarray(cube, float), quat=np.array([1.0, 0, 0, 0]))})
+
+
+def _closed(ex, steps):
+    for _ in range(steps):
+        ex.note_executed(Action(ee_pos=np.zeros(3), gripper=1.0))
+
+
+def test_phase_sync_follows_a_learner_that_skipped_phases(stub_task):
+    from skillforge.learning.expert import PhaseSyncExpert
+    from skillforge.skills.pick_place import PickPlace
+
+    ex = PhaseSyncExpert(PickPlace)
+    ex.reset(stub_task)
+    cube = np.array([0.5, -0.1, 0.02])
+    a = ex.act(_obs([0.5, -0.1, 0.3], 0.08, cube))
+    assert ex.phase == "approach" and a.gripper == 0.0 and not ex.jumps
+    # the learner went down and closed on the cube while the shadow teacher still approached
+    _closed(ex, 30)
+    a = ex.act(_obs(cube + [0, 0, 0.005], 0.04, cube))
+    assert ex.phase in ("lift", "transport") and a.gripper == 1.0 and ex.ctx.monitor.armed
+    # ... then carried it over the bin and is already lowering: place, not "go to hover"
+    _closed(ex, 30)
+    over = np.array([0.5, 0.2, 0.08])
+    a = ex.act(_obs(over, 0.04, over - [0, 0, 0.005]))
+    assert ex.phase == "place" and a.gripper == 1.0 and a.ee_pos[2] < over[2]
+    assert len(ex.jumps) == 2 and ex.jumps[0].startswith("2:approach->") and ex.jumps[1].endswith("->place")
+    # fingers opened with the cube in the bin: release / done, never a re-pick
+    ex.note_executed(Action(ee_pos=np.zeros(3), gripper=0.0))
+    a = ex.act(_obs(over, 0.08, [0.5, 0.2, 0.02]))
+    assert ex.phase in ex.post and a.gripper == 0.0
+
+
+def test_phase_sync_expert_alone_behaves_like_its_teacher(stub_task):
+    from skillforge.eval.harness import evaluate
+    from skillforge.learning.expert import PhaseSyncExpert
+    from skillforge.sim import StubEnv
+    from skillforge.skills.pick_place import PickPlace
+
+    class Driver:  # the expert executing its own labels
+        name, version = "sync", "1"
+
+        def __init__(self):
+            self.ex = PhaseSyncExpert(PickPlace)
+
+        def reset(self, task):
+            self.ex.reset(task)
+
+        def act(self, obs):
+            a = self.ex.act(obs)
+            self.ex.note_executed(a)
+            return a
+
+    seeds = list(range(5))
+    rep_t, _ = evaluate(StubEnv, PickPlace(), stub_task, seeds)
+    d = Driver()
+    rep_s, _ = evaluate(StubEnv, d, stub_task, seeds)
+    assert rep_s.n_success == rep_t.n_success == 5
+    with pytest.raises(TypeError, match="phase machine"):
+        PhaseSyncExpert(lambda: _NotAPhaseMachine()).reset(stub_task)
+
+
+class _NotAPhaseMachine:
+    name, version = "x", "0"
+
+    def reset(self, task):
+        pass
+
+    def act(self, obs):
+        return Action(ee_pos=obs.ee_pos)
+
+
+def test_dagger_with_phase_sync_relabels_deterministically(trained):
+    task, ds, ckpt, meta, cfg = trained
+    c = _cfg(source="dagger:r1", learner_checkpoint=str(ckpt), relabel="phase_sync", sync_tol=None)
+    (rec, arr), = collect(task, [202], c)
+    assert rec["source"] == "dagger:r1" and "phase_jumps" in rec
+    assert arr["label_valid"].mean() > 0.9  # no gate: labels stay usable off the teacher's path
+    again = collect(task, [202], c)[0][1]
+    assert all(np.array_equal(arr[k], again[k]) for k in arr)
+    with pytest.raises(ValueError, match="relabel"):
+        collect(task, [202], _cfg(learner_checkpoint=str(ckpt), relabel="bogus"))
 
 
 @slow

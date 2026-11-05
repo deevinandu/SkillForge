@@ -75,12 +75,81 @@ DEFAULT_TEACHER = "skillforge.skills.pick_place:PickPlace"
 DEFAULT_ENV = "skillforge.sim:make_env"
 
 
+def _is_path_spec(spec: str) -> bool:
+    head = spec.rpartition(":")[0] if spec.rpartition(":")[2].isidentifier() else spec
+    return head.endswith(".py") or "/" in head or os.sep in head
+
+
+def _module_from_file(path: Path):
+    """Import a single-file module from `path` under a stable, path-derived name.
+
+    The module is registered in `sys.modules` so `inspect.getsource` (used by
+    `eval.regression.source_of` to ship the skill to worker processes) and pickling work.
+    """
+    import hashlib
+    import importlib.util
+    import sys
+
+    path = path.resolve()
+    if not path.is_file():
+        raise FileNotFoundError(f"teacher file not found: {path}")
+    stem = "".join(c if c.isalnum() else "_" for c in path.stem)
+    name = f"_skillforge_file_{stem}_{hashlib.sha256(str(path).encode()).hexdigest()[:8]}"
+    mod = sys.modules.get(name)
+    if mod is not None and getattr(mod, "__file__", None) == str(path):
+        return mod
+    spec = importlib.util.spec_from_file_location(name, path)
+    if spec is None or spec.loader is None:
+        raise ImportError(f"cannot import {path}")
+    mod = importlib.util.module_from_spec(spec)
+    sys.modules[name] = mod
+    try:
+        spec.loader.exec_module(mod)
+    except BaseException:
+        sys.modules.pop(name, None)
+        raise
+    return mod
+
+
+def _only_skill_class(mod) -> Any:
+    found = [
+        v for v in vars(mod).values()
+        if isinstance(v, type) and v.__module__ == mod.__name__
+        and all(hasattr(v, k) for k in ("name", "version", "reset", "act"))
+    ]
+    if len(found) != 1:
+        names = ", ".join(sorted(c.__name__ for c in found)) or "none"
+        raise ValueError(f"{mod.__file__}: expected exactly one Skill class, found {names}; use 'path.py:Class'")
+    return found[0]
+
+
 def load_object(spec: str) -> Any:
-    """'package.module:attr' -> the attribute."""
+    """Resolve a teacher/env spec to the object it names.
+
+    Accepted forms: 'package.module:attr' (importable module), or 'path/to/file.py[:attr]'
+    (a single-file module loaded from disk, e.g. an agent-written skill under results/). Without
+    ':attr' a file must define exactly one Skill-like class (name, version, reset, act).
+    """
+    if _is_path_spec(spec):
+        file, sep, attr = spec.rpartition(":")
+        if not sep or not attr.isidentifier():
+            file, attr = spec, ""
+        mod = _module_from_file(Path(file))
+        return getattr(mod, attr) if attr else _only_skill_class(mod)
     mod, _, attr = spec.partition(":")
     if not attr:
-        raise ValueError(f"expected 'module:attr', got '{spec}'")
+        raise ValueError(f"expected 'module:attr' or 'path.py[:attr]', got '{spec}'")
     return getattr(importlib.import_module(mod), attr)
+
+
+def resolve_spec(spec: str) -> str:
+    """Make a file spec absolute (so worker processes and dataset meta do not depend on cwd)."""
+    if not _is_path_spec(spec):
+        return spec
+    file, sep, attr = spec.rpartition(":")
+    if not sep or not attr.isidentifier():
+        return str(Path(spec).resolve())
+    return f"{Path(file).resolve()}:{attr}"
 
 
 def task_sha(task: TaskSpec) -> str:
@@ -121,6 +190,10 @@ class CollectConfig:
     sync_patience: int = 3  # DAgger: consecutive disagreeing steps before the teacher counts as out of phase
     pos_clip: float = 0.05  # metres; targets are compared after this clip (as the policy sees them)
     learner_overrides: dict = field(default_factory=dict)  # e.g. {"ensemble_m": 0.1}
+    # DAgger labeler: "shadow" runs the teacher alongside the learner, unsynced (use the sync
+    # gate); "phase_sync" wraps it in expert.PhaseSyncExpert, which re-syncs its phase to the
+    # executed state every step (set sync_tol None with it: its labels stay usable off-path)
+    relabel: str = "shadow"
 
     def to_json(self) -> dict:
         return asdict(self)
@@ -207,6 +280,9 @@ def record_episode(
                     offset = noise_rng.normal(0.0, cfg.dart.pos_std, 3) if on else np.zeros(3)
                 if np.any(offset):
                     a_x = Action(mode="ee", ee_pos=np.asarray(a_x.ee_pos) + offset, ee_quat=a_x.ee_quat, gripper=a_x.gripper)
+            note = getattr(teacher, "note_executed", None)
+            if note is not None:
+                note(a_x)
             states.append(s)
             labels.append(action_vector(a_t))
             executed.append(action_vector(a_x))
@@ -241,6 +317,7 @@ def record_episode(
         "failure_detail": detail,
         "source": cfg.source,
         "label_valid_frac": round(float(np.mean(valid)), 4) if valid else 0.0,
+        "phase_jumps": len(getattr(teacher, "jumps", [])),
         "randomization": env.randomization_sample(),
         "events_tail": events[-8:],
         "duration_s": round(time.perf_counter() - t0, 4),
@@ -261,7 +338,14 @@ def _worker_setup(task_json: str, cfg_json: str) -> tuple[SimEnv, Skill, Skill |
         task = TaskSpec.model_validate_json(task_json)
         cfg = CollectConfig.from_json(json.loads(cfg_json))
         env = load_object(cfg.make_env)(task)
-        teacher = load_object(cfg.teacher)()
+        if cfg.relabel == "phase_sync":
+            from .expert import PhaseSyncExpert
+
+            teacher = PhaseSyncExpert(load_object(cfg.teacher))
+        elif cfg.relabel == "shadow":
+            teacher = load_object(cfg.teacher)()
+        else:
+            raise ValueError(f"unknown relabel mode '{cfg.relabel}'")
         learner = None
         if cfg.learner_checkpoint:
             from .skill import LearnedSkill
