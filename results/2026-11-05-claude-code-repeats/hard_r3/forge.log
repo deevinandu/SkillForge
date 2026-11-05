@@ -1,0 +1,6 @@
+forge franka_pick_cube_to_bin_hard: seed pick_place@0.2.0, improver claude-code, -> runs/t3-evidence/hard_r3/forge/20261105T002217Z/history.json
+round  0  0.2.0          69/100   69% [59%-77%]  ACCEPT seed                                                         fails: collision=17, grasp_slip=5, timeout=4  $0.0000
+round  1  0.2.1          94/100   94% [88%-97%]  ACCEPT passes paired gate vs 0.2.0: +26/-1 p=2.09e-07 < 0.1         fails: grasp_slip=3, timeout=3  paired vs 0.2.0 +26/-1 p=2.09e-07 tok in/out 1466052/21731  $1.1941
+stopped: target; best 0.2.1: pick_place@0.2.1 on franka_pick_cube_to_bin_hard: 94/100 = 94% (95% CI 88%-97%); failures: grasp_slip=3, timeout=3
+usage: 1 calls, in 52 (+cache write 59752, cache read 1406248), out 21731, est $1.1941
+exit 0

@@ -1,0 +1,6 @@
+forge franka_pick_cylinder_to_bin: seed pick_place@0.2.0, improver claude-code, -> runs/t3-evidence/cylinder_r1/forge/20261105T002902Z/history.json
+round  0  0.2.0          44/100   44% [35%-54%]  ACCEPT seed                                                         fails: grasp_slip=25, ik_failure=25, collision=6  $0.0000
+round  1  0.2.1          99/100   99% [95%-100%]  ACCEPT passes paired gate vs 0.2.0: +56/-1 p=4.02e-16 < 0.1         fails: ik_failure=1  paired vs 0.2.0 +56/-1 p=4.02e-16 tok in/out 4055746/44327  $2.5996
+stopped: target; best 0.2.1: pick_place@0.2.1 on franka_pick_cylinder_to_bin: 99/100 = 99% (95% CI 95%-100%); failures: ik_failure=1
+usage: 1 calls, in 90 (+cache write 115587, cache read 3940069), out 44327, est $2.5996
+exit 0

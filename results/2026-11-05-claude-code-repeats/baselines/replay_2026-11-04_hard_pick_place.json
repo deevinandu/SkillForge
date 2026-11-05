@@ -1,0 +1,56 @@
+{
+ "task": "franka_pick_cube_to_bin_hard",
+ "skill": "pick_place",
+ "version": "0.2.0",
+ "seeds": [
+  0,
+  99
+ ],
+ "n_success": 69,
+ "n": 100,
+ "ci95": [
+  0.5937376052204429,
+  0.7722043679386762
+ ],
+ "failure_counts": {
+  "collision": 17,
+  "grasp_slip": 5,
+  "timeout": 4,
+  "wrong_placement": 4,
+  "ik_failure": 1
+ },
+ "failing_seeds": [
+  0,
+  2,
+  6,
+  9,
+  11,
+  13,
+  19,
+  21,
+  22,
+  26,
+  30,
+  32,
+  34,
+  39,
+  40,
+  41,
+  42,
+  46,
+  48,
+  52,
+  60,
+  61,
+  62,
+  68,
+  69,
+  75,
+  82,
+  86,
+  89,
+  91,
+  92
+ ],
+ "wall_s": 20.660299429999895
+}

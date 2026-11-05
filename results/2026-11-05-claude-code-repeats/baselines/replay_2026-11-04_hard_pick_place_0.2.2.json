@@ -1,0 +1,28 @@
+{
+ "task": "franka_pick_cube_to_bin_hard",
+ "skill": "results/2026-11-04-claude-code/hard/pick_place_0.2.2.py",
+ "version": "0.1.0",
+ "seeds": [
+  0,
+  99
+ ],
+ "n_success": 95,
+ "n": 100,
+ "ci95": [
+  0.8882480347279118,
+  0.9784566385436864
+ ],
+ "failure_counts": {
+  "grasp_slip": 3,
+  "grasp_miss": 1,
+  "timeout": 1
+ },
+ "failing_seeds": [
+  38,
+  60,
+  72,
+  89,
+  91
+ ],
+ "wall_s": 16.088135089999923
+}
