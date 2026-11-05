@@ -17,6 +17,19 @@ Seed plan (disjoint on purpose): teacher data 0.., DAgger round r at 100000*r..,
   python -m skillforge.learning dagger --data franka_v02_dagger --policy runs/policies/bc_plain/policy.pt --rounds 2 --seeds 300
   python -m skillforge.learning eval --policy runs/policies/bc_plain/policy.pt --seeds 500 --seed-start 2000000
 
+Hard task with the agent-written teacher (a file path works as --teacher) and phase-synchronised
+DAgger, rolled out at nominal and then under stress (DAgger data in its own datasets, the teacher
+demos joined with --extra-data)::
+
+  T=franka_pick_cube_to_bin_hard; P=results/2026-11-04-claude-code/hard/pick_place_0.2.2.py
+  python -m skillforge.learning collect --task $T --teacher $P --name ${T}_agent022 --seeds 1500
+  python -m skillforge.learning train --data ${T}_agent022 --out runs/policies/bc/policy.pt
+  python -m skillforge.learning dagger --task $T --teacher $P --relabel phase_sync --data ${T}_dagger_ps \\
+      --extra-data ${T}_agent022 --policy runs/policies/bc/policy.pt --rounds 3 --seeds 300 --prefix ps_dagger
+  python -m skillforge.learning dagger --task $T --teacher $P --relabel phase_sync --collect-stress 2 \\
+      --data ${T}_dagger_ps_stress --extra-data ${T}_agent022 ${T}_dagger_ps \\
+      --policy runs/policies/ps_dagger_r3/policy.pt --start-round 4 --rounds 2 --seeds 300 --prefix ps_sdagger
+
 `eval` caches the teacher's results under runs/compare_cache/ (keyed on teacher code, task,
 seeds and the sim backend's source), so comparing several policies re-runs only the learner.
 """

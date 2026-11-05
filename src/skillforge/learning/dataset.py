@@ -47,6 +47,11 @@ differs, or the clipped position targets differ by more than `sync_tol`) for mor
 `sync_patience` consecutive steps, the teacher is considered out of phase and every label from
 the start of that disagreement on is marked invalid. What is left is corrective signal near the
 learner's own path, which is all a phase-machine expert can give without a state-only oracle.
+
+`relabel="phase_sync"` is that oracle, built from the teacher itself: `expert.PhaseSyncExpert`
+re-synchronises the shadow teacher's phase to the executed state every step (fast-forwarding or
+rewinding its sequence, re-planning, arming its hold monitor), so its labels stay meaningful
+off its own path and the sync gate is not needed (`sync_tol=None`). See expert.py.
 """
 
 from __future__ import annotations
