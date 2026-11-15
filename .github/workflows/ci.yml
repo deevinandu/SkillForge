@@ -7,6 +7,9 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with: {python-version: "3.11"}
+      # MuJoCo renders through OSMesa on a headless runner (sim/__init__.py sets MUJOCO_GL=osmesa);
+      # without the library, `import mujoco` fails while pytest collects the tests.
+      - run: sudo apt-get update && sudo apt-get install -y libosmesa6
       - run: pip install -e ".[dev,sim]"
       - run: ruff check src tests
       - run: pytest -q
