@@ -15,7 +15,7 @@ import numpy as np
 from skillforge.contracts import Action, ObjectState, Observation, SimEnv, StepInfo, TaskSpec
 
 from .estimators import DepthEstimator, Estimate, OracleEstimator, PoseEstimator
-from .frames import CameraFrame, FrameSource, SimFrameSource, overview_camera
+from .frames import CameraFrame, FrameSource, SimFrameSource, VisualRandomization, overview_camera
 
 
 class PerceivedEnv:
@@ -97,7 +97,11 @@ class PerceivedEnv:
         return obs, StepInfo(success=info.success, terminated=info.terminated, events=info.events + events)
 
     def randomization_sample(self) -> dict[str, float]:
-        return self.inner.randomization_sample()
+        """The inner env's sample plus the frame source's visual draw (keys start with 'visual.')."""
+        sample = dict(self.inner.randomization_sample())
+        if hasattr(self.source, "visual_sample"):
+            sample.update(self.source.visual_sample())
+        return sample
 
     def render(self, camera: str | None = None) -> np.ndarray | None:
         return self.inner.render(camera)
@@ -187,7 +191,31 @@ class PerceivedEnv:
         return replace(obs, objects=objects), events
 
 
-# Module-level factories: picklable, so they work with `evaluate_parallel` and the sandbox.
+# Factories. All are module-level (or `functools.partial` of one), so they pickle and work with
+# `evaluate_parallel` and the sandbox.
+
+NOISY_DEPTH_STD = 0.003  # metres at 1 m, growing with z^2: the order of a consumer stereo depth camera
+
+
+def make_perceived_env(
+    task: TaskSpec,
+    *,
+    segment: str = "mask",
+    depth_noise: float = 0.0,
+    visual: VisualRandomization | None = None,
+) -> PerceivedEnv:
+    """MuJoCo env seen through the overview and wrist depth cameras.
+
+    segment='mask' uses the renderer's object masks; 'color' segments by hue, told each object's
+    nominal colour (the model's), so randomized lighting and colours have to be coped with.
+    """
+    from skillforge.sim import make_env
+
+    inner = make_env(task)
+    bx, by = task.scene.robot.base_pose.pos[:2]
+    source = SimFrameSource(inner, virtual=(overview_camera((bx, by)),), depth_noise=depth_noise, visual=visual)
+    colors = source.object_colors() if segment == "color" else None
+    return PerceivedEnv(inner, DepthEstimator(segment=segment, colors=colors), source=source)
 
 
 def make_oracle_env(task: TaskSpec) -> PerceivedEnv:
@@ -197,22 +225,27 @@ def make_oracle_env(task: TaskSpec) -> PerceivedEnv:
 
 
 def make_depth_env(task: TaskSpec) -> PerceivedEnv:
-    """MuJoCo env seen through the overview and wrist depth cameras, sim masks for segmentation."""
-    from skillforge.sim import make_env
-
-    return PerceivedEnv(make_env(task), DepthEstimator())
-
-
-NOISY_DEPTH_STD = 0.003  # metres at 1 m, growing with z^2: the order of a consumer stereo depth camera
+    """Sim masks, clean depth, perfect calibration: the best case."""
+    return make_perceived_env(task)
 
 
 def make_noisy_depth_env(task: TaskSpec) -> PerceivedEnv:
     """`make_depth_env` with per-pixel depth noise. The noise is independent per pixel, so it
     mostly averages out over an object's pixels; a real camera's correlated error (bias, warp)
     is not modelled."""
-    from skillforge.sim import make_env
+    return make_perceived_env(task, depth_noise=NOISY_DEPTH_STD)
 
-    inner = make_env(task)
-    bx, by = task.scene.robot.base_pose.pos[:2]
-    source = SimFrameSource(inner, virtual=(overview_camera((bx, by)),), depth_noise=NOISY_DEPTH_STD)
-    return PerceivedEnv(inner, DepthEstimator(), source=source)
+
+def make_color_depth_env(task: TaskSpec) -> PerceivedEnv:
+    """Colour segmentation instead of the sim's masks; nothing randomized."""
+    return make_perceived_env(task, segment="color")
+
+
+def make_dr_depth_env(task: TaskSpec) -> PerceivedEnv:
+    """Sim masks with the default visual randomization (only its calibration error matters to masks)."""
+    return make_perceived_env(task, visual=VisualRandomization())
+
+
+def make_dr_color_depth_env(task: TaskSpec) -> PerceivedEnv:
+    """Colour segmentation, depth noise and the default visual randomization: the hardest sim setting here."""
+    return make_perceived_env(task, segment="color", depth_noise=NOISY_DEPTH_STD, visual=VisualRandomization())

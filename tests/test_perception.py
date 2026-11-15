@@ -15,8 +15,10 @@ from skillforge.perception import (
     OracleEstimator,
     PerceivedEnv,
     SimFrameSource,
+    VisualRandomization,
     backproject,
     make_depth_env,
+    make_dr_color_depth_env,
     make_oracle_env,
     measure,
     overview_camera,
@@ -145,6 +147,21 @@ def test_color_mask_picks_the_hue_not_the_brightness():
     img[1, 0], img[1, 1] = (158, 128, 97), (200, 200, 200)  # table brown, grey
     m = color_mask(img, (0.85, 0.15, 0.15))
     assert m.tolist() == [[True, True, False], [False, False, False]]
+
+
+def test_colour_cloud_ignores_a_table_of_the_same_hue(stub_task):
+    """Depth noise lifts some table pixels above the height cut; they must not join the object."""
+    rng = np.random.default_rng(0)
+    half, centre = np.array([0.02, 0.02, 0.02]), np.array([0.5, -0.1, 0.02])
+    cube = box_cloud(half, centre, 0.3, n=1500)
+    table = np.column_stack([rng.uniform(0.0, 1.0, 6000), rng.uniform(-0.6, 0.6, 6000), rng.uniform(0.003, 0.009, 6000)])
+    est = DepthEstimator(segment="color", colors={"cube": (0.85, 0.15, 0.15)})
+    est.reset(stub_task)  # its cube has the same 2 cm half-extents
+    kept = est._drop_table(np.concatenate([cube, table]), stub_task.scene.object("cube"))
+    assert len(kept) < len(cube) + 150 and np.linalg.norm(kept - centre, axis=1).max() < 0.06
+    pos, _, conf = fit_box(kept, half)
+    assert np.linalg.norm(pos - centre) < 0.003 and conf > 0.7
+    assert len(est._drop_table(table, stub_task.scene.object("cube"))) == 0  # no object in view
 
 
 def synthetic_frame():
@@ -506,6 +523,115 @@ def test_color_segmentation_matches_the_sim_mask(cube_env):
         assert np.linalg.norm(obs.objects["cube"].pos - truth.pos) < 0.004
     finally:
         env.close()
+
+
+# ---------------------------------------------------------------- visual randomization
+
+
+def cube_cloud(frame):
+    return backproject(frame, frame.masks["cube"])
+
+
+def test_visual_randomization_is_seeded_and_logged(cube_env):
+    cube_env.reset(0)
+    src = SimFrameSource(cube_env, virtual=(overview_camera(),), visual=VisualRandomization())
+    try:
+        src.reseed(5)
+        a, sample = src.capture("overview"), src.visual_sample()
+        src.reseed(5)
+        b = src.capture("overview")
+        src.reseed(6)
+        c = src.capture("overview")
+        assert np.array_equal(a.rgb, b.rgb) and np.array_equal(a.depth, b.depth)
+        assert not np.array_equal(a.rgb, c.rgb)
+        assert src.visual_sample() != sample
+        assert {"visual.light_scale", "visual.table_r", "visual.overview.extrinsic_deg", "visual.wrist.extrinsic_mm"} <= set(sample)
+        assert all(isinstance(v, float) for v in sample.values())
+    finally:
+        src.close()
+
+
+def test_lights_and_colours_change_the_image_but_not_the_geometry(cube_env):
+    cube_env.reset(0)
+    plain = SimFrameSource(cube_env, virtual=(overview_camera(),))
+    looks = SimFrameSource(
+        cube_env, virtual=(overview_camera(),), visual=VisualRandomization(extrinsic_trans=0.0, extrinsic_rot_deg=0.0)
+    )
+    try:
+        looks.reseed(3)
+        a, b = plain.capture("overview"), looks.capture("overview")
+        assert np.array_equal(a.depth, b.depth) and np.array_equal(a.masks["cube"], b.masks["cube"])
+        assert np.allclose(a.T_world_cam, b.T_world_cam)
+        assert np.abs(a.rgb.astype(int) - b.rgb.astype(int)).mean() > 5  # a visibly different picture
+    finally:
+        plain.close()
+        looks.close()
+
+
+def test_calibration_error_moves_the_cloud_but_not_the_reported_pose(cube_env):
+    cube_env.reset(0)
+    plain = SimFrameSource(cube_env, virtual=(overview_camera(),))
+    off = SimFrameSource(cube_env, virtual=(overview_camera(),), visual=VisualRandomization.calibration_only(0.003, 1.0))
+    try:
+        shifts = []
+        for seed in range(4):
+            off.reseed(seed)
+            a, b = plain.capture("overview"), off.capture("overview")
+            assert np.allclose(a.T_world_cam, b.T_world_cam)  # the frame still claims the calibrated pose
+            assert np.abs(a.rgb.astype(int) - b.rgb.astype(int)).mean() < 5  # same lights and colours
+            shifts.append(np.linalg.norm(cube_cloud(a).mean(axis=0) - cube_cloud(b).mean(axis=0)))
+        # up to 3 mm per axis plus up to 1 degree at ~0.9 m (16 mm): millimetres, not centimetres
+        assert max(shifts) > 0.001 and max(shifts) < 0.03
+    finally:
+        plain.close()
+        off.close()
+
+
+def test_visual_randomization_leaves_the_env_untouched(cube_env):
+    cube_env.reset(0)
+    m = cube_env.model
+    before = (m.geom_rgba.copy(), m.light_diffuse.copy(), m.light_dir.copy(), m.cam_pos.copy())
+    video_before = cube_env.render("front").copy()
+    src = SimFrameSource(cube_env, virtual=(overview_camera(),), visual=VisualRandomization())
+    try:
+        src.reseed(1)
+        for cam in ("overview", "wrist", "front"):
+            src.capture(cam)
+    finally:
+        src.close()
+    after = (m.geom_rgba, m.light_diffuse, m.light_dir, m.cam_pos)
+    assert all(np.array_equal(x, y) for x, y in zip(before, after, strict=True))
+    assert np.array_equal(cube_env.render("front"), video_before)
+
+
+def test_randomized_colour_env_is_deterministic_and_logs_its_draw(cube_env):
+    task = load("franka_pick_cube_to_bin")
+
+    def run():
+        env = make_dr_color_depth_env(task)
+        try:
+            obs = env.reset(4)
+            sample = env.randomization_sample()
+            trace = [obs.objects["cube"].pos.copy()]
+            for _ in range(12):
+                obs, _ = env.step(Action(ee_pos=np.array([0.45, 0.0, 0.35]), ee_quat=np.array([0.0, 1, 0, 0])))
+                trace.append(obs.objects["cube"].pos.copy())
+            return np.array(trace), sample, env.true_poses()["cube"].pos
+        finally:
+            env.close()
+
+    (a, sample, truth), (b, _, _) = run(), run()
+    assert np.array_equal(a, b)
+    assert "object_xy_jitter" in sample and "visual.light_scale" in sample  # the env's draw and the visual one
+    assert np.linalg.norm(a[-1] - truth) < 0.015  # found by colour, to within the calibration error
+
+
+def test_compare_cli_knows_its_settings():
+    from skillforge.perception import cli
+
+    assert {"true", "oracle", "depth", "noisy", "color", "dr", "dr-color"} == set(cli._envs())
+    with pytest.raises(SystemExit, match="unknown env"):
+        cli.main(["compare", "stub_pick_cube_to_bin", "--envs", "true,nope"])
 
 
 def test_yaw_quat_roundtrip():

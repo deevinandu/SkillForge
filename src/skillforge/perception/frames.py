@@ -55,6 +55,39 @@ def overview_camera(base_xy: tuple[float, float] = (0.0, 0.0)) -> VirtualCamera:
     return VirtualCamera("overview", (base_xy[0] + 0.5, base_xy[1], 0.02), 0.9, 180.0, -50.0)
 
 
+@dataclass(frozen=True)
+class VisualRandomization:
+    """What changes about how the scene looks, drawn once per episode from the env seed.
+
+    Lights and colours change the RGB image only. The extrinsic error changes geometry: the image
+    is rendered from a camera that is slightly off its calibrated pose, while the frame still
+    reports the calibrated `T_world_cam`, which is what a calibration error is. It is fixed in the
+    camera's own frame, so a wrist camera's error moves with the hand. Textures are not randomized.
+    """
+
+    light_scale: tuple[float, float] = (0.6, 1.4)  # on every light's diffuse and ambient
+    light_tilt_deg: float = 25.0  # directional lights are tilted by up to this
+    object_brightness: tuple[float, float] = (0.75, 1.15)  # scale on each object's rgb
+    object_color_jitter: float = 0.05  # +/- per channel, after the brightness scale
+    table_rgb: tuple[float, float] | None = (0.3, 0.85)  # each channel uniform in this; None keeps the table's colour
+    extrinsic_trans: float = 0.003  # metres, +/- per axis
+    extrinsic_rot_deg: float = 0.5  # degrees, the angle of a rotation about a random axis
+
+    @classmethod
+    def calibration_only(cls, trans: float, rot_deg: float) -> VisualRandomization:
+        """Camera calibration error alone: lights and colours stay as they are."""
+        return cls(
+            light_scale=(1.0, 1.0), light_tilt_deg=0.0, object_brightness=(1.0, 1.0), object_color_jitter=0.0,
+            table_rgb=None, extrinsic_trans=trans, extrinsic_rot_deg=rot_deg,
+        )
+
+
+def _axis_angle(axis: np.ndarray, angle: float) -> np.ndarray:
+    x, y, z = axis / np.linalg.norm(axis)
+    K = np.array([[0, -z, y], [z, 0, -x], [-y, x, 0]])
+    return np.eye(3) + np.sin(angle) * K + (1 - np.cos(angle)) * (K @ K)
+
+
 def backproject(frame: CameraFrame, mask: np.ndarray | None = None) -> np.ndarray:
     """World-frame points (N, 3) for the pixels in `mask` (all pixels if None) with a depth return."""
     valid = frame.depth > 0
@@ -82,8 +115,11 @@ class SimFrameSource:
     """Render RGB, depth and object masks from a `MujocoEnv`, for model or virtual cameras.
 
     `depth_noise` is the depth standard deviation in metres at 1 m; it grows with z squared, as a
-    stereo depth camera's does. The noise stream is reseeded by `reseed(seed)`, so the same env
-    seed gives the same frames.
+    stereo depth camera's does. `visual` randomizes lights, colours and camera calibration per
+    episode. Both are redrawn by `reseed(seed)`, so the same env seed gives the same frames.
+
+    Nothing is written to the env's model or data: visual changes are made to the renderer's
+    own scene after it is built, so the env's own `render()` (videos) is unaffected.
     """
 
     def __init__(
@@ -94,6 +130,7 @@ class SimFrameSource:
         virtual: tuple[VirtualCamera, ...] = (),
         depth_noise: float = 0.0,
         max_depth: float = 4.0,
+        visual: VisualRandomization | None = None,
     ):
         import mujoco
 
@@ -103,6 +140,7 @@ class SimFrameSource:
         self.virtual = {c.name: c for c in virtual}
         self.depth_noise = depth_noise
         self.max_depth = max_depth
+        self.visual = visual
         self._renderer = None
         self._failed = False
         self._rng = np.random.default_rng(0)
@@ -112,9 +150,78 @@ class SimFrameSource:
         # region box drawn around an object would also hide it from the segmentation image.
         self._opt = mujoco.MjvOption()
         self._opt.sitegroup[:] = 0
+        self._table_geom = int(m.geom("table").id) if mujoco.mj_name2id(m, mujoco.mjtObj.mjOBJ_GEOM, "table") >= 0 else -1
+        self._camera_names = sorted({m.camera(i).name for i in range(m.ncam)} | set(self.virtual))
+        self._draw: dict | None = None
+        self.reseed(0)
 
     def reseed(self, seed: int) -> None:
         self._rng = np.random.default_rng([seed, 2])
+        v = self.visual
+        if v is None:
+            self._draw = None
+            return
+        rng = np.random.default_rng([seed, 4])
+        tilt_axis = rng.normal(size=3)
+        d = {
+            "light_scale": float(rng.uniform(*v.light_scale)),
+            "light_tilt": _axis_angle(tilt_axis, np.radians(rng.uniform(0.0, v.light_tilt_deg))),
+            "table_rgb": None if v.table_rgb is None else rng.uniform(*v.table_rgb, size=3),
+            "object_rgb": {},
+            "extrinsic": {},
+        }
+        for gid, _ in sorted(self._geom_to_obj.items(), key=lambda kv: kv[1]):
+            rgb = self.env.model.geom_rgba[gid, :3] * rng.uniform(*v.object_brightness)
+            rgb = rgb + rng.uniform(-v.object_color_jitter, v.object_color_jitter, size=3)
+            d["object_rgb"][gid] = np.clip(rgb, 0.0, 1.0)
+        for name in self._camera_names:
+            dt = rng.uniform(-v.extrinsic_trans, v.extrinsic_trans, size=3)
+            angle = np.radians(rng.uniform(0.0, v.extrinsic_rot_deg))
+            d["extrinsic"][name] = (dt, _axis_angle(rng.normal(size=3), angle), float(np.degrees(angle)))
+        self._draw = d
+
+    def object_colors(self) -> dict[str, tuple[float, float, float]]:
+        """Each object's nominal rgb (0..1) from the model: what one would tell a colour segmenter."""
+        return {name: tuple(float(c) for c in self.env.model.geom_rgba[gid, :3]) for gid, name in self._geom_to_obj.items()}
+
+    def visual_sample(self) -> dict[str, float]:
+        """The visual values drawn at the last reseed, flat, for logging next to the env's sample."""
+        d = self._draw
+        if d is None:
+            return {}
+        out = {"visual.light_scale": d["light_scale"]}
+        if d["table_rgb"] is not None:
+            out.update({f"visual.table_{c}": float(d["table_rgb"][i]) for i, c in enumerate("rgb")})
+        for name, (dt, _, deg) in d["extrinsic"].items():
+            out[f"visual.{name}.extrinsic_mm"] = float(np.linalg.norm(dt) * 1e3)
+            out[f"visual.{name}.extrinsic_deg"] = deg
+        return out
+
+    def _randomize_scene(self, scene, camera: str, T: np.ndarray) -> None:
+        """Apply this episode's draw to the renderer's scene (not the model). `T` is the calibrated pose."""
+        d, mj = self._draw, self._mj
+        for i in range(scene.nlight):
+            light = scene.lights[i]
+            light.diffuse[:] = np.clip(np.asarray(light.diffuse) * d["light_scale"], 0.0, 1.0)
+            light.ambient[:] = np.clip(np.asarray(light.ambient) * d["light_scale"], 0.0, 1.0)
+            if not light.headlight:
+                light.dir[:] = d["light_tilt"] @ np.asarray(light.dir)
+        geom_type = int(mj.mjtObj.mjOBJ_GEOM)
+        for i in range(scene.ngeom):
+            g = scene.geoms[i]
+            if g.objtype != geom_type:
+                continue
+            if g.objid == self._table_geom:
+                if d["table_rgb"] is not None:
+                    g.rgba[:3] = d["table_rgb"]
+            elif g.objid in d["object_rgb"]:
+                g.rgba[:3] = d["object_rgb"][g.objid]
+        dt, dR, _ = d["extrinsic"][camera]
+        R = T[:3, :3] @ dR  # the camera's real orientation (OpenCV axes: x right, y down, z forward)
+        for eye in scene.camera:
+            eye.pos[:] = np.asarray(eye.pos) + T[:3, :3] @ dt
+            eye.forward[:] = R[:, 2]
+            eye.up[:] = -R[:, 1]
 
     def close(self) -> None:
         if self._renderer is not None:
@@ -157,7 +264,6 @@ class SimFrameSource:
         h, w = self.size
 
         r.update_scene(data, camera=cam, scene_option=self._opt)
-        rgb = r.render().copy()
         # The scene holds two GL cameras (left/right eye); the image is rendered from their mean.
         gl = r.scene.camera
         pos = (np.asarray(gl[0].pos) + np.asarray(gl[1].pos)) / 2
@@ -171,6 +277,9 @@ class SimFrameSource:
         T[:3, 0], T[:3, 1], T[:3, 2], T[:3, 3] = right, -up, fwd, pos
         f = (h / 2) / np.tan(np.radians(fovy) / 2)
         K = np.array([[f, 0, w / 2], [0, f, h / 2], [0, 0, 1.0]])
+        if self._draw is not None:
+            self._randomize_scene(r.scene, camera, T)
+        rgb = r.render().copy()
 
         r.enable_depth_rendering()
         depth = r.render().astype(np.float32)
