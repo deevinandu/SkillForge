@@ -1,0 +1,1081 @@
+{
+  "task": "franka_pick_ball_to_bin",
+  "seeds": [
+    5000,
+    5200
+  ],
+  "reports": {
+    "true": {
+      "task_id": "franka_pick_ball_to_bin",
+      "skill": "pick_place",
+      "skill_version": "0.2.1",
+      "n_rollouts": 200,
+      "n_success": 180,
+      "success_rate": 0.9,
+      "ci95": [
+        0.8505931364369146,
+        0.9343300588284289
+      ],
+      "failure_counts": {
+        "grasp_slip": 10,
+        "ik_failure": 4,
+        "wrong_placement": 3,
+        "timeout": 3
+      },
+      "failures": [
+        {
+          "seed": 5012,
+          "tag": "grasp_slip",
+          "detail": "after 103 steps; cause: grasp_slip; events: ['grasp:ball', 'grasp_slip', 'grasp_miss']",
+          "randomization": {
+            "object_xy_jitter": 0.10481323413365415,
+            "object_yaw_jitter": 0.0,
+            "friction_scale": 0.5534177708662558,
+            "mass_scale": 1.0589641545653135,
+            "actuator_gain_scale": 0.9466319250949251,
+            "obs_noise_std": 0.005435579455486068,
+            "action_latency_steps": 3.0,
+            "ball.dx": -0.06793342391349622,
+            "ball.dy": 0.09497904480121114,
+            "ball.dyaw": 0.0
+          },
+          "video": null
+        },
+        {
+          "seed": 5020,
+          "tag": "ik_failure",
+          "detail": "after 295 steps; cause: ik_failure; events: ['grasp:ball', 'release:ball', 'ik_failure']",
+          "randomization": {
+            "object_xy_jitter": 0.06493567218569142,
+            "object_yaw_jitter": 0.0,
+            "friction_scale": 0.9224630709910899,
+            "mass_scale": 1.0610133489298101,
+            "actuator_gain_scale": 0.9750438499756608,
+            "obs_noise_std": 0.009908398385157884,
+            "action_latency_steps": 3.0,
+            "ball.dx": -0.0035379354182143094,
+            "ball.dy": -0.04292157603167483,
+            "ball.dyaw": 0.0
+          },
+          "video": null
+        },
+        {
+          "seed": 5027,
+          "tag": "ik_failure",
+          "detail": "after 86 steps; cause: ik_failure; events: ['grasp:ball', 'grasp_slip', 'grasp_miss', 'ik_failure']",
+          "randomization": {
+            "object_xy_jitter": 0.047424643848994065,
+            "object_yaw_jitter": 0.0,
+            "friction_scale": 0.44810266581711683,
+            "mass_scale": 0.809335608712365,
+            "actuator_gain_scale": 0.9309498663416108,
+            "obs_noise_std": 0.011105427211224844,
+            "action_latency_steps": 0.0,
+            "ball.dx": -0.001326775925827757,
+            "ball.dy": 0.030713468397974016,
+            "ball.dyaw": 0.0
+          },
+          "video": null
+        },
+        {
+          "seed": 5036,
+          "tag": "grasp_slip",
+          "detail": "after 181 steps; cause: grasp_slip; events: ['grasp:ball', 'grasp_slip', 'grasp_miss']",
+          "randomization": {
+            "object_xy_jitter": 0.07814933438479803,
+            "object_yaw_jitter": 0.0,
+            "friction_scale": 0.48912703083670905,
+            "mass_scale": 1.2916805393843638,
+            "actuator_gain_scale": 0.9649298863865027,
+            "obs_noise_std": 0.010540180377478668,
+            "action_latency_steps": 3.0,
+            "ball.dx": -0.061121957236550103,
+            "ball.dy": -0.04946273095741446,
+            "ball.dyaw": 0.0
+          },
+          "video": null
+        },
+        {
+          "seed": 5041,
+          "tag": "grasp_slip",
+          "detail": "after 89 steps; cause: grasp_slip; events: ['grasp:ball', 'grasp_slip', 'grasp_miss']",
+          "randomization": {
+            "object_xy_jitter": 0.0074871200813893465,
+            "object_yaw_jitter": 0.0,
+            "friction_scale": 0.840575502633223,
+            "mass_scale": 0.8707287572431941,
+            "actuator_gain_scale": 1.2984118971264071,
+            "obs_noise_std": 0.007188118179450985,
+            "action_latency_steps": 2.0,
+            "ball.dx": 0.006721189935429575,
+            "ball.dy": -0.003452196130929985,
+            "ball.dyaw": 0.0
+          },
+          "video": null
+        },
+        {
+          "seed": 5045,
+          "tag": "wrong_placement",
+          "detail": "after 300 steps; cause: grasp:ball; events: ['grasp:ball', 'release:ball']",
+          "randomization": {
+            "object_xy_jitter": 0.03273259825254528,
+            "object_yaw_jitter": 0.0,
+            "friction_scale": 0.8553106069399288,
+            "mass_scale": 1.177584592797627,
+            "actuator_gain_scale": 1.2184789403367917,
+            "obs_noise_std": 0.011663444338217624,
+            "action_latency_steps": 3.0,
+            "ball.dx": 0.0035270932505037586,
+            "ball.dy": 0.012397007071833423,
+            "ball.dyaw": 0.0
+          },
+          "video": null
+        },
+        {
+          "seed": 5066,
+          "tag": "ik_failure",
+          "detail": "after 162 steps; cause: ik_failure; events: ['collision:left_finger-table', 'collision:right_finger-table', 'grasp:ball', 'grasp_slip', 'grasp_miss', 'ik_failure']",
+          "randomization": {
+            "object_xy_jitter": 0.059219510889942734,
+            "object_yaw_jitter": 0.0,
+            "friction_scale": 0.7536070109766932,
+            "mass_scale": 0.7723402957046309,
+            "actuator_gain_scale": 1.0890949414648587,
+            "obs_noise_std": 0.009977519618759706,
+            "action_latency_steps": 5.0,
+            "ball.dx": -0.04846891896703498,
+            "ball.dy": 0.0563520957907936,
+            "ball.dyaw": 0.0
+          },
+          "video": null
+        },
+        {
+          "seed": 5077,
+          "tag": "grasp_slip",
+          "detail": "after 96 steps; cause: grasp_slip; events: ['grasp:ball', 'grasp_slip', 'grasp_miss']",
+          "randomization": {
+            "object_xy_jitter": 0.10099596225945999,
+            "object_yaw_jitter": 0.0,
+            "friction_scale": 0.45061798178440454,
+            "mass_scale": 1.159334971414453,
+            "actuator_gain_scale": 1.302451568949487,
+            "obs_noise_std": 0.003771811371063663,
+            "action_latency_steps": 3.0,
+            "ball.dx": -0.010655819371698613,
+            "ball.dy": -0.017659924139187072,
+            "ball.dyaw": 0.0
+          },
+          "video": null
+        },
+        {
+          "seed": 5079,
+          "tag": "timeout",
+          "detail": "after 300 steps; cause: still holding; events: ['grasp:ball', 'release:ball', 'grasp:ball', 'release:ball', 'grasp:ball']",
+          "randomization": {
+            "object_xy_jitter": 0.06339690443283744,
+            "object_yaw_jitter": 0.0,
+            "friction_scale": 0.6053600910247868,
+            "mass_scale": 0.793402797124881,
+            "actuator_gain_scale": 0.8208660260751944,
+            "obs_noise_std": 0.011395768592741029,
+            "action_latency_steps": 0.0,
+            "ball.dx": -0.04827544798371618,
+            "ball.dy": -0.03562396101502911,
+            "ball.dyaw": 0.0
+          },
+          "video": null
+        },
+        {
+          "seed": 5086,
+          "tag": "ik_failure",
+          "detail": "after 94 steps; cause: ik_failure; events: ['grasp:ball', 'grasp_slip', 'grasp_miss', 'ik_failure']",
+          "randomization": {
+            "object_xy_jitter": 0.07211092986809625,
+            "object_yaw_jitter": 0.0,
+            "friction_scale": 0.7025508751555298,
+            "mass_scale": 1.4120744399843257,
+            "actuator_gain_scale": 1.2087111550370475,
+            "obs_noise_std": 0.008511944920806334,
+            "action_latency_steps": 2.0,
+            "ball.dx": -0.024723445566625972,
+            "ball.dy": -0.05271784095705262,
+            "ball.dyaw": 0.0
+          },
+          "video": null
+        },
+        {
+          "seed": 5092,
+          "tag": "wrong_placement",
+          "detail": "after 300 steps; cause: grasp:ball; events: ['grasp:ball', 'release:ball']",
+          "randomization": {
+            "object_xy_jitter": 0.03662487765740241,
+            "object_yaw_jitter": 0.0,
+            "friction_scale": 0.9859875628328627,
+            "mass_scale": 1.0775455691188998,
+            "actuator_gain_scale": 0.6322763960143106,
+            "obs_noise_std": 0.010307643201234422,
+            "action_latency_steps": 3.0,
+            "ball.dx": -0.003112783011214662,
+            "ball.dy": -0.021862326526327802,
+            "ball.dyaw": 0.0
+          },
+          "video": null
+        },
+        {
+          "seed": 5094,
+          "tag": "timeout",
+          "detail": "after 300 steps; cause: still holding; events: ['release:ball', 'grasp:ball', 'release:ball', 'grasp:ball', 'release:ball', 'grasp:ball']",
+          "randomization": {
+            "object_xy_jitter": 0.0920697982767425,
+            "object_yaw_jitter": 0.0,
+            "friction_scale": 0.7612557946945797,
+            "mass_scale": 0.9286236030133205,
+            "actuator_gain_scale": 1.1065832073250115,
+            "obs_noise_std": 0.010985562953751605,
+            "action_latency_steps": 1.0,
+            "ball.dx": -0.0016746568997824257,
+            "ball.dy": 0.003211555041547326,
+            "ball.dyaw": 0.0
+          },
+          "video": null
+        },
+        {
+          "seed": 5109,
+          "tag": "grasp_slip",
+          "detail": "after 272 steps; cause: grasp_slip; events: ['release:ball', 'grasp:ball', 'release:ball', 'grasp:ball', 'grasp_slip', 'grasp_miss']",
+          "randomization": {
+            "object_xy_jitter": 0.031496956135486476,
+            "object_yaw_jitter": 0.0,
+            "friction_scale": 0.6165499648938928,
+            "mass_scale": 1.3431386631906452,
+            "actuator_gain_scale": 0.8320907839963937,
+            "obs_noise_std": 0.011771022500783676,
+            "action_latency_steps": 2.0,
+            "ball.dx": -0.030480885080059267,
+            "ball.dy": 0.019468521212386368,
+            "ball.dyaw": 0.0
+          },
+          "video": null
+        },
+        {
+          "seed": 5110,
+          "tag": "timeout",
+          "detail": "after 300 steps; cause: still holding; events: ['grasp:ball', 'release:ball', 'grasp:ball', 'release:ball', 'grasp:ball']",
+          "randomization": {
+            "object_xy_jitter": 0.11555742148104962,
+            "object_yaw_jitter": 0.0,
+            "friction_scale": 0.7598886574310173,
+            "mass_scale": 1.0102264064144348,
+            "actuator_gain_scale": 0.9948620359902192,
+            "obs_noise_std": 0.011499014380249088,
+            "action_latency_steps": 1.0,
+            "ball.dx": -0.09001260921021068,
+            "ball.dy": -0.06987652412234295,
+            "ball.dyaw": 0.0
+          },
+          "video": null
+        },
+        {
+          "seed": 5115,
+          "tag": "grasp_slip",
+          "detail": "after 114 steps; cause: grasp_slip; events: ['grasp:ball', 'grasp_slip', 'grasp_miss']",
+          "randomization": {
+            "object_xy_jitter": 0.10735798132398806,
+            "object_yaw_jitter": 0.0,
+            "friction_scale": 0.4611114074907336,
+            "mass_scale": 1.2618933217759567,
+            "actuator_gain_scale": 1.1987121770800657,
+            "obs_noise_std": 0.006432256361776806,
+            "action_latency_steps": 2.0,
+            "ball.dx": -0.08321904208676496,
+            "ball.dy": -0.05691491501530681,
+            "ball.dyaw": 0.0
+          },
+          "video": null
+        },
+        {
+          "seed": 5117,
+          "tag": "grasp_slip",
+          "detail": "after 92 steps; cause: grasp_slip; events: ['grasp:ball', 'grasp_slip', 'grasp_miss']",
+          "randomization": {
+            "object_xy_jitter": 0.08659942117958014,
+            "object_yaw_jitter": 0.0,
+            "friction_scale": 0.45026073908472325,
+            "mass_scale": 0.9168045720023028,
+            "actuator_gain_scale": 0.9552151490055307,
+            "obs_noise_std": 0.008875724232095896,
+            "action_latency_steps": 0.0,
+            "ball.dx": -0.08596689294900679,
+            "ball.dy": 0.06323578662535953,
+            "ball.dyaw": 0.0
+          },
+          "video": null
+        },
+        {
+          "seed": 5143,
+          "tag": "grasp_slip",
+          "detail": "after 92 steps; cause: grasp_slip; events: ['grasp:ball', 'grasp_slip', 'grasp_miss']",
+          "randomization": {
+            "object_xy_jitter": 0.11768366941849816,
+            "object_yaw_jitter": 0.0,
+            "friction_scale": 0.4417164040137743,
+            "mass_scale": 0.9710396280729456,
+            "actuator_gain_scale": 1.0911929510688694,
+            "obs_noise_std": 0.008163406753152325,
+            "action_latency_steps": 1.0,
+            "ball.dx": -0.05165409443851472,
+            "ball.dy": 0.08496463783487858,
+            "ball.dyaw": 0.0
+          },
+          "video": null
+        },
+        {
+          "seed": 5158,
+          "tag": "wrong_placement",
+          "detail": "after 300 steps; cause: grasp:ball; events: ['grasp:ball', 'release:ball', 'grasp:ball', 'release:ball']",
+          "randomization": {
+            "object_xy_jitter": 0.0996084288619037,
+            "object_yaw_jitter": 0.0,
+            "friction_scale": 0.9701526933614772,
+            "mass_scale": 1.1903287918395944,
+            "actuator_gain_scale": 0.6715991979513528,
+            "obs_noise_std": 0.011720397932284302,
+            "action_latency_steps": 5.0,
+            "ball.dx": -0.049071272985590754,
+            "ball.dy": 0.0851347294337433,
+            "ball.dyaw": 0.0
+          },
+          "video": null
+        },
+        {
+          "seed": 5172,
+          "tag": "grasp_slip",
+          "detail": "after 87 steps; cause: grasp_slip; events: ['grasp:ball', 'grasp_slip', 'grasp_miss']",
+          "randomization": {
+            "object_xy_jitter": 0.054103296830823204,
+            "object_yaw_jitter": 0.0,
+            "friction_scale": 0.6457731650432443,
+            "mass_scale": 1.3896206078027653,
+            "actuator_gain_scale": 1.287869332932425,
+            "obs_noise_std": 0.0034707477278868395,
+            "action_latency_steps": 2.0,
+            "ball.dx": 0.0363065488177696,
+            "ball.dy": -0.03135549020152219,
+            "ball.dyaw": 0.0
+          },
+          "video": null
+        },
+        {
+          "seed": 5173,
+          "tag": "grasp_slip",
+          "detail": "after 97 steps; cause: grasp_slip; events: ['grasp:ball', 'grasp_slip', 'grasp_miss']",
+          "randomization": {
+            "object_xy_jitter": 0.11992589859224233,
+            "object_yaw_jitter": 0.0,
+            "friction_scale": 0.7551611313672922,
+            "mass_scale": 1.392056033473497,
+            "actuator_gain_scale": 1.1254311794096847,
+            "obs_noise_std": 0.005846344073955019,
+            "action_latency_steps": 1.0,
+            "ball.dx": -0.0490241245619011,
+            "ball.dy": 0.09509374762621438,
+            "ball.dyaw": 0.0
+          },
+          "video": null
+        }
+      ],
+      "created_at": "2026-11-15T06:14:08+00:00"
+    },
+    "oracle": {
+      "task_id": "franka_pick_ball_to_bin",
+      "skill": "pick_place",
+      "skill_version": "0.2.1",
+      "n_rollouts": 200,
+      "n_success": 180,
+      "success_rate": 0.9,
+      "ci95": [
+        0.8505931364369146,
+        0.9343300588284289
+      ],
+      "failure_counts": {
+        "grasp_slip": 10,
+        "ik_failure": 4,
+        "wrong_placement": 3,
+        "timeout": 3
+      },
+      "failures": [
+        {
+          "seed": 5012,
+          "tag": "grasp_slip",
+          "detail": "after 103 steps; cause: grasp_slip; events: ['grasp:ball', 'grasp_slip', 'grasp_miss']",
+          "randomization": {
+            "object_xy_jitter": 0.10481323413365415,
+            "object_yaw_jitter": 0.0,
+            "friction_scale": 0.5534177708662558,
+            "mass_scale": 1.0589641545653135,
+            "actuator_gain_scale": 0.9466319250949251,
+            "obs_noise_std": 0.005435579455486068,
+            "action_latency_steps": 3.0,
+            "ball.dx": -0.06793342391349622,
+            "ball.dy": 0.09497904480121114,
+            "ball.dyaw": 0.0
+          },
+          "video": null
+        },
+        {
+          "seed": 5020,
+          "tag": "ik_failure",
+          "detail": "after 295 steps; cause: ik_failure; events: ['grasp:ball', 'release:ball', 'ik_failure']",
+          "randomization": {
+            "object_xy_jitter": 0.06493567218569142,
+            "object_yaw_jitter": 0.0,
+            "friction_scale": 0.9224630709910899,
+            "mass_scale": 1.0610133489298101,
+            "actuator_gain_scale": 0.9750438499756608,
+            "obs_noise_std": 0.009908398385157884,
+            "action_latency_steps": 3.0,
+            "ball.dx": -0.0035379354182143094,
+            "ball.dy": -0.04292157603167483,
+            "ball.dyaw": 0.0
+          },
+          "video": null
+        },
+        {
+          "seed": 5027,
+          "tag": "ik_failure",
+          "detail": "after 86 steps; cause: ik_failure; events: ['grasp:ball', 'grasp_slip', 'grasp_miss', 'ik_failure']",
+          "randomization": {
+            "object_xy_jitter": 0.047424643848994065,
+            "object_yaw_jitter": 0.0,
+            "friction_scale": 0.44810266581711683,
+            "mass_scale": 0.809335608712365,
+            "actuator_gain_scale": 0.9309498663416108,
+            "obs_noise_std": 0.011105427211224844,
+            "action_latency_steps": 0.0,
+            "ball.dx": -0.001326775925827757,
+            "ball.dy": 0.030713468397974016,
+            "ball.dyaw": 0.0
+          },
+          "video": null
+        },
+        {
+          "seed": 5036,
+          "tag": "grasp_slip",
+          "detail": "after 181 steps; cause: grasp_slip; events: ['grasp:ball', 'grasp_slip', 'grasp_miss']",
+          "randomization": {
+            "object_xy_jitter": 0.07814933438479803,
+            "object_yaw_jitter": 0.0,
+            "friction_scale": 0.48912703083670905,
+            "mass_scale": 1.2916805393843638,
+            "actuator_gain_scale": 0.9649298863865027,
+            "obs_noise_std": 0.010540180377478668,
+            "action_latency_steps": 3.0,
+            "ball.dx": -0.061121957236550103,
+            "ball.dy": -0.04946273095741446,
+            "ball.dyaw": 0.0
+          },
+          "video": null
+        },
+        {
+          "seed": 5041,
+          "tag": "grasp_slip",
+          "detail": "after 89 steps; cause: grasp_slip; events: ['grasp:ball', 'grasp_slip', 'grasp_miss']",
+          "randomization": {
+            "object_xy_jitter": 0.0074871200813893465,
+            "object_yaw_jitter": 0.0,
+            "friction_scale": 0.840575502633223,
+            "mass_scale": 0.8707287572431941,
+            "actuator_gain_scale": 1.2984118971264071,
+            "obs_noise_std": 0.007188118179450985,
+            "action_latency_steps": 2.0,
+            "ball.dx": 0.006721189935429575,
+            "ball.dy": -0.003452196130929985,
+            "ball.dyaw": 0.0
+          },
+          "video": null
+        },
+        {
+          "seed": 5045,
+          "tag": "wrong_placement",
+          "detail": "after 300 steps; cause: grasp:ball; events: ['grasp:ball', 'release:ball']",
+          "randomization": {
+            "object_xy_jitter": 0.03273259825254528,
+            "object_yaw_jitter": 0.0,
+            "friction_scale": 0.8553106069399288,
+            "mass_scale": 1.177584592797627,
+            "actuator_gain_scale": 1.2184789403367917,
+            "obs_noise_std": 0.011663444338217624,
+            "action_latency_steps": 3.0,
+            "ball.dx": 0.0035270932505037586,
+            "ball.dy": 0.012397007071833423,
+            "ball.dyaw": 0.0
+          },
+          "video": null
+        },
+        {
+          "seed": 5066,
+          "tag": "ik_failure",
+          "detail": "after 162 steps; cause: ik_failure; events: ['collision:left_finger-table', 'collision:right_finger-table', 'grasp:ball', 'grasp_slip', 'grasp_miss', 'ik_failure']",
+          "randomization": {
+            "object_xy_jitter": 0.059219510889942734,
+            "object_yaw_jitter": 0.0,
+            "friction_scale": 0.7536070109766932,
+            "mass_scale": 0.7723402957046309,
+            "actuator_gain_scale": 1.0890949414648587,
+            "obs_noise_std": 0.009977519618759706,
+            "action_latency_steps": 5.0,
+            "ball.dx": -0.04846891896703498,
+            "ball.dy": 0.0563520957907936,
+            "ball.dyaw": 0.0
+          },
+          "video": null
+        },
+        {
+          "seed": 5077,
+          "tag": "grasp_slip",
+          "detail": "after 96 steps; cause: grasp_slip; events: ['grasp:ball', 'grasp_slip', 'grasp_miss']",
+          "randomization": {
+            "object_xy_jitter": 0.10099596225945999,
+            "object_yaw_jitter": 0.0,
+            "friction_scale": 0.45061798178440454,
+            "mass_scale": 1.159334971414453,
+            "actuator_gain_scale": 1.302451568949487,
+            "obs_noise_std": 0.003771811371063663,
+            "action_latency_steps": 3.0,
+            "ball.dx": -0.010655819371698613,
+            "ball.dy": -0.017659924139187072,
+            "ball.dyaw": 0.0
+          },
+          "video": null
+        },
+        {
+          "seed": 5079,
+          "tag": "timeout",
+          "detail": "after 300 steps; cause: still holding; events: ['grasp:ball', 'release:ball', 'grasp:ball', 'release:ball', 'grasp:ball']",
+          "randomization": {
+            "object_xy_jitter": 0.06339690443283744,
+            "object_yaw_jitter": 0.0,
+            "friction_scale": 0.6053600910247868,
+            "mass_scale": 0.793402797124881,
+            "actuator_gain_scale": 0.8208660260751944,
+            "obs_noise_std": 0.011395768592741029,
+            "action_latency_steps": 0.0,
+            "ball.dx": -0.04827544798371618,
+            "ball.dy": -0.03562396101502911,
+            "ball.dyaw": 0.0
+          },
+          "video": null
+        },
+        {
+          "seed": 5086,
+          "tag": "ik_failure",
+          "detail": "after 94 steps; cause: ik_failure; events: ['grasp:ball', 'grasp_slip', 'grasp_miss', 'ik_failure']",
+          "randomization": {
+            "object_xy_jitter": 0.07211092986809625,
+            "object_yaw_jitter": 0.0,
+            "friction_scale": 0.7025508751555298,
+            "mass_scale": 1.4120744399843257,
+            "actuator_gain_scale": 1.2087111550370475,
+            "obs_noise_std": 0.008511944920806334,
+            "action_latency_steps": 2.0,
+            "ball.dx": -0.024723445566625972,
+            "ball.dy": -0.05271784095705262,
+            "ball.dyaw": 0.0
+          },
+          "video": null
+        },
+        {
+          "seed": 5092,
+          "tag": "wrong_placement",
+          "detail": "after 300 steps; cause: grasp:ball; events: ['grasp:ball', 'release:ball']",
+          "randomization": {
+            "object_xy_jitter": 0.03662487765740241,
+            "object_yaw_jitter": 0.0,
+            "friction_scale": 0.9859875628328627,
+            "mass_scale": 1.0775455691188998,
+            "actuator_gain_scale": 0.6322763960143106,
+            "obs_noise_std": 0.010307643201234422,
+            "action_latency_steps": 3.0,
+            "ball.dx": -0.003112783011214662,
+            "ball.dy": -0.021862326526327802,
+            "ball.dyaw": 0.0
+          },
+          "video": null
+        },
+        {
+          "seed": 5094,
+          "tag": "timeout",
+          "detail": "after 300 steps; cause: still holding; events: ['release:ball', 'grasp:ball', 'release:ball', 'grasp:ball', 'release:ball', 'grasp:ball']",
+          "randomization": {
+            "object_xy_jitter": 0.0920697982767425,
+            "object_yaw_jitter": 0.0,
+            "friction_scale": 0.7612557946945797,
+            "mass_scale": 0.9286236030133205,
+            "actuator_gain_scale": 1.1065832073250115,
+            "obs_noise_std": 0.010985562953751605,
+            "action_latency_steps": 1.0,
+            "ball.dx": -0.0016746568997824257,
+            "ball.dy": 0.003211555041547326,
+            "ball.dyaw": 0.0
+          },
+          "video": null
+        },
+        {
+          "seed": 5109,
+          "tag": "grasp_slip",
+          "detail": "after 272 steps; cause: grasp_slip; events: ['release:ball', 'grasp:ball', 'release:ball', 'grasp:ball', 'grasp_slip', 'grasp_miss']",
+          "randomization": {
+            "object_xy_jitter": 0.031496956135486476,
+            "object_yaw_jitter": 0.0,
+            "friction_scale": 0.6165499648938928,
+            "mass_scale": 1.3431386631906452,
+            "actuator_gain_scale": 0.8320907839963937,
+            "obs_noise_std": 0.011771022500783676,
+            "action_latency_steps": 2.0,
+            "ball.dx": -0.030480885080059267,
+            "ball.dy": 0.019468521212386368,
+            "ball.dyaw": 0.0
+          },
+          "video": null
+        },
+        {
+          "seed": 5110,
+          "tag": "timeout",
+          "detail": "after 300 steps; cause: still holding; events: ['grasp:ball', 'release:ball', 'grasp:ball', 'release:ball', 'grasp:ball']",
+          "randomization": {
+            "object_xy_jitter": 0.11555742148104962,
+            "object_yaw_jitter": 0.0,
+            "friction_scale": 0.7598886574310173,
+            "mass_scale": 1.0102264064144348,
+            "actuator_gain_scale": 0.9948620359902192,
+            "obs_noise_std": 0.011499014380249088,
+            "action_latency_steps": 1.0,
+            "ball.dx": -0.09001260921021068,
+            "ball.dy": -0.06987652412234295,
+            "ball.dyaw": 0.0
+          },
+          "video": null
+        },
+        {
+          "seed": 5115,
+          "tag": "grasp_slip",
+          "detail": "after 114 steps; cause: grasp_slip; events: ['grasp:ball', 'grasp_slip', 'grasp_miss']",
+          "randomization": {
+            "object_xy_jitter": 0.10735798132398806,
+            "object_yaw_jitter": 0.0,
+            "friction_scale": 0.4611114074907336,
+            "mass_scale": 1.2618933217759567,
+            "actuator_gain_scale": 1.1987121770800657,
+            "obs_noise_std": 0.006432256361776806,
+            "action_latency_steps": 2.0,
+            "ball.dx": -0.08321904208676496,
+            "ball.dy": -0.05691491501530681,
+            "ball.dyaw": 0.0
+          },
+          "video": null
+        },
+        {
+          "seed": 5117,
+          "tag": "grasp_slip",
+          "detail": "after 92 steps; cause: grasp_slip; events: ['grasp:ball', 'grasp_slip', 'grasp_miss']",
+          "randomization": {
+            "object_xy_jitter": 0.08659942117958014,
+            "object_yaw_jitter": 0.0,
+            "friction_scale": 0.45026073908472325,
+            "mass_scale": 0.9168045720023028,
+            "actuator_gain_scale": 0.9552151490055307,
+            "obs_noise_std": 0.008875724232095896,
+            "action_latency_steps": 0.0,
+            "ball.dx": -0.08596689294900679,
+            "ball.dy": 0.06323578662535953,
+            "ball.dyaw": 0.0
+          },
+          "video": null
+        },
+        {
+          "seed": 5143,
+          "tag": "grasp_slip",
+          "detail": "after 92 steps; cause: grasp_slip; events: ['grasp:ball', 'grasp_slip', 'grasp_miss']",
+          "randomization": {
+            "object_xy_jitter": 0.11768366941849816,
+            "object_yaw_jitter": 0.0,
+            "friction_scale": 0.4417164040137743,
+            "mass_scale": 0.9710396280729456,
+            "actuator_gain_scale": 1.0911929510688694,
+            "obs_noise_std": 0.008163406753152325,
+            "action_latency_steps": 1.0,
+            "ball.dx": -0.05165409443851472,
+            "ball.dy": 0.08496463783487858,
+            "ball.dyaw": 0.0
+          },
+          "video": null
+        },
+        {
+          "seed": 5158,
+          "tag": "wrong_placement",
+          "detail": "after 300 steps; cause: grasp:ball; events: ['grasp:ball', 'release:ball', 'grasp:ball', 'release:ball']",
+          "randomization": {
+            "object_xy_jitter": 0.0996084288619037,
+            "object_yaw_jitter": 0.0,
+            "friction_scale": 0.9701526933614772,
+            "mass_scale": 1.1903287918395944,
+            "actuator_gain_scale": 0.6715991979513528,
+            "obs_noise_std": 0.011720397932284302,
+            "action_latency_steps": 5.0,
+            "ball.dx": -0.049071272985590754,
+            "ball.dy": 0.0851347294337433,
+            "ball.dyaw": 0.0
+          },
+          "video": null
+        },
+        {
+          "seed": 5172,
+          "tag": "grasp_slip",
+          "detail": "after 87 steps; cause: grasp_slip; events: ['grasp:ball', 'grasp_slip', 'grasp_miss']",
+          "randomization": {
+            "object_xy_jitter": 0.054103296830823204,
+            "object_yaw_jitter": 0.0,
+            "friction_scale": 0.6457731650432443,
+            "mass_scale": 1.3896206078027653,
+            "actuator_gain_scale": 1.287869332932425,
+            "obs_noise_std": 0.0034707477278868395,
+            "action_latency_steps": 2.0,
+            "ball.dx": 0.0363065488177696,
+            "ball.dy": -0.03135549020152219,
+            "ball.dyaw": 0.0
+          },
+          "video": null
+        },
+        {
+          "seed": 5173,
+          "tag": "grasp_slip",
+          "detail": "after 97 steps; cause: grasp_slip; events: ['grasp:ball', 'grasp_slip', 'grasp_miss']",
+          "randomization": {
+            "object_xy_jitter": 0.11992589859224233,
+            "object_yaw_jitter": 0.0,
+            "friction_scale": 0.7551611313672922,
+            "mass_scale": 1.392056033473497,
+            "actuator_gain_scale": 1.1254311794096847,
+            "obs_noise_std": 0.005846344073955019,
+            "action_latency_steps": 1.0,
+            "ball.dx": -0.0490241245619011,
+            "ball.dy": 0.09509374762621438,
+            "ball.dyaw": 0.0
+          },
+          "video": null
+        }
+      ],
+      "created_at": "2026-11-15T06:14:10+00:00"
+    },
+    "depth": {
+      "task_id": "franka_pick_ball_to_bin",
+      "skill": "pick_place",
+      "skill_version": "0.2.1",
+      "n_rollouts": 200,
+      "n_success": 193,
+      "success_rate": 0.965,
+      "ci95": [
+        0.9295285391333187,
+        0.9829446753626429
+      ],
+      "failure_counts": {
+        "grasp_slip": 6,
+        "ik_failure": 1
+      },
+      "failures": [
+        {
+          "seed": 5012,
+          "tag": "grasp_slip",
+          "detail": "after 109 steps; cause: grasp_slip; events: ['grasp:ball', 'grasp_slip', 'grasp_miss', 'perception_miss:ball', 'perception_miss:ball']",
+          "randomization": {
+            "object_xy_jitter": 0.10481323413365415,
+            "object_yaw_jitter": 0.0,
+            "friction_scale": 0.5534177708662558,
+            "mass_scale": 1.0589641545653135,
+            "actuator_gain_scale": 0.9466319250949251,
+            "obs_noise_std": 0.005435579455486068,
+            "action_latency_steps": 3.0,
+            "ball.dx": -0.06793342391349622,
+            "ball.dy": 0.09497904480121114,
+            "ball.dyaw": 0.0
+          },
+          "video": null
+        },
+        {
+          "seed": 5070,
+          "tag": "ik_failure",
+          "detail": "after 79 steps; cause: ik_failure; events: ['grasp:ball', 'grasp_slip', 'grasp_miss', 'perception_miss:ball', 'ik_failure']",
+          "randomization": {
+            "object_xy_jitter": 0.0008875744723427381,
+            "object_yaw_jitter": 0.0,
+            "friction_scale": 0.476607398873089,
+            "mass_scale": 1.424711419942341,
+            "actuator_gain_scale": 1.3529317770552176,
+            "obs_noise_std": 0.0038924883029222506,
+            "action_latency_steps": 1.0,
+            "ball.dx": -0.00023802045593895708,
+            "ball.dy": -0.0006718428351349163,
+            "ball.dyaw": 0.0
+          },
+          "video": null
+        },
+        {
+          "seed": 5106,
+          "tag": "grasp_slip",
+          "detail": "after 101 steps; cause: grasp_slip; events: ['grasp:ball', 'grasp_slip', 'grasp_miss', 'perception_miss:ball', 'perception_miss:ball']",
+          "randomization": {
+            "object_xy_jitter": 0.11177665885651282,
+            "object_yaw_jitter": 0.0,
+            "friction_scale": 0.43928112806287206,
+            "mass_scale": 0.7438821048674523,
+            "actuator_gain_scale": 0.8827989865990984,
+            "obs_noise_std": 0.009471914052257772,
+            "action_latency_steps": 4.0,
+            "ball.dx": -0.07825356361160912,
+            "ball.dy": 0.07640517147047617,
+            "ball.dyaw": 0.0
+          },
+          "video": null
+        },
+        {
+          "seed": 5115,
+          "tag": "grasp_slip",
+          "detail": "after 118 steps; cause: grasp_slip; events: ['grasp:ball', 'grasp_slip', 'grasp_miss', 'perception_miss:ball', 'perception_miss:ball', 'perception_miss:ball']",
+          "randomization": {
+            "object_xy_jitter": 0.10735798132398806,
+            "object_yaw_jitter": 0.0,
+            "friction_scale": 0.4611114074907336,
+            "mass_scale": 1.2618933217759567,
+            "actuator_gain_scale": 1.1987121770800657,
+            "obs_noise_std": 0.006432256361776806,
+            "action_latency_steps": 2.0,
+            "ball.dx": -0.08321904208676496,
+            "ball.dy": -0.05691491501530681,
+            "ball.dyaw": 0.0
+          },
+          "video": null
+        },
+        {
+          "seed": 5117,
+          "tag": "grasp_slip",
+          "detail": "after 82 steps; cause: grasp_slip; events: ['grasp:ball', 'grasp_slip', 'grasp_miss']",
+          "randomization": {
+            "object_xy_jitter": 0.08659942117958014,
+            "object_yaw_jitter": 0.0,
+            "friction_scale": 0.45026073908472325,
+            "mass_scale": 0.9168045720023028,
+            "actuator_gain_scale": 0.9552151490055307,
+            "obs_noise_std": 0.008875724232095896,
+            "action_latency_steps": 0.0,
+            "ball.dx": -0.08596689294900679,
+            "ball.dy": 0.06323578662535953,
+            "ball.dyaw": 0.0
+          },
+          "video": null
+        },
+        {
+          "seed": 5124,
+          "tag": "grasp_slip",
+          "detail": "after 93 steps; cause: grasp_slip; events: ['grasp:ball', 'grasp_slip', 'grasp_miss', 'perception_miss:ball', 'perception_miss:ball', 'perception_miss:ball']",
+          "randomization": {
+            "object_xy_jitter": 0.11287555004513805,
+            "object_yaw_jitter": 0.0,
+            "friction_scale": 0.7158894297224283,
+            "mass_scale": 0.7820152124295412,
+            "actuator_gain_scale": 1.2667439548468382,
+            "obs_noise_std": 0.008259224279061176,
+            "action_latency_steps": 3.0,
+            "ball.dx": -0.08022047664850732,
+            "ball.dy": 0.032553369855523595,
+            "ball.dyaw": 0.0
+          },
+          "video": null
+        },
+        {
+          "seed": 5143,
+          "tag": "grasp_slip",
+          "detail": "after 96 steps; cause: grasp_slip; events: ['grasp:ball', 'grasp_slip', 'grasp_miss', 'perception_miss:ball', 'perception_miss:ball']",
+          "randomization": {
+            "object_xy_jitter": 0.11768366941849816,
+            "object_yaw_jitter": 0.0,
+            "friction_scale": 0.4417164040137743,
+            "mass_scale": 0.9710396280729456,
+            "actuator_gain_scale": 1.0911929510688694,
+            "obs_noise_std": 0.008163406753152325,
+            "action_latency_steps": 1.0,
+            "ball.dx": -0.05165409443851472,
+            "ball.dy": 0.08496463783487858,
+            "ball.dyaw": 0.0
+          },
+          "video": null
+        }
+      ],
+      "created_at": "2026-11-15T06:14:56+00:00"
+    },
+    "noisy": {
+      "task_id": "franka_pick_ball_to_bin",
+      "skill": "pick_place",
+      "skill_version": "0.2.1",
+      "n_rollouts": 200,
+      "n_success": 193,
+      "success_rate": 0.965,
+      "ci95": [
+        0.9295285391333187,
+        0.9829446753626429
+      ],
+      "failure_counts": {
+        "grasp_slip": 6,
+        "ik_failure": 1
+      },
+      "failures": [
+        {
+          "seed": 5012,
+          "tag": "grasp_slip",
+          "detail": "after 103 steps; cause: grasp_slip; events: ['grasp:ball', 'grasp_slip', 'grasp_miss', 'perception_miss:ball', 'perception_miss:ball']",
+          "randomization": {
+            "object_xy_jitter": 0.10481323413365415,
+            "object_yaw_jitter": 0.0,
+            "friction_scale": 0.5534177708662558,
+            "mass_scale": 1.0589641545653135,
+            "actuator_gain_scale": 0.9466319250949251,
+            "obs_noise_std": 0.005435579455486068,
+            "action_latency_steps": 3.0,
+            "ball.dx": -0.06793342391349622,
+            "ball.dy": 0.09497904480121114,
+            "ball.dyaw": 0.0
+          },
+          "video": null
+        },
+        {
+          "seed": 5070,
+          "tag": "ik_failure",
+          "detail": "after 81 steps; cause: ik_failure; events: ['grasp:ball', 'grasp_slip', 'grasp_miss', 'perception_miss:ball', 'ik_failure']",
+          "randomization": {
+            "object_xy_jitter": 0.0008875744723427381,
+            "object_yaw_jitter": 0.0,
+            "friction_scale": 0.476607398873089,
+            "mass_scale": 1.424711419942341,
+            "actuator_gain_scale": 1.3529317770552176,
+            "obs_noise_std": 0.0038924883029222506,
+            "action_latency_steps": 1.0,
+            "ball.dx": -0.00023802045593895708,
+            "ball.dy": -0.0006718428351349163,
+            "ball.dyaw": 0.0
+          },
+          "video": null
+        },
+        {
+          "seed": 5106,
+          "tag": "grasp_slip",
+          "detail": "after 101 steps; cause: grasp_slip; events: ['grasp:ball', 'grasp_slip', 'grasp_miss', 'perception_miss:ball', 'perception_miss:ball']",
+          "randomization": {
+            "object_xy_jitter": 0.11177665885651282,
+            "object_yaw_jitter": 0.0,
+            "friction_scale": 0.43928112806287206,
+            "mass_scale": 0.7438821048674523,
+            "actuator_gain_scale": 0.8827989865990984,
+            "obs_noise_std": 0.009471914052257772,
+            "action_latency_steps": 4.0,
+            "ball.dx": -0.07825356361160912,
+            "ball.dy": 0.07640517147047617,
+            "ball.dyaw": 0.0
+          },
+          "video": null
+        },
+        {
+          "seed": 5115,
+          "tag": "grasp_slip",
+          "detail": "after 106 steps; cause: grasp_slip; events: ['grasp:ball', 'grasp_slip', 'grasp_miss', 'perception_miss:ball', 'perception_miss:ball', 'perception_miss:ball']",
+          "randomization": {
+            "object_xy_jitter": 0.10735798132398806,
+            "object_yaw_jitter": 0.0,
+            "friction_scale": 0.4611114074907336,
+            "mass_scale": 1.2618933217759567,
+            "actuator_gain_scale": 1.1987121770800657,
+            "obs_noise_std": 0.006432256361776806,
+            "action_latency_steps": 2.0,
+            "ball.dx": -0.08321904208676496,
+            "ball.dy": -0.05691491501530681,
+            "ball.dyaw": 0.0
+          },
+          "video": null
+        },
+        {
+          "seed": 5117,
+          "tag": "grasp_slip",
+          "detail": "after 88 steps; cause: grasp_slip; events: ['grasp:ball', 'grasp_slip', 'grasp_miss', 'perception_miss:ball']",
+          "randomization": {
+            "object_xy_jitter": 0.08659942117958014,
+            "object_yaw_jitter": 0.0,
+            "friction_scale": 0.45026073908472325,
+            "mass_scale": 0.9168045720023028,
+            "actuator_gain_scale": 0.9552151490055307,
+            "obs_noise_std": 0.008875724232095896,
+            "action_latency_steps": 0.0,
+            "ball.dx": -0.08596689294900679,
+            "ball.dy": 0.06323578662535953,
+            "ball.dyaw": 0.0
+          },
+          "video": null
+        },
+        {
+          "seed": 5124,
+          "tag": "grasp_slip",
+          "detail": "after 93 steps; cause: grasp_slip; events: ['grasp_slip', 'grasp_miss', 'perception_miss:ball', 'perception_miss:ball', 'perception_miss:ball', 'perception_miss:ball']",
+          "randomization": {
+            "object_xy_jitter": 0.11287555004513805,
+            "object_yaw_jitter": 0.0,
+            "friction_scale": 0.7158894297224283,
+            "mass_scale": 0.7820152124295412,
+            "actuator_gain_scale": 1.2667439548468382,
+            "obs_noise_std": 0.008259224279061176,
+            "action_latency_steps": 3.0,
+            "ball.dx": -0.08022047664850732,
+            "ball.dy": 0.032553369855523595,
+            "ball.dyaw": 0.0
+          },
+          "video": null
+        },
+        {
+          "seed": 5143,
+          "tag": "grasp_slip",
+          "detail": "after 88 steps; cause: grasp_slip; events: ['grasp:ball', 'grasp_slip', 'grasp_miss', 'perception_miss:ball', 'perception_miss:ball']",
+          "randomization": {
+            "object_xy_jitter": 0.11768366941849816,
+            "object_yaw_jitter": 0.0,
+            "friction_scale": 0.4417164040137743,
+            "mass_scale": 0.9710396280729456,
+            "actuator_gain_scale": 1.0911929510688694,
+            "obs_noise_std": 0.008163406753152325,
+            "action_latency_steps": 1.0,
+            "ball.dx": -0.05165409443851472,
+            "ball.dy": 0.08496463783487858,
+            "ball.dyaw": 0.0
+          },
+          "video": null
+        }
+      ],
+      "created_at": "2026-11-15T06:15:51+00:00"
+    }
+  },
+  "paired": {
+    "true_vs_oracle": {
+      "both": 180,
+      "true_only": 0,
+      "oracle_only": 0,
+      "neither": 20
+    },
+    "true_vs_depth": {
+      "both": 177,
+      "true_only": 3,
+      "depth_only": 16,
+      "neither": 4
+    },
+    "true_vs_noisy": {
+      "both": 177,
+      "true_only": 3,
+      "noisy_only": 16,
+      "neither": 4
+    }
+  }
+}
