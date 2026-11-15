@@ -1,0 +1,595 @@
+{
+  "task": "franka_pick_cube_to_bin_hard",
+  "seeds": [
+    5000,
+    5200
+  ],
+  "reports": {
+    "true": {
+      "task_id": "franka_pick_cube_to_bin_hard",
+      "skill": "pick_place",
+      "skill_version": "0.2.2",
+      "n_rollouts": 200,
+      "n_success": 195,
+      "success_rate": 0.975,
+      "ci95": [
+        0.9428208558483829,
+        0.9892754385292123
+      ],
+      "failure_counts": {
+        "timeout": 3,
+        "grasp_slip": 1,
+        "collision": 1
+      },
+      "failures": [
+        {
+          "seed": 5012,
+          "tag": "timeout",
+          "detail": "after 300 steps; cause: still holding; events: ['grasp:cube']",
+          "randomization": {
+            "object_xy_jitter": 0.1222821064892632,
+            "object_yaw_jitter": 0.7716837801692215,
+            "friction_scale": 0.4278481423885464,
+            "mass_scale": 1.0589641545653135,
+            "actuator_gain_scale": 0.9466319250949251,
+            "obs_noise_std": 0.006794474319357585,
+            "action_latency_steps": 3.0,
+            "cube.dx": -0.07925566123241226,
+            "cube.dy": 0.11080888560141301,
+            "cube.dyaw": -0.5862370031559319
+          },
+          "video": null
+        },
+        {
+          "seed": 5014,
+          "tag": "grasp_slip",
+          "detail": "after 300 steps; cause: grasp_slip; events: ['grasp:cube', 'grasp_slip', 'grasp_miss']",
+          "randomization": {
+            "object_xy_jitter": 0.08740829530674951,
+            "object_yaw_jitter": 0.6043331444982686,
+            "friction_scale": 0.6259779341386033,
+            "mass_scale": 1.132693948697934,
+            "actuator_gain_scale": 1.1615371038083717,
+            "obs_noise_std": 0.013145137462493605,
+            "action_latency_steps": 3.0,
+            "cube.dx": -0.05567358504452106,
+            "cube.dy": 0.059136556524721606,
+            "cube.dyaw": 0.4794574027985935
+          },
+          "video": null
+        },
+        {
+          "seed": 5024,
+          "tag": "timeout",
+          "detail": "after 300 steps; events: []",
+          "randomization": {
+            "object_xy_jitter": 0.103523974335773,
+            "object_yaw_jitter": 0.21771646338647677,
+            "friction_scale": 0.4591963933698863,
+            "mass_scale": 0.9707645258489002,
+            "actuator_gain_scale": 1.2571162238891223,
+            "obs_noise_std": 0.004513459684263332,
+            "action_latency_steps": 3.0,
+            "cube.dx": -0.08820743821910615,
+            "cube.dy": -0.06541525835020508,
+            "cube.dyaw": 0.03294579075992882
+          },
+          "video": null
+        },
+        {
+          "seed": 5038,
+          "tag": "timeout",
+          "detail": "after 300 steps; cause: still holding; events: ['grasp:cube']",
+          "randomization": {
+            "object_xy_jitter": 0.13250090839040443,
+            "object_yaw_jitter": 0.6977506474474846,
+            "friction_scale": 0.742590347215657,
+            "mass_scale": 0.7430904080980584,
+            "actuator_gain_scale": 0.6894192634588278,
+            "obs_noise_std": 0.008241313687091936,
+            "action_latency_steps": 5.0,
+            "cube.dx": -0.12419320115209186,
+            "cube.dy": -0.013628072703163893,
+            "cube.dyaw": -0.5425966343881719
+          },
+          "video": null
+        },
+        {
+          "seed": 5195,
+          "tag": "collision",
+          "detail": "after 300 steps; cause: collision:right_finger-table; events: ['grasp_slip', 'grasp_miss', 'collision:right_finger-table', 'grasp:cube', 'grasp_slip', 'grasp_miss']",
+          "randomization": {
+            "object_xy_jitter": 0.10836372935713447,
+            "object_yaw_jitter": 0.6210711494671234,
+            "friction_scale": 0.5780649662441664,
+            "mass_scale": 1.4966185745508185,
+            "actuator_gain_scale": 1.0541672753361957,
+            "obs_noise_std": 0.010839546720525407,
+            "action_latency_steps": 5.0,
+            "cube.dx": -0.07429160819400368,
+            "cube.dy": 0.013446843386768312,
+            "cube.dyaw": -0.6188946437696551
+          },
+          "video": null
+        }
+      ],
+      "created_at": "2026-11-15T05:27:31+00:00"
+    },
+    "oracle": {
+      "task_id": "franka_pick_cube_to_bin_hard",
+      "skill": "pick_place",
+      "skill_version": "0.2.2",
+      "n_rollouts": 200,
+      "n_success": 195,
+      "success_rate": 0.975,
+      "ci95": [
+        0.9428208558483829,
+        0.9892754385292123
+      ],
+      "failure_counts": {
+        "timeout": 3,
+        "grasp_slip": 1,
+        "collision": 1
+      },
+      "failures": [
+        {
+          "seed": 5012,
+          "tag": "timeout",
+          "detail": "after 300 steps; cause: still holding; events: ['grasp:cube']",
+          "randomization": {
+            "object_xy_jitter": 0.1222821064892632,
+            "object_yaw_jitter": 0.7716837801692215,
+            "friction_scale": 0.4278481423885464,
+            "mass_scale": 1.0589641545653135,
+            "actuator_gain_scale": 0.9466319250949251,
+            "obs_noise_std": 0.006794474319357585,
+            "action_latency_steps": 3.0,
+            "cube.dx": -0.07925566123241226,
+            "cube.dy": 0.11080888560141301,
+            "cube.dyaw": -0.5862370031559319
+          },
+          "video": null
+        },
+        {
+          "seed": 5014,
+          "tag": "grasp_slip",
+          "detail": "after 300 steps; cause: grasp_slip; events: ['grasp:cube', 'grasp_slip', 'grasp_miss']",
+          "randomization": {
+            "object_xy_jitter": 0.08740829530674951,
+            "object_yaw_jitter": 0.6043331444982686,
+            "friction_scale": 0.6259779341386033,
+            "mass_scale": 1.132693948697934,
+            "actuator_gain_scale": 1.1615371038083717,
+            "obs_noise_std": 0.013145137462493605,
+            "action_latency_steps": 3.0,
+            "cube.dx": -0.05567358504452106,
+            "cube.dy": 0.059136556524721606,
+            "cube.dyaw": 0.4794574027985935
+          },
+          "video": null
+        },
+        {
+          "seed": 5024,
+          "tag": "timeout",
+          "detail": "after 300 steps; events: []",
+          "randomization": {
+            "object_xy_jitter": 0.103523974335773,
+            "object_yaw_jitter": 0.21771646338647677,
+            "friction_scale": 0.4591963933698863,
+            "mass_scale": 0.9707645258489002,
+            "actuator_gain_scale": 1.2571162238891223,
+            "obs_noise_std": 0.004513459684263332,
+            "action_latency_steps": 3.0,
+            "cube.dx": -0.08820743821910615,
+            "cube.dy": -0.06541525835020508,
+            "cube.dyaw": 0.03294579075992882
+          },
+          "video": null
+        },
+        {
+          "seed": 5038,
+          "tag": "timeout",
+          "detail": "after 300 steps; cause: still holding; events: ['grasp:cube']",
+          "randomization": {
+            "object_xy_jitter": 0.13250090839040443,
+            "object_yaw_jitter": 0.6977506474474846,
+            "friction_scale": 0.742590347215657,
+            "mass_scale": 0.7430904080980584,
+            "actuator_gain_scale": 0.6894192634588278,
+            "obs_noise_std": 0.008241313687091936,
+            "action_latency_steps": 5.0,
+            "cube.dx": -0.12419320115209186,
+            "cube.dy": -0.013628072703163893,
+            "cube.dyaw": -0.5425966343881719
+          },
+          "video": null
+        },
+        {
+          "seed": 5195,
+          "tag": "collision",
+          "detail": "after 300 steps; cause: collision:right_finger-table; events: ['grasp_slip', 'grasp_miss', 'collision:right_finger-table', 'grasp:cube', 'grasp_slip', 'grasp_miss']",
+          "randomization": {
+            "object_xy_jitter": 0.10836372935713447,
+            "object_yaw_jitter": 0.6210711494671234,
+            "friction_scale": 0.5780649662441664,
+            "mass_scale": 1.4966185745508185,
+            "actuator_gain_scale": 1.0541672753361957,
+            "obs_noise_std": 0.010839546720525407,
+            "action_latency_steps": 5.0,
+            "cube.dx": -0.07429160819400368,
+            "cube.dy": 0.013446843386768312,
+            "cube.dyaw": -0.6188946437696551
+          },
+          "video": null
+        }
+      ],
+      "created_at": "2026-11-15T05:27:34+00:00"
+    },
+    "depth": {
+      "task_id": "franka_pick_cube_to_bin_hard",
+      "skill": "pick_place",
+      "skill_version": "0.2.2",
+      "n_rollouts": 200,
+      "n_success": 194,
+      "success_rate": 0.97,
+      "ci95": [
+        0.9361048802675267,
+        0.9861798741692518
+      ],
+      "failure_counts": {
+        "timeout": 1,
+        "grasp_slip": 2,
+        "wrong_placement": 3
+      },
+      "failures": [
+        {
+          "seed": 5038,
+          "tag": "timeout",
+          "detail": "after 300 steps; cause: still holding; events: ['grasp:cube']",
+          "randomization": {
+            "object_xy_jitter": 0.13250090839040443,
+            "object_yaw_jitter": 0.6977506474474846,
+            "friction_scale": 0.742590347215657,
+            "mass_scale": 0.7430904080980584,
+            "actuator_gain_scale": 0.6894192634588278,
+            "obs_noise_std": 0.008241313687091936,
+            "action_latency_steps": 5.0,
+            "cube.dx": -0.12419320115209186,
+            "cube.dy": -0.013628072703163893,
+            "cube.dyaw": -0.5425966343881719
+          },
+          "video": null
+        },
+        {
+          "seed": 5072,
+          "tag": "grasp_slip",
+          "detail": "after 300 steps; cause: grasp_slip; events: ['grasp_miss', 'grasp:cube', 'grasp_slip', 'grasp:cube', 'grasp_slip', 'grasp_miss']",
+          "randomization": {
+            "object_xy_jitter": 0.12091216878300826,
+            "object_yaw_jitter": 0.7546641691427134,
+            "friction_scale": 0.6985378558051154,
+            "mass_scale": 1.4300527202554183,
+            "actuator_gain_scale": 1.126310957647907,
+            "obs_noise_std": 0.003481226919451469,
+            "action_latency_steps": 5.0,
+            "cube.dx": 0.011906833758851348,
+            "cube.dy": 0.022249469820076723,
+            "cube.dyaw": -0.7217841088088255
+          },
+          "video": null
+        },
+        {
+          "seed": 5081,
+          "tag": "wrong_placement",
+          "detail": "after 300 steps; cause: grasp:cube; events: ['grasp:cube', 'release:cube']",
+          "randomization": {
+            "object_xy_jitter": 0.1158447037034327,
+            "object_yaw_jitter": 0.30988541449681517,
+            "friction_scale": 0.6055678477599317,
+            "mass_scale": 1.0611354585144963,
+            "actuator_gain_scale": 0.8951021414173503,
+            "obs_noise_std": 0.007990584368475953,
+            "action_latency_steps": 3.0,
+            "cube.dx": -0.057802411857123266,
+            "cube.dy": 0.1107169949546764,
+            "cube.dyaw": 0.2026726176735446
+          },
+          "video": null
+        },
+        {
+          "seed": 5106,
+          "tag": "wrong_placement",
+          "detail": "after 300 steps; cause: grasp:cube; events: ['grasp:cube', 'release:cube']",
+          "randomization": {
+            "object_xy_jitter": 0.13040610199926497,
+            "object_yaw_jitter": 0.0764001694418139,
+            "friction_scale": 0.3327342733857267,
+            "mass_scale": 0.7438821048674523,
+            "actuator_gain_scale": 0.8827989865990984,
+            "obs_noise_std": 0.011839892565322216,
+            "action_latency_steps": 5.0,
+            "cube.dx": -0.091295824213544,
+            "cube.dy": 0.08913936671555556,
+            "cube.dyaw": -0.051673662933603884
+          },
+          "video": null
+        },
+        {
+          "seed": 5146,
+          "tag": "wrong_placement",
+          "detail": "after 300 steps; cause: grasp:cube; events: ['grasp:cube', 'release:cube']",
+          "randomization": {
+            "object_xy_jitter": 0.13954019695436637,
+            "object_yaw_jitter": 0.718233947710043,
+            "friction_scale": 0.46446684035436636,
+            "mass_scale": 0.9861867991411238,
+            "actuator_gain_scale": 1.286410484822032,
+            "obs_noise_std": 0.0023137307200456754,
+            "action_latency_steps": 3.0,
+            "cube.dx": -0.04029668658522856,
+            "cube.dy": 0.04926959270443762,
+            "cube.dyaw": 0.0969335807823517
+          },
+          "video": null
+        },
+        {
+          "seed": 5195,
+          "tag": "grasp_slip",
+          "detail": "after 300 steps; cause: grasp_slip; events: ['grasp:cube', 'grasp_slip', 'grasp_miss', 'grasp:cube', 'grasp_slip', 'grasp_miss']",
+          "randomization": {
+            "object_xy_jitter": 0.10836372935713447,
+            "object_yaw_jitter": 0.6210711494671234,
+            "friction_scale": 0.5780649662441664,
+            "mass_scale": 1.4966185745508185,
+            "actuator_gain_scale": 1.0541672753361957,
+            "obs_noise_std": 0.010839546720525407,
+            "action_latency_steps": 5.0,
+            "cube.dx": -0.07429160819400368,
+            "cube.dy": 0.013446843386768312,
+            "cube.dyaw": -0.6188946437696551
+          },
+          "video": null
+        }
+      ],
+      "created_at": "2026-11-15T05:28:44+00:00"
+    },
+    "noisy": {
+      "task_id": "franka_pick_cube_to_bin_hard",
+      "skill": "pick_place",
+      "skill_version": "0.2.2",
+      "n_rollouts": 200,
+      "n_success": 189,
+      "success_rate": 0.945,
+      "ci95": [
+        0.9042120755340645,
+        0.9690149791986299
+      ],
+      "failure_counts": {
+        "timeout": 3,
+        "wrong_placement": 5,
+        "grasp_slip": 3
+      },
+      "failures": [
+        {
+          "seed": 5012,
+          "tag": "timeout",
+          "detail": "after 300 steps; cause: still holding; events: ['grasp:cube']",
+          "randomization": {
+            "object_xy_jitter": 0.1222821064892632,
+            "object_yaw_jitter": 0.7716837801692215,
+            "friction_scale": 0.4278481423885464,
+            "mass_scale": 1.0589641545653135,
+            "actuator_gain_scale": 0.9466319250949251,
+            "obs_noise_std": 0.006794474319357585,
+            "action_latency_steps": 3.0,
+            "cube.dx": -0.07925566123241226,
+            "cube.dy": 0.11080888560141301,
+            "cube.dyaw": -0.5862370031559319
+          },
+          "video": null
+        },
+        {
+          "seed": 5013,
+          "tag": "wrong_placement",
+          "detail": "after 300 steps; cause: grasp:cube; events: ['grasp:cube', 'release:cube']",
+          "randomization": {
+            "object_xy_jitter": 0.10908111853925065,
+            "object_yaw_jitter": 0.5820159699611631,
+            "friction_scale": 0.44332502897502324,
+            "mass_scale": 0.8675535592101685,
+            "actuator_gain_scale": 0.925076599519406,
+            "obs_noise_std": 0.0021518326838812496,
+            "action_latency_steps": 4.0,
+            "cube.dx": -0.06843184425534549,
+            "cube.dy": 0.057821249249130485,
+            "cube.dyaw": -0.2321607380809531
+          },
+          "video": null
+        },
+        {
+          "seed": 5024,
+          "tag": "timeout",
+          "detail": "after 300 steps; events: []",
+          "randomization": {
+            "object_xy_jitter": 0.103523974335773,
+            "object_yaw_jitter": 0.21771646338647677,
+            "friction_scale": 0.4591963933698863,
+            "mass_scale": 0.9707645258489002,
+            "actuator_gain_scale": 1.2571162238891223,
+            "obs_noise_std": 0.004513459684263332,
+            "action_latency_steps": 3.0,
+            "cube.dx": -0.08820743821910615,
+            "cube.dy": -0.06541525835020508,
+            "cube.dyaw": 0.03294579075992882
+          },
+          "video": null
+        },
+        {
+          "seed": 5038,
+          "tag": "timeout",
+          "detail": "after 300 steps; cause: still holding; events: ['grasp:cube']",
+          "randomization": {
+            "object_xy_jitter": 0.13250090839040443,
+            "object_yaw_jitter": 0.6977506474474846,
+            "friction_scale": 0.742590347215657,
+            "mass_scale": 0.7430904080980584,
+            "actuator_gain_scale": 0.6894192634588278,
+            "obs_noise_std": 0.008241313687091936,
+            "action_latency_steps": 5.0,
+            "cube.dx": -0.12419320115209186,
+            "cube.dy": -0.013628072703163893,
+            "cube.dyaw": -0.5425966343881719
+          },
+          "video": null
+        },
+        {
+          "seed": 5069,
+          "tag": "wrong_placement",
+          "detail": "after 300 steps; cause: grasp:cube; events: ['grasp:cube', 'release:cube']",
+          "randomization": {
+            "object_xy_jitter": 0.08481302554516443,
+            "object_yaw_jitter": 0.07918105820821683,
+            "friction_scale": 0.5035976029945266,
+            "mass_scale": 1.1370524815234067,
+            "actuator_gain_scale": 0.8913357854431244,
+            "obs_noise_std": 0.008767237598385484,
+            "action_latency_steps": 3.0,
+            "cube.dx": -0.06924982552956879,
+            "cube.dy": 0.054861184944089425,
+            "cube.dyaw": 0.017181679151363538
+          },
+          "video": null
+        },
+        {
+          "seed": 5071,
+          "tag": "wrong_placement",
+          "detail": "after 300 steps; cause: grasp:cube; events: ['grasp:cube', 'release:cube']",
+          "randomization": {
+            "object_xy_jitter": 0.08154429181062978,
+            "object_yaw_jitter": 0.0997635304968871,
+            "friction_scale": 0.46009376593193646,
+            "mass_scale": 1.2336456592459069,
+            "actuator_gain_scale": 0.8053684860226036,
+            "obs_noise_std": 0.004963006689084844,
+            "action_latency_steps": 2.0,
+            "cube.dx": -0.06917483085244613,
+            "cube.dy": 0.05092453663623042,
+            "cube.dyaw": 0.08517298327228215
+          },
+          "video": null
+        },
+        {
+          "seed": 5072,
+          "tag": "grasp_slip",
+          "detail": "after 300 steps; cause: grasp_slip; events: ['grasp:cube', 'grasp_slip', 'grasp_miss', 'grasp:cube', 'grasp_slip', 'grasp_miss']",
+          "randomization": {
+            "object_xy_jitter": 0.12091216878300826,
+            "object_yaw_jitter": 0.7546641691427134,
+            "friction_scale": 0.6985378558051154,
+            "mass_scale": 1.4300527202554183,
+            "actuator_gain_scale": 1.126310957647907,
+            "obs_noise_std": 0.003481226919451469,
+            "action_latency_steps": 5.0,
+            "cube.dx": 0.011906833758851348,
+            "cube.dy": 0.022249469820076723,
+            "cube.dyaw": -0.7217841088088255
+          },
+          "video": null
+        },
+        {
+          "seed": 5081,
+          "tag": "wrong_placement",
+          "detail": "after 300 steps; cause: grasp:cube; events: ['grasp:cube', 'release:cube']",
+          "randomization": {
+            "object_xy_jitter": 0.1158447037034327,
+            "object_yaw_jitter": 0.30988541449681517,
+            "friction_scale": 0.6055678477599317,
+            "mass_scale": 1.0611354585144963,
+            "actuator_gain_scale": 0.8951021414173503,
+            "obs_noise_std": 0.007990584368475953,
+            "action_latency_steps": 3.0,
+            "cube.dx": -0.057802411857123266,
+            "cube.dy": 0.1107169949546764,
+            "cube.dyaw": 0.2026726176735446
+          },
+          "video": null
+        },
+        {
+          "seed": 5109,
+          "tag": "grasp_slip",
+          "detail": "after 300 steps; cause: grasp_slip; events: ['grasp:cube', 'grasp_slip', 'grasp_miss']",
+          "randomization": {
+            "object_xy_jitter": 0.03674644882473422,
+            "object_yaw_jitter": 0.5554654745230817,
+            "friction_scale": 0.480458304078244,
+            "mass_scale": 1.3431386631906452,
+            "actuator_gain_scale": 0.8320907839963937,
+            "obs_noise_std": 0.014713778125979595,
+            "action_latency_steps": 2.0,
+            "cube.dx": -0.03556103259340248,
+            "cube.dy": 0.022713274747784097,
+            "cube.dyaw": 0.4950556510875005
+          },
+          "video": null
+        },
+        {
+          "seed": 5187,
+          "tag": "wrong_placement",
+          "detail": "after 300 steps; cause: grasp:cube; events: ['grasp:cube', 'release:cube']",
+          "randomization": {
+            "object_xy_jitter": 0.12769367220968827,
+            "object_yaw_jitter": 0.369055744989309,
+            "friction_scale": 0.5192740767108539,
+            "mass_scale": 1.0069566673561492,
+            "actuator_gain_scale": 0.8935376583549126,
+            "obs_noise_std": 0.002572503743160478,
+            "action_latency_steps": 4.0,
+            "cube.dx": -0.055254480775584314,
+            "cube.dy": -0.08707843618107561,
+            "cube.dyaw": -0.05257533089422872
+          },
+          "video": null
+        },
+        {
+          "seed": 5195,
+          "tag": "grasp_slip",
+          "detail": "after 300 steps; cause: grasp_slip; events: ['grasp:cube', 'grasp_slip', 'grasp_miss', 'grasp:cube', 'grasp_slip', 'grasp_miss']",
+          "randomization": {
+            "object_xy_jitter": 0.10836372935713447,
+            "object_yaw_jitter": 0.6210711494671234,
+            "friction_scale": 0.5780649662441664,
+            "mass_scale": 1.4966185745508185,
+            "actuator_gain_scale": 1.0541672753361957,
+            "obs_noise_std": 0.010839546720525407,
+            "action_latency_steps": 5.0,
+            "cube.dx": -0.07429160819400368,
+            "cube.dy": 0.013446843386768312,
+            "cube.dyaw": -0.6188946437696551
+          },
+          "video": null
+        }
+      ],
+      "created_at": "2026-11-15T05:30:20+00:00"
+    }
+  },
+  "paired": {
+    "true_vs_oracle": {
+      "both": 195,
+      "true_only": 0,
+      "oracle_only": 0,
+      "neither": 5
+    },
+    "true_vs_depth": {
+      "both": 191,
+      "true_only": 4,
+      "depth_only": 3,
+      "neither": 2
+    },
+    "true_vs_noisy": {
+      "both": 188,
+      "true_only": 7,
+      "noisy_only": 1,
+      "neither": 4
+    }
+  }
+}
