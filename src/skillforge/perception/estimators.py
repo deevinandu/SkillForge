@@ -5,10 +5,11 @@ observation noise): today's behaviour, and the reference for every comparison.
 `DepthEstimator` is classical and numpy-only: segment the object, back-project its depth pixels
 from every camera into one world-frame cloud, and fit the known `ObjectSpec` geometry to it.
 
-Assumptions of the geometric fit (stated, not hidden): the object rests upright on a horizontal
-surface or hangs upright in the gripper, so its top surface is horizontal. A box tipped onto an
-edge, a cylinder lying on its side or an object half hidden by the fingers does not match that
-model: it gets a coarse estimate (the centre of the visible points) and a low confidence.
+Assumptions of the geometric fit (stated, not hidden): a box rests upright on a horizontal
+surface or hangs upright in the gripper, so its top surface is horizontal; a cylinder stands
+upright or lies on its side. A box tipped onto an edge, a cylinder at some other tilt, or an
+object half hidden by the fingers does not match: it gets a coarse estimate (the centre of the
+visible points) and a low confidence.
 """
 
 from __future__ import annotations
@@ -32,6 +33,10 @@ class Estimate:
     # `min_confidence` the pose is coarse: the centre of the visible points, not a model fit.
     confidence: float = 0.0
     n_points: int = 0
+    # Horizontal position from a part of the fit that survives a hidden top (a cylinder's side
+    # wall), with its own confidence. None for shapes without such a fit.
+    xy: np.ndarray | None = None
+    xy_confidence: float = 0.0
 
 
 @runtime_checkable
@@ -156,32 +161,98 @@ def fit_box(pts: np.ndarray, half: np.ndarray, prev_yaw: float | None = None) ->
     return centre, yaw_quat(yaw), min(_extent_score(ext, expected), _span_score(pts, 2 * half[2]))
 
 
-def fit_cylinder(pts: np.ndarray, radius: float, half_height: float) -> tuple[np.ndarray, np.ndarray, float]:
-    """Upright cylinder: the top disc's centre gives xy, its height gives z."""
-    top, z_top = _top_points(pts, band=max(0.004, 0.2 * half_height))
-    lo = np.percentile(top[:, :2], 1, axis=0)
-    hi = np.percentile(top[:, :2], 99, axis=0)
-    centre = np.array([(lo[0] + hi[0]) / 2, (lo[1] + hi[1]) / 2, z_top - half_height])
-    conf = min(_extent_score(hi - lo, np.array([2 * radius, 2 * radius])), _span_score(pts, 2 * half_height))
-    return centre, yaw_quat(0.0), conf
-
-
-def fit_sphere(pts: np.ndarray, radius: float) -> tuple[np.ndarray, np.ndarray, float]:
-    """Sphere of known radius: Gauss-Newton on the centre, minimising (|p - c| - r)^2."""
-    c = pts.mean(axis=0)
-    c[2] = np.percentile(pts[:, 2], 97) - radius
+def _fit_centre(pts: np.ndarray, radius: float, init: np.ndarray) -> tuple[np.ndarray, float]:
+    """Centre of a circle (2D points) or sphere (3D) of known radius: Gauss-Newton on
+    (|p - c| - r)^2 from `init`. Returns (centre, RMS of the residual). A partial arc is enough."""
+    c = np.asarray(init, dtype=float).copy()
     for _ in range(10):
         d = pts - c
-        n = np.linalg.norm(d, axis=1)
-        n = np.maximum(n, 1e-9)
-        J = -d / n[:, None]
-        r = n - radius
-        step, *_ = np.linalg.lstsq(J, -r, rcond=None)
+        n = np.maximum(np.linalg.norm(d, axis=1), 1e-9)
+        step, *_ = np.linalg.lstsq(-d / n[:, None], -(n - radius), rcond=None)
         c = c + step
         if np.linalg.norm(step) < 1e-6:
             break
     rms = float(np.sqrt(np.mean((np.linalg.norm(pts - c, axis=1) - radius) ** 2)))
-    return c, yaw_quat(0.0), float(np.clip(1.0 - rms / (0.25 * radius), 0.0, 1.0))
+    return c, rms
+
+
+def _round_score(rms: float, radius: float) -> float:
+    """1 for points exactly on the circle/sphere, 0 once the RMS residual reaches a quarter radius."""
+    return float(np.clip(1.0 - rms / (0.25 * radius), 0.0, 1.0))
+
+
+@dataclass
+class CylinderFit:
+    pos: np.ndarray
+    quat: np.ndarray
+    confidence: float
+    lying: bool  # True: the axis is horizontal (the cylinder is on its side)
+    # Horizontal centre from the side wall alone, assuming a vertical axis. It does not need the
+    # top to be visible, so it still works when the fingers cover the top of a held cylinder.
+    xy: np.ndarray | None
+    xy_confidence: float
+
+
+def fit_cylinder(pts: np.ndarray, radius: float, half_height: float) -> CylinderFit:
+    """Cylinder of known size, standing upright or lying on its side: whichever fits better.
+
+    Upright: the side wall is a circle of the known radius seen from above (fitted even from a
+    partial arc); the top disc's height gives z. Lying: the cross-section perpendicular to the
+    long horizontal axis is that circle, which gives the centre across the axis and in z.
+    """
+    band = max(0.004, 0.2 * half_height)
+    top, z_top = _top_points(pts, band)
+    lo, hi = np.percentile(top[:, :2], [1, 99], axis=0)
+    top_centre = (lo + hi) / 2
+    wall = pts[pts[:, 2] < z_top - band]
+    xy, xy_conf = None, 0.0
+    if len(wall) >= 30:
+        xy, rms = _fit_centre(wall[:, :2], radius, top_centre)
+        xy_conf = _round_score(rms, radius)
+    up_conf = min(_extent_score(hi - lo, np.array([2 * radius, 2 * radius])), _span_score(pts, 2 * half_height))
+    up_xy = xy if xy is not None and xy_conf >= up_conf else top_centre
+    upright = CylinderFit(
+        np.array([up_xy[0], up_xy[1], z_top - half_height]), yaw_quat(0.0), up_conf, False, xy, xy_conf
+    )
+
+    centre_xy, th, ext = _min_area_rect(pts[:, :2])
+    if ext[1] > ext[0]:
+        th, ext = th + np.pi / 2, ext[::-1]
+    axis, perp = np.array([np.cos(th), np.sin(th)]), np.array([-np.sin(th), np.cos(th)])
+    t = pts[:, :2] @ axis
+    along = np.percentile(t, [1, 99])
+    # the end caps are flat discs, not part of the round wall: fit the circle to the middle
+    margin = 0.1 * (along[1] - along[0])
+    mid = pts[(t > along[0] + margin) & (t < along[1] - margin)]
+    if len(mid) < 30:
+        return upright
+    section = np.column_stack([mid[:, :2] @ perp, mid[:, 2]])
+    c, rms = _fit_centre(section, radius, np.array([centre_xy @ perp, np.percentile(mid[:, 2], 97) - radius]))
+    length_score = float(np.clip(1.0 - 2.0 * abs((along[1] - along[0]) - 2 * half_height) / (2 * half_height), 0.0, 1.0))
+    # No height-span test here: a camera looking down at an angle never sees the underside.
+    lying_conf = min(_round_score(rms, radius), length_score)
+    if lying_conf <= max(up_conf, 0.5):  # a weak "lying" guess must not replace the upright fit
+        return upright
+    pos_xy = axis * along.mean() + perp * c[0]
+    # object z (the cylinder's axis) laid along `axis`: tip it onto world x, then yaw to th
+    tip = np.array([np.cos(np.pi / 4), 0.0, np.sin(np.pi / 4), 0.0])
+    w1, x1, y1, z1 = yaw_quat(th)
+    w2, x2, y2, z2 = tip
+    quat = np.array([
+        w1 * w2 - x1 * x2 - y1 * y2 - z1 * z2,
+        w1 * x2 + x1 * w2 + y1 * z2 - z1 * y2,
+        w1 * y2 - x1 * z2 + y1 * w2 + z1 * x2,
+        w1 * z2 + x1 * y2 - y1 * x2 + z1 * w2,
+    ])
+    return CylinderFit(np.array([pos_xy[0], pos_xy[1], c[1]]), quat, lying_conf, True, None, 0.0)
+
+
+def fit_sphere(pts: np.ndarray, radius: float) -> tuple[np.ndarray, np.ndarray, float]:
+    """Sphere of known radius, from whatever cap of it is visible."""
+    init = pts.mean(axis=0)
+    init[2] = np.percentile(pts[:, 2], 97) - radius
+    c, rms = _fit_centre(pts, radius, init)
+    return c, yaw_quat(0.0), _round_score(rms, radius)
 
 
 # ---------------------------------------------------------------- depth estimator
@@ -232,7 +303,9 @@ class DepthEstimator:
         segment: Literal["mask", "color"] = "mask",
         colors: dict[str, tuple[float, float, float]] | None = None,
         min_points: int = 40,
-        min_confidence: float = 0.3,
+        # Measured on the cylinder task: fits scoring 0.8+ are within ~1 mm, fits at 0.3-0.6 are
+        # ~5 mm off (the fingers already hide part of the object). Below this the pose is coarse.
+        min_confidence: float = 0.7,
         table_z: float = 0.0,
         voxel: float = 0.002,  # metres; evens out density so a close camera does not outvote a far one
         max_pixels: int = 4000,  # per camera and object
@@ -282,23 +355,25 @@ class DepthEstimator:
         out = {}
         for name, o in self._objects.items():
             pts = self._cloud(name, frames)
+            xy, xy_conf = None, 0.0
             if len(pts) < self.min_points:
                 out[name] = Estimate(np.zeros(3), yaw_quat(0.0), found=False, n_points=len(pts))
                 continue
             if o.shape == "box":
                 pos, quat, conf = fit_box(pts, np.asarray(o.size, dtype=float), self._yaw.get(name))
             elif o.shape == "cylinder":
-                pos, quat, conf = fit_cylinder(pts, o.size[0], o.size[1])
+                fit = fit_cylinder(pts, o.size[0], o.size[1])
+                pos, quat, conf, xy, xy_conf = fit.pos, fit.quat, fit.confidence, fit.xy, fit.xy_confidence
             elif o.shape == "sphere":
                 pos, quat, conf = fit_sphere(pts, o.size[0])
             else:  # mesh: no model fit yet, so always the coarse estimate below
                 pos, quat, conf = pts.mean(axis=0), yaw_quat(0.0), 0.0
             if conf < self.min_confidence:
-                # The cloud does not look like the upright shape (tipped over, or half hidden).
+                # The cloud does not look like the known shape (tipped over, or half hidden).
                 # The middle of what is visible is still far better than a stale pose.
                 lo, hi = np.percentile(pts, [1, 99], axis=0)
                 pos, quat = (lo + hi) / 2, yaw_quat(self._yaw.get(name, 0.0))
-            else:
+            elif o.shape == "box":
                 self._yaw[name] = quat_yaw(quat)
-            out[name] = Estimate(pos, quat, found=True, confidence=conf, n_points=len(pts))
+            out[name] = Estimate(pos, quat, True, confidence=conf, n_points=len(pts), xy=xy, xy_confidence=xy_conf)
         return out

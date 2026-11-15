@@ -95,8 +95,12 @@ def test_fit_cylinder_and_sphere():
     top = np.column_stack([rad * np.cos(a), rad * np.sin(a), np.full(3000, hh)])
     a2 = rng.uniform(-0.5, 1.5, 1500)  # the part of the wall facing the camera
     wall = np.column_stack([r * np.cos(a2), r * np.sin(a2), rng.uniform(-hh, hh, 1500)])
-    pos, _, conf = fit_cylinder(np.concatenate([top, wall]) + centre, r, hh)
-    assert np.linalg.norm(pos - centre) < 0.002 and conf > 0.8
+    fit = fit_cylinder(np.concatenate([top, wall]) + centre, r, hh)
+    assert np.linalg.norm(fit.pos - centre) < 0.002 and fit.confidence > 0.8 and not fit.lying
+    # with the top hidden (fingers over it) the side wall alone still gives the horizontal centre
+    hidden = fit_cylinder(wall[wall[:, 2] < 0.0] + centre, r, hh)
+    assert hidden.confidence < 0.7 and hidden.xy_confidence > 0.9
+    assert np.linalg.norm(hidden.xy - centre[:2]) < 0.001
 
     d = rng.normal(size=(3000, 3))
     d = d / np.linalg.norm(d, axis=1, keepdims=True)
@@ -104,6 +108,27 @@ def test_fit_cylinder_and_sphere():
     c = np.array([0.45, -0.2, 0.025])
     pos, _, conf = fit_sphere(d * 0.025 + c, 0.025)
     assert np.linalg.norm(pos - c) < 0.001 and conf > 0.9
+
+
+@pytest.mark.parametrize("yaw", [0.0, 0.7, 2.0])
+def test_fit_cylinder_on_its_side(yaw):
+    """A can lying on the table, seen from one side: the visible half of its wall and one cap."""
+    rng = np.random.default_rng(2)
+    r, hh = 0.02, 0.04
+    ang = rng.uniform(-0.4, np.pi - 0.6, 4000)  # the upper wall and the side facing the camera
+    wall = np.column_stack([rng.uniform(-hh, hh, 4000), r * np.cos(ang), r * np.sin(ang)])
+    a, rad = rng.uniform(0, 2 * np.pi, 800), r * np.sqrt(rng.uniform(0, 1, 800))
+    cap = np.column_stack([np.full(800, hh), rad * np.cos(a), rad * np.sin(a)])
+    local = np.concatenate([wall, cap])  # axis along local x
+    c, s = np.cos(yaw), np.sin(yaw)
+    centre = np.array([0.5, -0.2, r])
+    pts = local @ np.array([[c, -s, 0], [s, c, 0], [0, 0, 1]]).T + centre
+    fit = fit_cylinder(pts, r, hh)
+    assert fit.lying and fit.confidence > 0.8
+    assert np.linalg.norm(fit.pos - centre) < 0.002
+    w, x, y, z = fit.quat  # the object's z axis (third column of its rotation) lies along the can
+    axis = np.array([2 * (x * z + w * y), 2 * (y * z - w * x), 1 - 2 * (x * x + y * y)])
+    assert abs(abs(axis @ np.array([c, s, 0.0])) - 1) < 0.01
 
 
 def test_voxel_downsample_is_even_and_deterministic():
@@ -288,6 +313,71 @@ def test_hidden_object_in_the_gripper_is_carried_with_the_end_effector(stub_task
         assert moved == 0.0 and events == ["perception_miss:cube"]
 
 
+class WallEstimator:
+    """Like a cylinder whose top the fingers hide: no confident pose, but a good side-wall xy."""
+
+    needs_frames = False
+    min_confidence = 0.7
+
+    def __init__(self, slide):
+        self.slide = np.array(slide)
+
+    def reset(self, task):
+        self.calls = 0
+
+    def estimate(self, frames, obs):
+        self.calls += 1
+        o = obs.objects["cube"]
+        if self.calls <= 3:  # clearly visible before the grasp
+            return {"cube": Estimate(pos=o.pos.copy(), quat=o.quat.copy(), found=True, confidence=1.0)}
+        xy = o.pos[:2] + self.slide  # where the object really is: it slid in the fingers
+        return {"cube": Estimate(pos=o.pos + 0.01, quat=o.quat.copy(), found=True, confidence=0.1, xy=xy, xy_confidence=0.95)}
+
+
+def test_in_hand_carry_takes_the_horizontal_position_from_a_confident_wall_fit(stub_task):
+    env = PerceivedEnv(CarryEnv(stub_task), WallEstimator(slide=(0.0, 0.015)))
+    obs = env.reset(0)
+    for _ in range(8):
+        obs, _ = env.step(Action(ee_pos=np.zeros(3)))
+    pos = obs.objects["cube"].pos
+    assert np.allclose(pos[:2], [0.56, -0.1 + 0.015])  # xy follows the wall fit, slide included
+    assert np.isclose(pos[2], 0.02)  # z is carried, not taken from the coarse estimate
+
+
+class CoarseEstimator:
+    """Always a coarse (low-confidence) estimate, drifting 0.5 mm further from the env's pose per call."""
+
+    needs_frames = False
+    min_confidence = 0.7
+
+    def reset(self, task):
+        self.calls = 0
+
+    def estimate(self, frames, obs):
+        self.calls += 1
+        o = obs.objects["cube"]
+        pos = o.pos + [0.0005 * self.calls, 0.0, 0.0]
+        return {"cube": Estimate(pos=pos, quat=o.quat.copy(), found=True, confidence=0.1)}
+
+
+@pytest.mark.parametrize("ee, follows", [((0.5, -0.1, 0.30), True), ((0.5, -0.1, 0.08), False)])
+def test_coarse_estimate_is_used_only_when_the_gripper_is_clear_of_the_object(stub_task, ee, follows):
+    """Far from the gripper the fingers cannot be what hides the object, so a coarse estimate is
+    news about the object; next to the gripper it is occlusion, and the last pose stands."""
+    clean = stub_task.model_copy(update={"scene": stub_task.scene.model_copy(update={"randomization": type(stub_task.scene.randomization)()})})
+    est = CoarseEstimator()
+    env = PerceivedEnv(StubEnv(clean), est)
+    env.reset(0)
+    for _ in range(40):
+        obs, _ = env.step(Action(ee_pos=np.array(ee)))
+    off = obs.objects["cube"].pos[0] - clean.scene.object("cube").pose.pos[0]
+    latest = 0.0005 * est.calls
+    if follows:
+        assert np.isclose(off, latest)
+    else:  # frozen at the value it had when the gripper came within clear_radius
+        assert 0 < off < latest - 0.005
+
+
 # ---------------------------------------------------------------- MuJoCo, no rendering
 
 
@@ -361,7 +451,7 @@ def test_depth_noise_is_seeded(cube_env):
 
 @pytest.mark.parametrize(
     "task_name, tol",
-    [("franka_pick_cube_to_bin_hard", 0.003), ("franka_pick_cylinder_to_bin", 0.003), ("franka_pick_ball_to_bin", 0.003)],
+    [("franka_pick_cube_to_bin_hard", 0.003), ("franka_pick_cylinder_to_bin", 0.002), ("franka_pick_ball_to_bin", 0.003)],
 )
 def test_depth_estimator_finds_each_shape_at_rest(cube_env, task_name, tol):
     task = load(task_name)

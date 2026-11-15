@@ -29,9 +29,10 @@ class PerceivedEnv:
         end effector. This uses only the observation (measured gripper width, ee pose). The
         carry assumes a rigid grasp, so an object sliding in the fingers is tracked with error.
 
-    Each step an object's pose comes from, in order: a confident model fit; the in-hand carry; a
-    coarse estimate if it is more than `jump` from the last pose (the object moved); else the last
-    pose. An object with no pixels at all keeps its last pose (its nominal pose from the task
+    Each step an object's pose comes from, in order: a confident model fit; the in-hand carry
+    (with the horizontal position corrected from the estimate when it offers one); a coarse
+    estimate if the gripper is more than `clear_radius` from it or it is more than `jump` from the
+    last pose (the object itself changed); else the last pose. An object with no pixels at all keeps its last pose (its nominal pose from the task
     before the first sighting) and the events gain `perception_miss:<obj>`, once per streak.
     """
 
@@ -47,6 +48,7 @@ class PerceivedEnv:
         hold_radius: float = 0.05,  # metres: an estimate this close to the tcp can be "in hand"
         min_confidence: float | None = None,  # below this an estimate is coarse; default: the estimator's
         jump: float = 0.03,  # metres: a coarse estimate this far from the last one replaces it
+        clear_radius: float = 0.12,  # metres: beyond this from the tcp the fingers cannot hide the object
     ):
         self.inner = inner
         self.task: TaskSpec = inner.task
@@ -56,6 +58,7 @@ class PerceivedEnv:
         self.hold_radius = hold_radius
         self.min_confidence = getattr(estimator, "min_confidence", 0.0) if min_confidence is None else min_confidence
         self.jump = jump
+        self.clear_radius = clear_radius
         if source is None and estimator.needs_frames:
             bx, by = self.task.scene.robot.base_pose.pos[:2]
             source = SimFrameSource(inner, virtual=(overview_camera((bx, by)),))
@@ -151,14 +154,26 @@ class PerceivedEnv:
             confident = seen and est.confidence >= self.min_confidence
             if confident:
                 state = ObjectState(pos=est.pos.copy(), quat=est.quat.copy())
-            elif held:  # the fingers are the usual reason a held object is half hidden
-                state = ObjectState(pos=last.pos + (ee - self._prev_ee), quat=last.quat.copy())
-            elif seen and np.linalg.norm(est.pos - last.pos) > self.jump:
-                # a coarse estimate far from the last one: the object moved (fell over, rolled)
+            elif held:
+                # The fingers are the usual reason a held object is half hidden: move the last
+                # pose with the tcp. If the estimator still has a trustworthy horizontal
+                # position (a cylinder's side wall below the fingers), that corrects the carry
+                # when the object slides in the grasp.
+                pos = last.pos + (ee - self._prev_ee)
+                if seen and est.xy is not None and est.xy_confidence >= self.min_confidence:
+                    pos[:2] = est.xy
+                state = ObjectState(pos=pos, quat=last.quat.copy())
+            elif seen and (
+                np.linalg.norm(est.pos - ee) > self.clear_radius
+                or np.linalg.norm(est.pos - last.pos) > self.jump
+            ):
+                # A coarse estimate that the gripper is nowhere near (so the fingers are not what
+                # hides the object), or one far from the last pose: the object itself changed
+                # (fell over, rolled away). Coarse and current beats precise and stale.
                 state = ObjectState(pos=est.pos.copy(), quat=est.quat.copy())
             else:
-                # not seen, or a coarse estimate that agrees with the last one: the object is
-                # where it was and something (often the open fingers) is in the way
+                # not seen, or a coarse estimate next to the gripper that agrees with the last
+                # pose: the object is where it was and the open fingers are in the way
                 state = last
                 if fresh and not seen and o.name not in self._missing:  # once per streak
                     events.append(f"perception_miss:{o.name}")
