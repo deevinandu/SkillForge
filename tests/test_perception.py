@@ -634,6 +634,23 @@ def test_compare_cli_knows_its_settings():
         cli.main(["compare", "stub_pick_cube_to_bin", "--envs", "true,nope"])
 
 
+def test_robustness_runs_the_same_sweep_in_every_setting(stub_task):
+    from skillforge.eval.regression import source_of
+    from skillforge.perception import cli
+
+    grid = {"obs_noise_std": (0.0, 0.03), "object_xy_jitter": (0.0, 0.05)}
+    reps = cli.robustness([("true", StubEnv), ("oracle", make_stub_oracle)], source_of(PickPlace), stub_task,
+                          range(6), axes=grid, stress_factor=None, workers=2)
+    assert list(reps) == ["true", "oracle"]
+    for r in reps.values():
+        assert [c.axis for c in r.curves] == list(grid) and r.seeds == list(range(6)) and r.stress is None
+    # the zero-noise oracle passes the env's poses through, so the curves agree point for point
+    for a, b in zip(reps["true"].curves, reps["oracle"].curves, strict=True):
+        assert [(p.value, p.n_success) for p in a.points] == [(p.value, p.n_success) for p in b.points]
+    with pytest.raises(SystemExit, match="unknown env"):
+        cli.main(["robustness", "stub_pick_cube_to_bin", "--envs", "true,nope"])
+
+
 def test_yaw_quat_roundtrip():
     for y in (-1.0, 0.0, 0.4):
         assert abs(quat_yaw(yaw_quat(y)) - y) < 1e-12

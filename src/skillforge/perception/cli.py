@@ -5,6 +5,9 @@
            --envs picks the settings: true, oracle, depth, noisy (depth noise), color (colour
            segmentation), dr (visual randomization), dr-color (colour + noise + randomization)
   calibration  success against camera calibration error alone, at several rotation errors
+  robustness  T4's robustness sweep (one randomization axis at a time, same seeds at every point)
+           run once per setting in --envs, so the curves with perception sit next to the curves
+           with the env's own poses; plus a depth-noise curve, the camera's counterpart of obs noise
   error    estimator error against true sim poses -> perception.json
 """
 
@@ -121,6 +124,82 @@ def cmd_calibration(a: argparse.Namespace) -> None:
     _run(envs, a, extra={"trans_mm": a.trans_mm})
 
 
+# Depth noise std at 1 m, metres (it grows with z^2). 3 mm is `NOISY_DEPTH_STD`.
+DEPTH_NOISE_GRID = (0.0, 0.0015, 0.003, 0.006, 0.012)
+
+
+def robustness(envs, src, task, seeds, *, axes=None, others="task", stress_factor=2.0, workers=None, pool=None) -> dict:
+    """T4's `sweep` once per (label, make_env) in `envs`, on the same seeds and one pool.
+
+    Returns label -> RobustnessReport. `obs_noise_std` perturbs the env's own object poses,
+    which a perceived env throws away, so that axis is expected to be flat under perception;
+    `depth_noise_curve` is the axis that plays its part there.
+    """
+    from skillforge.eval.parallel import EvalPool
+    from skillforge.eval.robustness import sweep
+
+    own = pool is None
+    pool = pool or EvalPool(workers)
+    if own:
+        pool.__enter__()
+    try:
+        out = {}
+        for label, mk in envs:
+            out[label] = sweep(mk, src, task, axes=axes, seeds=seeds, others=others, stress_factor=stress_factor, pool=pool)
+            print(f"[{label}]\n{out[label].summary()}", flush=True)
+        return out
+    finally:
+        if own:
+            pool.close()
+
+
+def depth_noise_curve(src, task, seeds, *, values=DEPTH_NOISE_GRID, segment="mask", workers=None, pool=None) -> list[dict]:
+    """Success against per-pixel depth noise, everything else as the task has it."""
+    from functools import partial
+
+    from skillforge.eval.parallel import EvalPool
+
+    from .env import make_perceived_env
+
+    own = pool is None
+    pool = pool or EvalPool(workers)
+    if own:
+        pool.__enter__()
+    try:
+        pts = []
+        for v in values:
+            rep, _ = pool.evaluate(partial(make_perceived_env, segment=segment, depth_noise=float(v)), src, task, seeds)
+            pts.append({"value": float(v), "n": rep.n_rollouts, "n_success": rep.n_success,
+                        "success_rate": rep.success_rate, "ci95": list(rep.ci95), "failure_counts": rep.failure_counts})
+            print(f"depth noise {1e3 * v:g} mm: {rep.summary()}", flush=True)
+        return pts
+    finally:
+        if own:
+            pool.close()
+
+
+def cmd_robustness(a: argparse.Namespace) -> None:
+    from skillforge.eval.parallel import EvalPool
+
+    table = _envs()
+    names = list(dict.fromkeys(n.strip() for n in a.envs.split(",")))
+    unknown = [n for n in names if n not in table]
+    if unknown:
+        raise SystemExit(f"unknown env(s) {unknown}; have {list(table)}")
+    _threads()
+    task, src, seeds = _task(a.task), _source(a.skill), list(_seeds(a.seeds))
+    with EvalPool(a.workers) as pool:
+        reports = robustness([(n, table[n]) for n in names], src, task, seeds, axes=a.axes or None, others=a.others,
+                             stress_factor=None if a.no_stress else a.stress, pool=pool)
+        noise = None if a.no_depth_noise else depth_noise_curve(src, task, seeds, pool=pool)
+    out = Path(a.out)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    doc = {"task": task.id, "seeds": [seeds[0], seeds[-1] + 1], "others": a.others,
+           "reports": {k: json.loads(v.model_dump_json()) for k, v in reports.items()}, "depth_noise": noise}
+    out.write_text(json.dumps(doc, indent=2))
+    print(f"wrote {out}")
+
+
 def cmd_error(a: argparse.Namespace) -> None:
     from skillforge.skills import load_skill
 
@@ -143,6 +222,7 @@ def main(argv: list[str] | None = None) -> int:
     for name, fn, default_out in (
         ("compare", cmd_compare, RUNS / "perception" / "compare.json"),
         ("calibration", cmd_calibration, RUNS / "perception" / "calibration.json"),
+        ("robustness", cmd_robustness, RUNS / "perception" / "robustness.json"),
         ("error", cmd_error, RUNS / "perception" / "perception.json"),
     ):
         p = sub.add_parser(name)
@@ -156,6 +236,14 @@ def main(argv: list[str] | None = None) -> int:
             p.add_argument("--envs", default="true,oracle,depth", help="comma list; the first is the reference. "
                            "true, oracle, depth, noisy, color, dr, dr-color")
             p.add_argument("--noisy", action="store_true", help="same as adding 'noisy' to --envs")
+        if name == "robustness":
+            p.add_argument("--envs", default="true,depth", help="comma list: true, oracle, depth, noisy, color, dr, dr-color")
+            p.add_argument("--axes", nargs="*", help="randomization axes to sweep; default: all of T4's")
+            p.add_argument("--others", choices=["task", "nominal"], default="task",
+                           help="the axes not being swept keep the task's ranges, or sit at nominal")
+            p.add_argument("--stress", type=float, default=2.0, help="widen every range by this factor for one extra eval")
+            p.add_argument("--no-stress", action="store_true")
+            p.add_argument("--no-depth-noise", action="store_true", help="skip the depth-noise curve")
         if name == "calibration":
             p.add_argument("--rot-deg", default="0.25,0.5,1.0", help="max rotation error per camera, degrees")
             p.add_argument("--trans-mm", type=float, default=3.0, help="max translation error per axis, mm")
