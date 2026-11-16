@@ -1,0 +1,790 @@
+{
+  "mode": "dry_run",
+  "task_id": "franka_pick_cube_to_bin_hard",
+  "skill": "pick_place",
+  "skill_version": "0.2.2",
+  "limits": {
+    "ee_speed": 0.1,
+    "ee_ang_speed": 1.0,
+    "joint_speed": 1.0,
+    "force": 20.0,
+    "watchdog_periods": 2.0
+  },
+  "workspace": {
+    "lo": [
+      0.26,
+      -0.39,
+      0.005
+    ],
+    "hi": [
+      0.77,
+      0.4,
+      0.6211024294875894
+    ]
+  },
+  "aborted_seeds": [],
+  "auto_vs_label": {
+    "n": 20,
+    "agree": 20,
+    "auto_only": 0,
+    "label_only": 0,
+    "rate": 1.0,
+    "ci95": [
+      0.8388698745050667,
+      1.0
+    ]
+  },
+  "trials": [
+    {
+      "seed": 0,
+      "label_success": true,
+      "label_source": "sim_truth",
+      "label_failure": null,
+      "note": "",
+      "auto_success": true,
+      "vlm_success": null,
+      "n_steps": 262,
+      "stopped": null,
+      "safety_events": [
+        [
+          1,
+          "safety:joint_speed"
+        ]
+      ],
+      "targets": {
+        "cube": {
+          "pos": [
+            0.5409305446812749,
+            -0.14221951451150405,
+            0.02
+          ],
+          "quat": [
+            0.9957580429557978,
+            0.0,
+            0.0,
+            0.09201043358684598
+          ],
+          "yaw_offset": 0.18428151235688472
+        }
+      },
+      "measured": {
+        "cube.placed_dx": 0.04093054468127488,
+        "cube.placed_dy": 0.007780485488495942,
+        "cube.place_error": 0.0
+      },
+      "arrays": "arrays/episode_0.npz",
+      "video": "video/episode_0.gif"
+    },
+    {
+      "seed": 1,
+      "label_success": true,
+      "label_source": "sim_truth",
+      "label_failure": null,
+      "note": "",
+      "auto_success": true,
+      "vlm_success": null,
+      "n_steps": 273,
+      "stopped": null,
+      "safety_events": [],
+      "targets": {
+        "cube": {
+          "pos": [
+            0.48698732324663774,
+            -0.14289272589608332,
+            0.02
+          ],
+          "quat": [
+            0.9385143425670746,
+            0.0,
+            0.0,
+            -0.34524024793742075
+          ],
+          "yaw_offset": -0.7049895210903185
+        }
+      },
+      "measured": {
+        "cube.placed_dx": -0.013012676753362262,
+        "cube.placed_dy": 0.007107274103916678,
+        "cube.place_error": 0.0
+      },
+      "arrays": "arrays/episode_1.npz",
+      "video": "video/episode_1.gif"
+    },
+    {
+      "seed": 2,
+      "label_success": true,
+      "label_source": "sim_truth",
+      "label_failure": null,
+      "note": "",
+      "auto_success": true,
+      "vlm_success": null,
+      "n_steps": 260,
+      "stopped": null,
+      "safety_events": [
+        [
+          1,
+          "safety:joint_speed"
+        ]
+      ],
+      "targets": {
+        "cube": {
+          "pos": [
+            0.4674138687296073,
+            -0.16648380830140075,
+            0.02
+          ],
+          "quat": [
+            0.9993196778792913,
+            0.0,
+            0.0,
+            0.036880637240012254
+          ],
+          "yaw_offset": 0.07377800617551686
+        }
+      },
+      "measured": {
+        "cube.placed_dx": -0.032586131270392726,
+        "cube.placed_dy": -0.016483808301400754,
+        "cube.place_error": 0.0
+      },
+      "arrays": "arrays/episode_2.npz",
+      "video": "video/episode_2.gif"
+    },
+    {
+      "seed": 3,
+      "label_success": true,
+      "label_source": "sim_truth",
+      "label_failure": null,
+      "note": "",
+      "auto_success": true,
+      "vlm_success": null,
+      "n_steps": 262,
+      "stopped": null,
+      "safety_events": [],
+      "targets": {
+        "cube": {
+          "pos": [
+            0.49183993799963843,
+            -0.14437442545824553,
+            0.02
+          ],
+          "quat": [
+            0.9974222730744873,
+            0.0,
+            0.0,
+            -0.07175520312090937
+          ],
+          "yaw_offset": -0.14363384373921678
+        }
+      },
+      "measured": {
+        "cube.placed_dx": -0.008160062000361568,
+        "cube.placed_dy": 0.005625574541754469,
+        "cube.place_error": 0.0
+      },
+      "arrays": "arrays/episode_3.npz",
+      "video": "video/episode_3.gif"
+    },
+    {
+      "seed": 4,
+      "label_success": true,
+      "label_source": "sim_truth",
+      "label_failure": null,
+      "note": "",
+      "auto_success": true,
+      "vlm_success": null,
+      "n_steps": 261,
+      "stopped": null,
+      "safety_events": [],
+      "targets": {
+        "cube": {
+          "pos": [
+            0.41405721154978303,
+            -0.051867583976755505,
+            0.02
+          ],
+          "quat": [
+            0.9998444592301817,
+            0.0,
+            0.0,
+            0.01763681793027188
+          ],
+          "yaw_offset": 0.03527546480382637
+        }
+      },
+      "measured": {
+        "cube.placed_dx": -0.08594278845021697,
+        "cube.placed_dy": 0.09813241602324449,
+        "cube.place_error": 0.0
+      },
+      "arrays": "arrays/episode_4.npz",
+      "video": "video/episode_4.gif"
+    },
+    {
+      "seed": 5,
+      "label_success": true,
+      "label_source": "sim_truth",
+      "label_failure": null,
+      "note": "",
+      "auto_success": true,
+      "vlm_success": null,
+      "n_steps": 299,
+      "stopped": null,
+      "safety_events": [
+        [
+          1,
+          "safety:joint_speed"
+        ]
+      ],
+      "targets": {
+        "cube": {
+          "pos": [
+            0.39750465644573685,
+            -0.25171038141101276,
+            0.02
+          ],
+          "quat": [
+            0.950301253856379,
+            0.0,
+            0.0,
+            0.3113318597879021
+          ],
+          "yaw_offset": 0.6331884490585319
+        }
+      },
+      "measured": {
+        "cube.placed_dx": -0.10249534355426315,
+        "cube.placed_dy": -0.10171038141101277,
+        "cube.place_error": 0.0
+      },
+      "arrays": "arrays/episode_5.npz",
+      "video": "video/episode_5.gif"
+    },
+    {
+      "seed": 6,
+      "label_success": true,
+      "label_source": "sim_truth",
+      "label_failure": null,
+      "note": "",
+      "auto_success": true,
+      "vlm_success": null,
+      "n_steps": 263,
+      "stopped": null,
+      "safety_events": [],
+      "targets": {
+        "cube": {
+          "pos": [
+            0.4743778701074758,
+            -0.12288892399716822,
+            0.02
+          ],
+          "quat": [
+            0.9948434887492593,
+            0.0,
+            0.0,
+            -0.10142205328823911
+          ],
+          "yaw_offset": -0.20319348328132655
+        }
+      },
+      "measured": {
+        "cube.placed_dx": -0.025622129892524215,
+        "cube.placed_dy": 0.027111076002831774,
+        "cube.place_error": 0.0
+      },
+      "arrays": "arrays/episode_6.npz",
+      "video": "video/episode_6.gif"
+    },
+    {
+      "seed": 7,
+      "label_success": true,
+      "label_source": "sim_truth",
+      "label_failure": null,
+      "note": "",
+      "auto_success": true,
+      "vlm_success": null,
+      "n_steps": 231,
+      "stopped": null,
+      "safety_events": [],
+      "targets": {
+        "cube": {
+          "pos": [
+            0.5562235598611832,
+            -0.09800490910967218,
+            0.02
+          ],
+          "quat": [
+            0.9997449962801879,
+            0.0,
+            0.0,
+            -0.022581904541624447
+          ],
+          "yaw_offset": -0.045167648454645715
+        }
+      },
+      "measured": {
+        "cube.placed_dx": 0.056223559861183214,
+        "cube.placed_dy": 0.05199509089032782,
+        "cube.place_error": 0.0
+      },
+      "arrays": "arrays/episode_7.npz",
+      "video": "video/episode_7.gif"
+    },
+    {
+      "seed": 8,
+      "label_success": true,
+      "label_source": "sim_truth",
+      "label_failure": null,
+      "note": "",
+      "auto_success": true,
+      "vlm_success": null,
+      "n_steps": 273,
+      "stopped": null,
+      "safety_events": [],
+      "targets": {
+        "cube": {
+          "pos": [
+            0.48834987735991986,
+            -0.18598427766441897,
+            0.02
+          ],
+          "quat": [
+            0.9998671248156196,
+            0.0,
+            0.0,
+            -0.01630131016041958
+          ],
+          "yaw_offset": -0.03260406442398911
+        }
+      },
+      "measured": {
+        "cube.placed_dx": -0.01165012264008014,
+        "cube.placed_dy": -0.03598427766441897,
+        "cube.place_error": 0.0
+      },
+      "arrays": "arrays/episode_8.npz",
+      "video": "video/episode_8.gif"
+    },
+    {
+      "seed": 9,
+      "label_success": false,
+      "label_source": "sim_truth",
+      "label_failure": "timeout",
+      "note": "",
+      "auto_success": false,
+      "vlm_success": null,
+      "n_steps": 300,
+      "stopped": null,
+      "safety_events": [],
+      "targets": {
+        "cube": {
+          "pos": [
+            0.6019118698500059,
+            -0.2653562612241894,
+            0.02
+          ],
+          "quat": [
+            0.9999001914729199,
+            0.0,
+            0.0,
+            -0.014128237413712254
+          ],
+          "yaw_offset": -0.028257414944001608
+        }
+      },
+      "measured": {
+        "cube.placed_dx": 0.10191186985000589,
+        "cube.placed_dy": -0.11535626122418943,
+        "cube.place_error": 0.0
+      },
+      "arrays": "arrays/episode_9.npz",
+      "video": "video/episode_9.gif"
+    },
+    {
+      "seed": 10,
+      "label_success": true,
+      "label_source": "sim_truth",
+      "label_failure": null,
+      "note": "",
+      "auto_success": true,
+      "vlm_success": null,
+      "n_steps": 269,
+      "stopped": null,
+      "safety_events": [
+        [
+          1,
+          "safety:joint_speed"
+        ]
+      ],
+      "targets": {
+        "cube": {
+          "pos": [
+            0.5914791944372182,
+            -0.16993978723318925,
+            0.02
+          ],
+          "quat": [
+            0.9972266981171478,
+            0.0,
+            0.0,
+            0.07442387091767672
+          ],
+          "yaw_offset": 0.14898549456699822
+        }
+      },
+      "measured": {
+        "cube.placed_dx": 0.09147919443721819,
+        "cube.placed_dy": -0.01993978723318926,
+        "cube.place_error": 0.0
+      },
+      "arrays": "arrays/episode_10.npz",
+      "video": "video/episode_10.gif"
+    },
+    {
+      "seed": 11,
+      "label_success": true,
+      "label_source": "sim_truth",
+      "label_failure": null,
+      "note": "",
+      "auto_success": true,
+      "vlm_success": null,
+      "n_steps": 245,
+      "stopped": null,
+      "safety_events": [
+        [
+          1,
+          "safety:joint_speed"
+        ]
+      ],
+      "targets": {
+        "cube": {
+          "pos": [
+            0.4866719892490718,
+            -0.13386032955886096,
+            0.02
+          ],
+          "quat": [
+            0.9988592201440865,
+            0.0,
+            0.0,
+            0.04775205056484363
+          ],
+          "yaw_offset": 0.09554043409430207
+        }
+      },
+      "measured": {
+        "cube.placed_dx": -0.01332801075092821,
+        "cube.placed_dy": 0.016139670441139037,
+        "cube.place_error": 0.0
+      },
+      "arrays": "arrays/episode_11.npz",
+      "video": "video/episode_11.gif"
+    },
+    {
+      "seed": 12,
+      "label_success": true,
+      "label_source": "sim_truth",
+      "label_failure": null,
+      "note": "",
+      "auto_success": true,
+      "vlm_success": null,
+      "n_steps": 264,
+      "stopped": null,
+      "safety_events": [
+        [
+          1,
+          "safety:joint_speed"
+        ]
+      ],
+      "targets": {
+        "cube": {
+          "pos": [
+            0.47296669848977674,
+            -0.12216685650722323,
+            0.02
+          ],
+          "quat": [
+            0.9647872585370323,
+            0.0,
+            0.0,
+            0.26303145394533656
+          ],
+          "yaw_offset": 0.532325918314565
+        }
+      },
+      "measured": {
+        "cube.placed_dx": -0.027033301510223262,
+        "cube.placed_dy": 0.02783314349277677,
+        "cube.place_error": 0.0
+      },
+      "arrays": "arrays/episode_12.npz",
+      "video": "video/episode_12.gif"
+    },
+    {
+      "seed": 13,
+      "label_success": true,
+      "label_source": "sim_truth",
+      "label_failure": null,
+      "note": "",
+      "auto_success": true,
+      "vlm_success": null,
+      "n_steps": 263,
+      "stopped": null,
+      "safety_events": [
+        [
+          1,
+          "safety:joint_speed"
+        ]
+      ],
+      "targets": {
+        "cube": {
+          "pos": [
+            0.37956535724633444,
+            -0.05062264156002552,
+            0.02
+          ],
+          "quat": [
+            0.9474899619792905,
+            0.0,
+            0.0,
+            0.31978550928471217
+          ],
+          "yaw_offset": 0.6510062016410189
+        }
+      },
+      "measured": {
+        "cube.placed_dx": -0.12043464275366556,
+        "cube.placed_dy": 0.09937735843997447,
+        "cube.place_error": 0.0
+      },
+      "arrays": "arrays/episode_13.npz",
+      "video": "video/episode_13.gif"
+    },
+    {
+      "seed": 14,
+      "label_success": true,
+      "label_source": "sim_truth",
+      "label_failure": null,
+      "note": "",
+      "auto_success": true,
+      "vlm_success": null,
+      "n_steps": 271,
+      "stopped": null,
+      "safety_events": [],
+      "targets": {
+        "cube": {
+          "pos": [
+            0.5503310202107076,
+            -0.1576390209947591,
+            0.02
+          ],
+          "quat": [
+            0.999789251707196,
+            0.0,
+            0.0,
+            0.02052930029896152
+          ],
+          "yaw_offset": 0.041061485184420154
+        }
+      },
+      "measured": {
+        "cube.placed_dx": 0.05033102021070757,
+        "cube.placed_dy": -0.007639020994759105,
+        "cube.place_error": 0.0
+      },
+      "arrays": "arrays/episode_14.npz",
+      "video": "video/episode_14.gif"
+    },
+    {
+      "seed": 15,
+      "label_success": true,
+      "label_source": "sim_truth",
+      "label_failure": null,
+      "note": "",
+      "auto_success": true,
+      "vlm_success": null,
+      "n_steps": 273,
+      "stopped": null,
+      "safety_events": [
+        [
+          1,
+          "safety:joint_speed"
+        ]
+      ],
+      "targets": {
+        "cube": {
+          "pos": [
+            0.47000408826388573,
+            -0.15833875339041498,
+            0.02
+          ],
+          "quat": [
+            0.9539074591178683,
+            0.0,
+            0.0,
+            0.3001009154256155
+          ],
+          "yaw_offset": 0.6095968877716808
+        }
+      },
+      "measured": {
+        "cube.placed_dx": -0.029995911736114267,
+        "cube.placed_dy": -0.008338753390414982,
+        "cube.place_error": 0.0
+      },
+      "arrays": "arrays/episode_15.npz",
+      "video": "video/episode_15.gif"
+    },
+    {
+      "seed": 16,
+      "label_success": true,
+      "label_source": "sim_truth",
+      "label_failure": null,
+      "note": "",
+      "auto_success": true,
+      "vlm_success": null,
+      "n_steps": 290,
+      "stopped": null,
+      "safety_events": [
+        [
+          1,
+          "safety:joint_speed"
+        ]
+      ],
+      "targets": {
+        "cube": {
+          "pos": [
+            0.5562006595415928,
+            -0.22233565177326847,
+            0.02
+          ],
+          "quat": [
+            0.994776117638496,
+            0.0,
+            0.0,
+            0.1020807316592169
+          ],
+          "yaw_offset": 0.20451771298794902
+        }
+      },
+      "measured": {
+        "cube.placed_dx": 0.05620065954159281,
+        "cube.placed_dy": -0.07233565177326848,
+        "cube.place_error": 0.0
+      },
+      "arrays": "arrays/episode_16.npz",
+      "video": "video/episode_16.gif"
+    },
+    {
+      "seed": 17,
+      "label_success": true,
+      "label_source": "sim_truth",
+      "label_failure": null,
+      "note": "",
+      "auto_success": true,
+      "vlm_success": null,
+      "n_steps": 247,
+      "stopped": null,
+      "safety_events": [],
+      "targets": {
+        "cube": {
+          "pos": [
+            0.5263461112163901,
+            -0.09406615264757719,
+            0.02
+          ],
+          "quat": [
+            0.9981248125700739,
+            0.0,
+            0.0,
+            -0.06121158821624304
+          ],
+          "yaw_offset": -0.12249975600984872
+        }
+      },
+      "measured": {
+        "cube.placed_dx": 0.026346111216390078,
+        "cube.placed_dy": 0.05593384735242281,
+        "cube.place_error": 0.0
+      },
+      "arrays": "arrays/episode_17.npz",
+      "video": "video/episode_17.gif"
+    },
+    {
+      "seed": 18,
+      "label_success": true,
+      "label_source": "sim_truth",
+      "label_failure": null,
+      "note": "",
+      "auto_success": true,
+      "vlm_success": null,
+      "n_steps": 268,
+      "stopped": null,
+      "safety_events": [],
+      "targets": {
+        "cube": {
+          "pos": [
+            0.5085946612821411,
+            -0.15275478194173361,
+            0.02
+          ],
+          "quat": [
+            0.9774746258706557,
+            0.0,
+            0.0,
+            -0.2110529691310255
+          ],
+          "yaw_offset": -0.4253041379044742
+        }
+      },
+      "measured": {
+        "cube.placed_dx": 0.008594661282141147,
+        "cube.placed_dy": -0.0027547819417336195,
+        "cube.place_error": 0.0
+      },
+      "arrays": "arrays/episode_18.npz",
+      "video": "video/episode_18.gif"
+    },
+    {
+      "seed": 19,
+      "label_success": true,
+      "label_source": "sim_truth",
+      "label_failure": null,
+      "note": "",
+      "auto_success": true,
+      "vlm_success": null,
+      "n_steps": 279,
+      "stopped": null,
+      "safety_events": [
+        [
+          1,
+          "safety:joint_speed"
+        ]
+      ],
+      "targets": {
+        "cube": {
+          "pos": [
+            0.5045552053360965,
+            -0.17216812215783084,
+            0.02
+          ],
+          "quat": [
+            0.9545630967912594,
+            0.0,
+            0.0,
+            0.2980088828278122
+          ],
+          "yaw_offset": 0.6052121583277058
+        }
+      },
+      "measured": {
+        "cube.placed_dx": 0.004555205336096546,
+        "cube.placed_dy": -0.022168122157830844,
+        "cube.place_error": 0.0
+      },
+      "arrays": "arrays/episode_19.npz",
+      "video": "video/episode_19.gif"
+    }
+  ],
+  "created_at": "2026-11-16T05:34:11+00:00"
+}

@@ -1,0 +1,4247 @@
+{
+  "truth": {
+    "true_success": 196,
+    "estimator_success": 196,
+    "false_success": 0,
+    "missed_success": 0,
+    "n": 200,
+    "median_steps": 263.5,
+    "failures": {
+      "timeout": 1,
+      "grasp_slip": 2,
+      "ik_failure": 1
+    },
+    "trials": [
+      {
+        "seed": 5000,
+        "true": true,
+        "auto": true,
+        "steps": 269,
+        "failure": null
+      },
+      {
+        "seed": 5001,
+        "true": true,
+        "auto": true,
+        "steps": 280,
+        "failure": null
+      },
+      {
+        "seed": 5002,
+        "true": true,
+        "auto": true,
+        "steps": 249,
+        "failure": null
+      },
+      {
+        "seed": 5003,
+        "true": true,
+        "auto": true,
+        "steps": 259,
+        "failure": null
+      },
+      {
+        "seed": 5004,
+        "true": true,
+        "auto": true,
+        "steps": 261,
+        "failure": null
+      },
+      {
+        "seed": 5005,
+        "true": true,
+        "auto": true,
+        "steps": 275,
+        "failure": null
+      },
+      {
+        "seed": 5006,
+        "true": true,
+        "auto": true,
+        "steps": 262,
+        "failure": null
+      },
+      {
+        "seed": 5007,
+        "true": true,
+        "auto": true,
+        "steps": 255,
+        "failure": null
+      },
+      {
+        "seed": 5008,
+        "true": true,
+        "auto": true,
+        "steps": 297,
+        "failure": null
+      },
+      {
+        "seed": 5009,
+        "true": true,
+        "auto": true,
+        "steps": 241,
+        "failure": null
+      },
+      {
+        "seed": 5010,
+        "true": true,
+        "auto": true,
+        "steps": 260,
+        "failure": null
+      },
+      {
+        "seed": 5011,
+        "true": true,
+        "auto": true,
+        "steps": 264,
+        "failure": null
+      },
+      {
+        "seed": 5012,
+        "true": true,
+        "auto": true,
+        "steps": 249,
+        "failure": null
+      },
+      {
+        "seed": 5013,
+        "true": true,
+        "auto": true,
+        "steps": 262,
+        "failure": null
+      },
+      {
+        "seed": 5014,
+        "true": true,
+        "auto": true,
+        "steps": 254,
+        "failure": null
+      },
+      {
+        "seed": 5015,
+        "true": true,
+        "auto": true,
+        "steps": 275,
+        "failure": null
+      },
+      {
+        "seed": 5016,
+        "true": true,
+        "auto": true,
+        "steps": 290,
+        "failure": null
+      },
+      {
+        "seed": 5017,
+        "true": true,
+        "auto": true,
+        "steps": 262,
+        "failure": null
+      },
+      {
+        "seed": 5018,
+        "true": true,
+        "auto": true,
+        "steps": 266,
+        "failure": null
+      },
+      {
+        "seed": 5019,
+        "true": true,
+        "auto": true,
+        "steps": 244,
+        "failure": null
+      },
+      {
+        "seed": 5020,
+        "true": true,
+        "auto": true,
+        "steps": 276,
+        "failure": null
+      },
+      {
+        "seed": 5021,
+        "true": true,
+        "auto": true,
+        "steps": 263,
+        "failure": null
+      },
+      {
+        "seed": 5022,
+        "true": true,
+        "auto": true,
+        "steps": 261,
+        "failure": null
+      },
+      {
+        "seed": 5023,
+        "true": true,
+        "auto": true,
+        "steps": 252,
+        "failure": null
+      },
+      {
+        "seed": 5024,
+        "true": true,
+        "auto": true,
+        "steps": 289,
+        "failure": null
+      },
+      {
+        "seed": 5025,
+        "true": true,
+        "auto": true,
+        "steps": 255,
+        "failure": null
+      },
+      {
+        "seed": 5026,
+        "true": true,
+        "auto": true,
+        "steps": 244,
+        "failure": null
+      },
+      {
+        "seed": 5027,
+        "true": true,
+        "auto": true,
+        "steps": 244,
+        "failure": null
+      },
+      {
+        "seed": 5028,
+        "true": true,
+        "auto": true,
+        "steps": 266,
+        "failure": null
+      },
+      {
+        "seed": 5029,
+        "true": true,
+        "auto": true,
+        "steps": 265,
+        "failure": null
+      },
+      {
+        "seed": 5030,
+        "true": true,
+        "auto": true,
+        "steps": 256,
+        "failure": null
+      },
+      {
+        "seed": 5031,
+        "true": true,
+        "auto": true,
+        "steps": 265,
+        "failure": null
+      },
+      {
+        "seed": 5032,
+        "true": true,
+        "auto": true,
+        "steps": 280,
+        "failure": null
+      },
+      {
+        "seed": 5033,
+        "true": true,
+        "auto": true,
+        "steps": 277,
+        "failure": null
+      },
+      {
+        "seed": 5034,
+        "true": true,
+        "auto": true,
+        "steps": 262,
+        "failure": null
+      },
+      {
+        "seed": 5035,
+        "true": true,
+        "auto": true,
+        "steps": 247,
+        "failure": null
+      },
+      {
+        "seed": 5036,
+        "true": true,
+        "auto": true,
+        "steps": 286,
+        "failure": null
+      },
+      {
+        "seed": 5037,
+        "true": true,
+        "auto": true,
+        "steps": 241,
+        "failure": null
+      },
+      {
+        "seed": 5038,
+        "true": true,
+        "auto": true,
+        "steps": 294,
+        "failure": null
+      },
+      {
+        "seed": 5039,
+        "true": true,
+        "auto": true,
+        "steps": 274,
+        "failure": null
+      },
+      {
+        "seed": 5040,
+        "true": true,
+        "auto": true,
+        "steps": 275,
+        "failure": null
+      },
+      {
+        "seed": 5041,
+        "true": true,
+        "auto": true,
+        "steps": 263,
+        "failure": null
+      },
+      {
+        "seed": 5042,
+        "true": true,
+        "auto": true,
+        "steps": 258,
+        "failure": null
+      },
+      {
+        "seed": 5043,
+        "true": true,
+        "auto": true,
+        "steps": 259,
+        "failure": null
+      },
+      {
+        "seed": 5044,
+        "true": true,
+        "auto": true,
+        "steps": 254,
+        "failure": null
+      },
+      {
+        "seed": 5045,
+        "true": true,
+        "auto": true,
+        "steps": 258,
+        "failure": null
+      },
+      {
+        "seed": 5046,
+        "true": true,
+        "auto": true,
+        "steps": 280,
+        "failure": null
+      },
+      {
+        "seed": 5047,
+        "true": true,
+        "auto": true,
+        "steps": 261,
+        "failure": null
+      },
+      {
+        "seed": 5048,
+        "true": true,
+        "auto": true,
+        "steps": 272,
+        "failure": null
+      },
+      {
+        "seed": 5049,
+        "true": true,
+        "auto": true,
+        "steps": 272,
+        "failure": null
+      },
+      {
+        "seed": 5050,
+        "true": true,
+        "auto": true,
+        "steps": 258,
+        "failure": null
+      },
+      {
+        "seed": 5051,
+        "true": true,
+        "auto": true,
+        "steps": 243,
+        "failure": null
+      },
+      {
+        "seed": 5052,
+        "true": true,
+        "auto": true,
+        "steps": 292,
+        "failure": null
+      },
+      {
+        "seed": 5053,
+        "true": true,
+        "auto": true,
+        "steps": 271,
+        "failure": null
+      },
+      {
+        "seed": 5054,
+        "true": true,
+        "auto": true,
+        "steps": 282,
+        "failure": null
+      },
+      {
+        "seed": 5055,
+        "true": true,
+        "auto": true,
+        "steps": 265,
+        "failure": null
+      },
+      {
+        "seed": 5056,
+        "true": true,
+        "auto": true,
+        "steps": 275,
+        "failure": null
+      },
+      {
+        "seed": 5057,
+        "true": true,
+        "auto": true,
+        "steps": 267,
+        "failure": null
+      },
+      {
+        "seed": 5058,
+        "true": true,
+        "auto": true,
+        "steps": 264,
+        "failure": null
+      },
+      {
+        "seed": 5059,
+        "true": false,
+        "auto": false,
+        "steps": 300,
+        "failure": "timeout"
+      },
+      {
+        "seed": 5060,
+        "true": true,
+        "auto": true,
+        "steps": 261,
+        "failure": null
+      },
+      {
+        "seed": 5061,
+        "true": true,
+        "auto": true,
+        "steps": 267,
+        "failure": null
+      },
+      {
+        "seed": 5062,
+        "true": true,
+        "auto": true,
+        "steps": 272,
+        "failure": null
+      },
+      {
+        "seed": 5063,
+        "true": true,
+        "auto": true,
+        "steps": 231,
+        "failure": null
+      },
+      {
+        "seed": 5064,
+        "true": true,
+        "auto": true,
+        "steps": 276,
+        "failure": null
+      },
+      {
+        "seed": 5065,
+        "true": true,
+        "auto": true,
+        "steps": 256,
+        "failure": null
+      },
+      {
+        "seed": 5066,
+        "true": true,
+        "auto": true,
+        "steps": 264,
+        "failure": null
+      },
+      {
+        "seed": 5067,
+        "true": true,
+        "auto": true,
+        "steps": 263,
+        "failure": null
+      },
+      {
+        "seed": 5068,
+        "true": true,
+        "auto": true,
+        "steps": 243,
+        "failure": null
+      },
+      {
+        "seed": 5069,
+        "true": true,
+        "auto": true,
+        "steps": 258,
+        "failure": null
+      },
+      {
+        "seed": 5070,
+        "true": true,
+        "auto": true,
+        "steps": 253,
+        "failure": null
+      },
+      {
+        "seed": 5071,
+        "true": true,
+        "auto": true,
+        "steps": 253,
+        "failure": null
+      },
+      {
+        "seed": 5072,
+        "true": true,
+        "auto": true,
+        "steps": 267,
+        "failure": null
+      },
+      {
+        "seed": 5073,
+        "true": true,
+        "auto": true,
+        "steps": 264,
+        "failure": null
+      },
+      {
+        "seed": 5074,
+        "true": true,
+        "auto": true,
+        "steps": 222,
+        "failure": null
+      },
+      {
+        "seed": 5075,
+        "true": false,
+        "auto": false,
+        "steps": 300,
+        "failure": "grasp_slip"
+      },
+      {
+        "seed": 5076,
+        "true": true,
+        "auto": true,
+        "steps": 257,
+        "failure": null
+      },
+      {
+        "seed": 5077,
+        "true": true,
+        "auto": true,
+        "steps": 269,
+        "failure": null
+      },
+      {
+        "seed": 5078,
+        "true": true,
+        "auto": true,
+        "steps": 256,
+        "failure": null
+      },
+      {
+        "seed": 5079,
+        "true": true,
+        "auto": true,
+        "steps": 270,
+        "failure": null
+      },
+      {
+        "seed": 5080,
+        "true": true,
+        "auto": true,
+        "steps": 270,
+        "failure": null
+      },
+      {
+        "seed": 5081,
+        "true": true,
+        "auto": true,
+        "steps": 244,
+        "failure": null
+      },
+      {
+        "seed": 5082,
+        "true": true,
+        "auto": true,
+        "steps": 255,
+        "failure": null
+      },
+      {
+        "seed": 5083,
+        "true": true,
+        "auto": true,
+        "steps": 224,
+        "failure": null
+      },
+      {
+        "seed": 5084,
+        "true": true,
+        "auto": true,
+        "steps": 262,
+        "failure": null
+      },
+      {
+        "seed": 5085,
+        "true": true,
+        "auto": true,
+        "steps": 258,
+        "failure": null
+      },
+      {
+        "seed": 5086,
+        "true": true,
+        "auto": true,
+        "steps": 282,
+        "failure": null
+      },
+      {
+        "seed": 5087,
+        "true": true,
+        "auto": true,
+        "steps": 267,
+        "failure": null
+      },
+      {
+        "seed": 5088,
+        "true": true,
+        "auto": true,
+        "steps": 254,
+        "failure": null
+      },
+      {
+        "seed": 5089,
+        "true": true,
+        "auto": true,
+        "steps": 278,
+        "failure": null
+      },
+      {
+        "seed": 5090,
+        "true": true,
+        "auto": true,
+        "steps": 248,
+        "failure": null
+      },
+      {
+        "seed": 5091,
+        "true": true,
+        "auto": true,
+        "steps": 268,
+        "failure": null
+      },
+      {
+        "seed": 5092,
+        "true": true,
+        "auto": true,
+        "steps": 271,
+        "failure": null
+      },
+      {
+        "seed": 5093,
+        "true": true,
+        "auto": true,
+        "steps": 241,
+        "failure": null
+      },
+      {
+        "seed": 5094,
+        "true": true,
+        "auto": true,
+        "steps": 252,
+        "failure": null
+      },
+      {
+        "seed": 5095,
+        "true": true,
+        "auto": true,
+        "steps": 283,
+        "failure": null
+      },
+      {
+        "seed": 5096,
+        "true": true,
+        "auto": true,
+        "steps": 283,
+        "failure": null
+      },
+      {
+        "seed": 5097,
+        "true": true,
+        "auto": true,
+        "steps": 266,
+        "failure": null
+      },
+      {
+        "seed": 5098,
+        "true": true,
+        "auto": true,
+        "steps": 262,
+        "failure": null
+      },
+      {
+        "seed": 5099,
+        "true": true,
+        "auto": true,
+        "steps": 259,
+        "failure": null
+      },
+      {
+        "seed": 5100,
+        "true": true,
+        "auto": true,
+        "steps": 277,
+        "failure": null
+      },
+      {
+        "seed": 5101,
+        "true": true,
+        "auto": true,
+        "steps": 284,
+        "failure": null
+      },
+      {
+        "seed": 5102,
+        "true": true,
+        "auto": true,
+        "steps": 268,
+        "failure": null
+      },
+      {
+        "seed": 5103,
+        "true": true,
+        "auto": true,
+        "steps": 280,
+        "failure": null
+      },
+      {
+        "seed": 5104,
+        "true": true,
+        "auto": true,
+        "steps": 284,
+        "failure": null
+      },
+      {
+        "seed": 5105,
+        "true": true,
+        "auto": true,
+        "steps": 289,
+        "failure": null
+      },
+      {
+        "seed": 5106,
+        "true": true,
+        "auto": true,
+        "steps": 264,
+        "failure": null
+      },
+      {
+        "seed": 5107,
+        "true": true,
+        "auto": true,
+        "steps": 262,
+        "failure": null
+      },
+      {
+        "seed": 5108,
+        "true": true,
+        "auto": true,
+        "steps": 250,
+        "failure": null
+      },
+      {
+        "seed": 5109,
+        "true": true,
+        "auto": true,
+        "steps": 257,
+        "failure": null
+      },
+      {
+        "seed": 5110,
+        "true": true,
+        "auto": true,
+        "steps": 288,
+        "failure": null
+      },
+      {
+        "seed": 5111,
+        "true": true,
+        "auto": true,
+        "steps": 253,
+        "failure": null
+      },
+      {
+        "seed": 5112,
+        "true": true,
+        "auto": true,
+        "steps": 271,
+        "failure": null
+      },
+      {
+        "seed": 5113,
+        "true": true,
+        "auto": true,
+        "steps": 280,
+        "failure": null
+      },
+      {
+        "seed": 5114,
+        "true": true,
+        "auto": true,
+        "steps": 265,
+        "failure": null
+      },
+      {
+        "seed": 5115,
+        "true": true,
+        "auto": true,
+        "steps": 286,
+        "failure": null
+      },
+      {
+        "seed": 5116,
+        "true": true,
+        "auto": true,
+        "steps": 265,
+        "failure": null
+      },
+      {
+        "seed": 5117,
+        "true": true,
+        "auto": true,
+        "steps": 248,
+        "failure": null
+      },
+      {
+        "seed": 5118,
+        "true": true,
+        "auto": true,
+        "steps": 275,
+        "failure": null
+      },
+      {
+        "seed": 5119,
+        "true": true,
+        "auto": true,
+        "steps": 251,
+        "failure": null
+      },
+      {
+        "seed": 5120,
+        "true": true,
+        "auto": true,
+        "steps": 269,
+        "failure": null
+      },
+      {
+        "seed": 5121,
+        "true": true,
+        "auto": true,
+        "steps": 262,
+        "failure": null
+      },
+      {
+        "seed": 5122,
+        "true": true,
+        "auto": true,
+        "steps": 247,
+        "failure": null
+      },
+      {
+        "seed": 5123,
+        "true": true,
+        "auto": true,
+        "steps": 253,
+        "failure": null
+      },
+      {
+        "seed": 5124,
+        "true": false,
+        "auto": false,
+        "steps": 300,
+        "failure": "grasp_slip"
+      },
+      {
+        "seed": 5125,
+        "true": true,
+        "auto": true,
+        "steps": 271,
+        "failure": null
+      },
+      {
+        "seed": 5126,
+        "true": true,
+        "auto": true,
+        "steps": 268,
+        "failure": null
+      },
+      {
+        "seed": 5127,
+        "true": true,
+        "auto": true,
+        "steps": 252,
+        "failure": null
+      },
+      {
+        "seed": 5128,
+        "true": true,
+        "auto": true,
+        "steps": 235,
+        "failure": null
+      },
+      {
+        "seed": 5129,
+        "true": true,
+        "auto": true,
+        "steps": 279,
+        "failure": null
+      },
+      {
+        "seed": 5130,
+        "true": true,
+        "auto": true,
+        "steps": 264,
+        "failure": null
+      },
+      {
+        "seed": 5131,
+        "true": true,
+        "auto": true,
+        "steps": 279,
+        "failure": null
+      },
+      {
+        "seed": 5132,
+        "true": true,
+        "auto": true,
+        "steps": 276,
+        "failure": null
+      },
+      {
+        "seed": 5133,
+        "true": true,
+        "auto": true,
+        "steps": 275,
+        "failure": null
+      },
+      {
+        "seed": 5134,
+        "true": true,
+        "auto": true,
+        "steps": 257,
+        "failure": null
+      },
+      {
+        "seed": 5135,
+        "true": true,
+        "auto": true,
+        "steps": 270,
+        "failure": null
+      },
+      {
+        "seed": 5136,
+        "true": true,
+        "auto": true,
+        "steps": 234,
+        "failure": null
+      },
+      {
+        "seed": 5137,
+        "true": true,
+        "auto": true,
+        "steps": 289,
+        "failure": null
+      },
+      {
+        "seed": 5138,
+        "true": true,
+        "auto": true,
+        "steps": 259,
+        "failure": null
+      },
+      {
+        "seed": 5139,
+        "true": true,
+        "auto": true,
+        "steps": 259,
+        "failure": null
+      },
+      {
+        "seed": 5140,
+        "true": true,
+        "auto": true,
+        "steps": 251,
+        "failure": null
+      },
+      {
+        "seed": 5141,
+        "true": true,
+        "auto": true,
+        "steps": 265,
+        "failure": null
+      },
+      {
+        "seed": 5142,
+        "true": true,
+        "auto": true,
+        "steps": 243,
+        "failure": null
+      },
+      {
+        "seed": 5143,
+        "true": true,
+        "auto": true,
+        "steps": 236,
+        "failure": null
+      },
+      {
+        "seed": 5144,
+        "true": true,
+        "auto": true,
+        "steps": 265,
+        "failure": null
+      },
+      {
+        "seed": 5145,
+        "true": true,
+        "auto": true,
+        "steps": 266,
+        "failure": null
+      },
+      {
+        "seed": 5146,
+        "true": true,
+        "auto": true,
+        "steps": 254,
+        "failure": null
+      },
+      {
+        "seed": 5147,
+        "true": true,
+        "auto": true,
+        "steps": 288,
+        "failure": null
+      },
+      {
+        "seed": 5148,
+        "true": true,
+        "auto": true,
+        "steps": 272,
+        "failure": null
+      },
+      {
+        "seed": 5149,
+        "true": true,
+        "auto": true,
+        "steps": 272,
+        "failure": null
+      },
+      {
+        "seed": 5150,
+        "true": true,
+        "auto": true,
+        "steps": 294,
+        "failure": null
+      },
+      {
+        "seed": 5151,
+        "true": true,
+        "auto": true,
+        "steps": 256,
+        "failure": null
+      },
+      {
+        "seed": 5152,
+        "true": true,
+        "auto": true,
+        "steps": 278,
+        "failure": null
+      },
+      {
+        "seed": 5153,
+        "true": true,
+        "auto": true,
+        "steps": 274,
+        "failure": null
+      },
+      {
+        "seed": 5154,
+        "true": true,
+        "auto": true,
+        "steps": 246,
+        "failure": null
+      },
+      {
+        "seed": 5155,
+        "true": true,
+        "auto": true,
+        "steps": 256,
+        "failure": null
+      },
+      {
+        "seed": 5156,
+        "true": true,
+        "auto": true,
+        "steps": 271,
+        "failure": null
+      },
+      {
+        "seed": 5157,
+        "true": true,
+        "auto": true,
+        "steps": 262,
+        "failure": null
+      },
+      {
+        "seed": 5158,
+        "true": true,
+        "auto": true,
+        "steps": 262,
+        "failure": null
+      },
+      {
+        "seed": 5159,
+        "true": true,
+        "auto": true,
+        "steps": 298,
+        "failure": null
+      },
+      {
+        "seed": 5160,
+        "true": true,
+        "auto": true,
+        "steps": 254,
+        "failure": null
+      },
+      {
+        "seed": 5161,
+        "true": true,
+        "auto": true,
+        "steps": 279,
+        "failure": null
+      },
+      {
+        "seed": 5162,
+        "true": true,
+        "auto": true,
+        "steps": 255,
+        "failure": null
+      },
+      {
+        "seed": 5163,
+        "true": true,
+        "auto": true,
+        "steps": 265,
+        "failure": null
+      },
+      {
+        "seed": 5164,
+        "true": true,
+        "auto": true,
+        "steps": 265,
+        "failure": null
+      },
+      {
+        "seed": 5165,
+        "true": true,
+        "auto": true,
+        "steps": 254,
+        "failure": null
+      },
+      {
+        "seed": 5166,
+        "true": true,
+        "auto": true,
+        "steps": 286,
+        "failure": null
+      },
+      {
+        "seed": 5167,
+        "true": true,
+        "auto": true,
+        "steps": 272,
+        "failure": null
+      },
+      {
+        "seed": 5168,
+        "true": false,
+        "auto": false,
+        "steps": 300,
+        "failure": "ik_failure"
+      },
+      {
+        "seed": 5169,
+        "true": true,
+        "auto": true,
+        "steps": 264,
+        "failure": null
+      },
+      {
+        "seed": 5170,
+        "true": true,
+        "auto": true,
+        "steps": 250,
+        "failure": null
+      },
+      {
+        "seed": 5171,
+        "true": true,
+        "auto": true,
+        "steps": 268,
+        "failure": null
+      },
+      {
+        "seed": 5172,
+        "true": true,
+        "auto": true,
+        "steps": 264,
+        "failure": null
+      },
+      {
+        "seed": 5173,
+        "true": true,
+        "auto": true,
+        "steps": 234,
+        "failure": null
+      },
+      {
+        "seed": 5174,
+        "true": true,
+        "auto": true,
+        "steps": 262,
+        "failure": null
+      },
+      {
+        "seed": 5175,
+        "true": true,
+        "auto": true,
+        "steps": 258,
+        "failure": null
+      },
+      {
+        "seed": 5176,
+        "true": true,
+        "auto": true,
+        "steps": 242,
+        "failure": null
+      },
+      {
+        "seed": 5177,
+        "true": true,
+        "auto": true,
+        "steps": 245,
+        "failure": null
+      },
+      {
+        "seed": 5178,
+        "true": true,
+        "auto": true,
+        "steps": 274,
+        "failure": null
+      },
+      {
+        "seed": 5179,
+        "true": true,
+        "auto": true,
+        "steps": 252,
+        "failure": null
+      },
+      {
+        "seed": 5180,
+        "true": true,
+        "auto": true,
+        "steps": 259,
+        "failure": null
+      },
+      {
+        "seed": 5181,
+        "true": true,
+        "auto": true,
+        "steps": 254,
+        "failure": null
+      },
+      {
+        "seed": 5182,
+        "true": true,
+        "auto": true,
+        "steps": 257,
+        "failure": null
+      },
+      {
+        "seed": 5183,
+        "true": true,
+        "auto": true,
+        "steps": 248,
+        "failure": null
+      },
+      {
+        "seed": 5184,
+        "true": true,
+        "auto": true,
+        "steps": 256,
+        "failure": null
+      },
+      {
+        "seed": 5185,
+        "true": true,
+        "auto": true,
+        "steps": 263,
+        "failure": null
+      },
+      {
+        "seed": 5186,
+        "true": true,
+        "auto": true,
+        "steps": 257,
+        "failure": null
+      },
+      {
+        "seed": 5187,
+        "true": true,
+        "auto": true,
+        "steps": 297,
+        "failure": null
+      },
+      {
+        "seed": 5188,
+        "true": true,
+        "auto": true,
+        "steps": 271,
+        "failure": null
+      },
+      {
+        "seed": 5189,
+        "true": true,
+        "auto": true,
+        "steps": 280,
+        "failure": null
+      },
+      {
+        "seed": 5190,
+        "true": true,
+        "auto": true,
+        "steps": 253,
+        "failure": null
+      },
+      {
+        "seed": 5191,
+        "true": true,
+        "auto": true,
+        "steps": 259,
+        "failure": null
+      },
+      {
+        "seed": 5192,
+        "true": true,
+        "auto": true,
+        "steps": 259,
+        "failure": null
+      },
+      {
+        "seed": 5193,
+        "true": true,
+        "auto": true,
+        "steps": 253,
+        "failure": null
+      },
+      {
+        "seed": 5194,
+        "true": true,
+        "auto": true,
+        "steps": 271,
+        "failure": null
+      },
+      {
+        "seed": 5195,
+        "true": true,
+        "auto": true,
+        "steps": 279,
+        "failure": null
+      },
+      {
+        "seed": 5196,
+        "true": true,
+        "auto": true,
+        "steps": 261,
+        "failure": null
+      },
+      {
+        "seed": 5197,
+        "true": true,
+        "auto": true,
+        "steps": 255,
+        "failure": null
+      },
+      {
+        "seed": 5198,
+        "true": true,
+        "auto": true,
+        "steps": 252,
+        "failure": null
+      },
+      {
+        "seed": 5199,
+        "true": true,
+        "auto": true,
+        "steps": 280,
+        "failure": null
+      }
+    ]
+  },
+  "depth": {
+    "true_success": 196,
+    "estimator_success": 197,
+    "false_success": 1,
+    "missed_success": 0,
+    "n": 200,
+    "median_steps": 264.0,
+    "failures": {
+      "timeout": 1,
+      "grasp_slip": 2,
+      "other": 1
+    },
+    "trials": [
+      {
+        "seed": 5000,
+        "true": true,
+        "auto": true,
+        "steps": 269,
+        "failure": null
+      },
+      {
+        "seed": 5001,
+        "true": true,
+        "auto": true,
+        "steps": 281,
+        "failure": null
+      },
+      {
+        "seed": 5002,
+        "true": true,
+        "auto": true,
+        "steps": 250,
+        "failure": null
+      },
+      {
+        "seed": 5003,
+        "true": true,
+        "auto": true,
+        "steps": 259,
+        "failure": null
+      },
+      {
+        "seed": 5004,
+        "true": true,
+        "auto": true,
+        "steps": 261,
+        "failure": null
+      },
+      {
+        "seed": 5005,
+        "true": true,
+        "auto": true,
+        "steps": 278,
+        "failure": null
+      },
+      {
+        "seed": 5006,
+        "true": true,
+        "auto": true,
+        "steps": 262,
+        "failure": null
+      },
+      {
+        "seed": 5007,
+        "true": true,
+        "auto": true,
+        "steps": 255,
+        "failure": null
+      },
+      {
+        "seed": 5008,
+        "true": true,
+        "auto": true,
+        "steps": 297,
+        "failure": null
+      },
+      {
+        "seed": 5009,
+        "true": true,
+        "auto": true,
+        "steps": 240,
+        "failure": null
+      },
+      {
+        "seed": 5010,
+        "true": true,
+        "auto": true,
+        "steps": 260,
+        "failure": null
+      },
+      {
+        "seed": 5011,
+        "true": true,
+        "auto": true,
+        "steps": 265,
+        "failure": null
+      },
+      {
+        "seed": 5012,
+        "true": true,
+        "auto": true,
+        "steps": 249,
+        "failure": null
+      },
+      {
+        "seed": 5013,
+        "true": true,
+        "auto": true,
+        "steps": 263,
+        "failure": null
+      },
+      {
+        "seed": 5014,
+        "true": true,
+        "auto": true,
+        "steps": 256,
+        "failure": null
+      },
+      {
+        "seed": 5015,
+        "true": true,
+        "auto": true,
+        "steps": 276,
+        "failure": null
+      },
+      {
+        "seed": 5016,
+        "true": true,
+        "auto": true,
+        "steps": 290,
+        "failure": null
+      },
+      {
+        "seed": 5017,
+        "true": true,
+        "auto": true,
+        "steps": 262,
+        "failure": null
+      },
+      {
+        "seed": 5018,
+        "true": true,
+        "auto": true,
+        "steps": 266,
+        "failure": null
+      },
+      {
+        "seed": 5019,
+        "true": true,
+        "auto": true,
+        "steps": 244,
+        "failure": null
+      },
+      {
+        "seed": 5020,
+        "true": true,
+        "auto": true,
+        "steps": 276,
+        "failure": null
+      },
+      {
+        "seed": 5021,
+        "true": true,
+        "auto": true,
+        "steps": 263,
+        "failure": null
+      },
+      {
+        "seed": 5022,
+        "true": true,
+        "auto": true,
+        "steps": 263,
+        "failure": null
+      },
+      {
+        "seed": 5023,
+        "true": true,
+        "auto": true,
+        "steps": 252,
+        "failure": null
+      },
+      {
+        "seed": 5024,
+        "true": true,
+        "auto": true,
+        "steps": 290,
+        "failure": null
+      },
+      {
+        "seed": 5025,
+        "true": true,
+        "auto": true,
+        "steps": 255,
+        "failure": null
+      },
+      {
+        "seed": 5026,
+        "true": true,
+        "auto": true,
+        "steps": 244,
+        "failure": null
+      },
+      {
+        "seed": 5027,
+        "true": true,
+        "auto": true,
+        "steps": 244,
+        "failure": null
+      },
+      {
+        "seed": 5028,
+        "true": true,
+        "auto": true,
+        "steps": 266,
+        "failure": null
+      },
+      {
+        "seed": 5029,
+        "true": true,
+        "auto": true,
+        "steps": 265,
+        "failure": null
+      },
+      {
+        "seed": 5030,
+        "true": true,
+        "auto": true,
+        "steps": 256,
+        "failure": null
+      },
+      {
+        "seed": 5031,
+        "true": true,
+        "auto": true,
+        "steps": 265,
+        "failure": null
+      },
+      {
+        "seed": 5032,
+        "true": true,
+        "auto": true,
+        "steps": 280,
+        "failure": null
+      },
+      {
+        "seed": 5033,
+        "true": true,
+        "auto": true,
+        "steps": 278,
+        "failure": null
+      },
+      {
+        "seed": 5034,
+        "true": true,
+        "auto": true,
+        "steps": 262,
+        "failure": null
+      },
+      {
+        "seed": 5035,
+        "true": true,
+        "auto": true,
+        "steps": 247,
+        "failure": null
+      },
+      {
+        "seed": 5036,
+        "true": true,
+        "auto": true,
+        "steps": 286,
+        "failure": null
+      },
+      {
+        "seed": 5037,
+        "true": true,
+        "auto": true,
+        "steps": 243,
+        "failure": null
+      },
+      {
+        "seed": 5038,
+        "true": true,
+        "auto": true,
+        "steps": 294,
+        "failure": null
+      },
+      {
+        "seed": 5039,
+        "true": true,
+        "auto": true,
+        "steps": 275,
+        "failure": null
+      },
+      {
+        "seed": 5040,
+        "true": true,
+        "auto": true,
+        "steps": 276,
+        "failure": null
+      },
+      {
+        "seed": 5041,
+        "true": true,
+        "auto": true,
+        "steps": 264,
+        "failure": null
+      },
+      {
+        "seed": 5042,
+        "true": true,
+        "auto": true,
+        "steps": 258,
+        "failure": null
+      },
+      {
+        "seed": 5043,
+        "true": true,
+        "auto": true,
+        "steps": 259,
+        "failure": null
+      },
+      {
+        "seed": 5044,
+        "true": true,
+        "auto": true,
+        "steps": 255,
+        "failure": null
+      },
+      {
+        "seed": 5045,
+        "true": true,
+        "auto": true,
+        "steps": 258,
+        "failure": null
+      },
+      {
+        "seed": 5046,
+        "true": true,
+        "auto": true,
+        "steps": 280,
+        "failure": null
+      },
+      {
+        "seed": 5047,
+        "true": true,
+        "auto": true,
+        "steps": 261,
+        "failure": null
+      },
+      {
+        "seed": 5048,
+        "true": true,
+        "auto": true,
+        "steps": 272,
+        "failure": null
+      },
+      {
+        "seed": 5049,
+        "true": true,
+        "auto": true,
+        "steps": 272,
+        "failure": null
+      },
+      {
+        "seed": 5050,
+        "true": true,
+        "auto": true,
+        "steps": 258,
+        "failure": null
+      },
+      {
+        "seed": 5051,
+        "true": true,
+        "auto": true,
+        "steps": 243,
+        "failure": null
+      },
+      {
+        "seed": 5052,
+        "true": true,
+        "auto": true,
+        "steps": 292,
+        "failure": null
+      },
+      {
+        "seed": 5053,
+        "true": true,
+        "auto": true,
+        "steps": 271,
+        "failure": null
+      },
+      {
+        "seed": 5054,
+        "true": true,
+        "auto": true,
+        "steps": 282,
+        "failure": null
+      },
+      {
+        "seed": 5055,
+        "true": true,
+        "auto": true,
+        "steps": 265,
+        "failure": null
+      },
+      {
+        "seed": 5056,
+        "true": true,
+        "auto": true,
+        "steps": 276,
+        "failure": null
+      },
+      {
+        "seed": 5057,
+        "true": true,
+        "auto": true,
+        "steps": 267,
+        "failure": null
+      },
+      {
+        "seed": 5058,
+        "true": true,
+        "auto": true,
+        "steps": 264,
+        "failure": null
+      },
+      {
+        "seed": 5059,
+        "true": false,
+        "auto": false,
+        "steps": 300,
+        "failure": "timeout"
+      },
+      {
+        "seed": 5060,
+        "true": true,
+        "auto": true,
+        "steps": 261,
+        "failure": null
+      },
+      {
+        "seed": 5061,
+        "true": true,
+        "auto": true,
+        "steps": 267,
+        "failure": null
+      },
+      {
+        "seed": 5062,
+        "true": true,
+        "auto": true,
+        "steps": 272,
+        "failure": null
+      },
+      {
+        "seed": 5063,
+        "true": true,
+        "auto": true,
+        "steps": 231,
+        "failure": null
+      },
+      {
+        "seed": 5064,
+        "true": true,
+        "auto": true,
+        "steps": 276,
+        "failure": null
+      },
+      {
+        "seed": 5065,
+        "true": true,
+        "auto": true,
+        "steps": 257,
+        "failure": null
+      },
+      {
+        "seed": 5066,
+        "true": true,
+        "auto": true,
+        "steps": 264,
+        "failure": null
+      },
+      {
+        "seed": 5067,
+        "true": true,
+        "auto": true,
+        "steps": 263,
+        "failure": null
+      },
+      {
+        "seed": 5068,
+        "true": true,
+        "auto": true,
+        "steps": 243,
+        "failure": null
+      },
+      {
+        "seed": 5069,
+        "true": true,
+        "auto": true,
+        "steps": 258,
+        "failure": null
+      },
+      {
+        "seed": 5070,
+        "true": true,
+        "auto": true,
+        "steps": 253,
+        "failure": null
+      },
+      {
+        "seed": 5071,
+        "true": true,
+        "auto": true,
+        "steps": 254,
+        "failure": null
+      },
+      {
+        "seed": 5072,
+        "true": true,
+        "auto": true,
+        "steps": 267,
+        "failure": null
+      },
+      {
+        "seed": 5073,
+        "true": true,
+        "auto": true,
+        "steps": 265,
+        "failure": null
+      },
+      {
+        "seed": 5074,
+        "true": true,
+        "auto": true,
+        "steps": 222,
+        "failure": null
+      },
+      {
+        "seed": 5075,
+        "true": false,
+        "auto": false,
+        "steps": 300,
+        "failure": "grasp_slip"
+      },
+      {
+        "seed": 5076,
+        "true": true,
+        "auto": true,
+        "steps": 257,
+        "failure": null
+      },
+      {
+        "seed": 5077,
+        "true": true,
+        "auto": true,
+        "steps": 269,
+        "failure": null
+      },
+      {
+        "seed": 5078,
+        "true": true,
+        "auto": true,
+        "steps": 256,
+        "failure": null
+      },
+      {
+        "seed": 5079,
+        "true": true,
+        "auto": true,
+        "steps": 270,
+        "failure": null
+      },
+      {
+        "seed": 5080,
+        "true": true,
+        "auto": true,
+        "steps": 270,
+        "failure": null
+      },
+      {
+        "seed": 5081,
+        "true": true,
+        "auto": true,
+        "steps": 245,
+        "failure": null
+      },
+      {
+        "seed": 5082,
+        "true": true,
+        "auto": true,
+        "steps": 255,
+        "failure": null
+      },
+      {
+        "seed": 5083,
+        "true": true,
+        "auto": true,
+        "steps": 224,
+        "failure": null
+      },
+      {
+        "seed": 5084,
+        "true": true,
+        "auto": true,
+        "steps": 262,
+        "failure": null
+      },
+      {
+        "seed": 5085,
+        "true": true,
+        "auto": true,
+        "steps": 258,
+        "failure": null
+      },
+      {
+        "seed": 5086,
+        "true": true,
+        "auto": true,
+        "steps": 283,
+        "failure": null
+      },
+      {
+        "seed": 5087,
+        "true": true,
+        "auto": true,
+        "steps": 267,
+        "failure": null
+      },
+      {
+        "seed": 5088,
+        "true": true,
+        "auto": true,
+        "steps": 254,
+        "failure": null
+      },
+      {
+        "seed": 5089,
+        "true": true,
+        "auto": true,
+        "steps": 277,
+        "failure": null
+      },
+      {
+        "seed": 5090,
+        "true": true,
+        "auto": true,
+        "steps": 248,
+        "failure": null
+      },
+      {
+        "seed": 5091,
+        "true": true,
+        "auto": true,
+        "steps": 268,
+        "failure": null
+      },
+      {
+        "seed": 5092,
+        "true": true,
+        "auto": true,
+        "steps": 271,
+        "failure": null
+      },
+      {
+        "seed": 5093,
+        "true": true,
+        "auto": true,
+        "steps": 242,
+        "failure": null
+      },
+      {
+        "seed": 5094,
+        "true": true,
+        "auto": true,
+        "steps": 252,
+        "failure": null
+      },
+      {
+        "seed": 5095,
+        "true": true,
+        "auto": true,
+        "steps": 283,
+        "failure": null
+      },
+      {
+        "seed": 5096,
+        "true": true,
+        "auto": true,
+        "steps": 283,
+        "failure": null
+      },
+      {
+        "seed": 5097,
+        "true": true,
+        "auto": true,
+        "steps": 267,
+        "failure": null
+      },
+      {
+        "seed": 5098,
+        "true": true,
+        "auto": true,
+        "steps": 262,
+        "failure": null
+      },
+      {
+        "seed": 5099,
+        "true": true,
+        "auto": true,
+        "steps": 259,
+        "failure": null
+      },
+      {
+        "seed": 5100,
+        "true": true,
+        "auto": true,
+        "steps": 278,
+        "failure": null
+      },
+      {
+        "seed": 5101,
+        "true": true,
+        "auto": true,
+        "steps": 284,
+        "failure": null
+      },
+      {
+        "seed": 5102,
+        "true": true,
+        "auto": true,
+        "steps": 268,
+        "failure": null
+      },
+      {
+        "seed": 5103,
+        "true": true,
+        "auto": true,
+        "steps": 279,
+        "failure": null
+      },
+      {
+        "seed": 5104,
+        "true": true,
+        "auto": true,
+        "steps": 284,
+        "failure": null
+      },
+      {
+        "seed": 5105,
+        "true": true,
+        "auto": true,
+        "steps": 289,
+        "failure": null
+      },
+      {
+        "seed": 5106,
+        "true": true,
+        "auto": true,
+        "steps": 265,
+        "failure": null
+      },
+      {
+        "seed": 5107,
+        "true": true,
+        "auto": true,
+        "steps": 262,
+        "failure": null
+      },
+      {
+        "seed": 5108,
+        "true": true,
+        "auto": true,
+        "steps": 250,
+        "failure": null
+      },
+      {
+        "seed": 5109,
+        "true": true,
+        "auto": true,
+        "steps": 257,
+        "failure": null
+      },
+      {
+        "seed": 5110,
+        "true": true,
+        "auto": true,
+        "steps": 289,
+        "failure": null
+      },
+      {
+        "seed": 5111,
+        "true": true,
+        "auto": true,
+        "steps": 252,
+        "failure": null
+      },
+      {
+        "seed": 5112,
+        "true": true,
+        "auto": true,
+        "steps": 271,
+        "failure": null
+      },
+      {
+        "seed": 5113,
+        "true": true,
+        "auto": true,
+        "steps": 281,
+        "failure": null
+      },
+      {
+        "seed": 5114,
+        "true": true,
+        "auto": true,
+        "steps": 265,
+        "failure": null
+      },
+      {
+        "seed": 5115,
+        "true": true,
+        "auto": true,
+        "steps": 286,
+        "failure": null
+      },
+      {
+        "seed": 5116,
+        "true": true,
+        "auto": true,
+        "steps": 265,
+        "failure": null
+      },
+      {
+        "seed": 5117,
+        "true": true,
+        "auto": true,
+        "steps": 248,
+        "failure": null
+      },
+      {
+        "seed": 5118,
+        "true": true,
+        "auto": true,
+        "steps": 275,
+        "failure": null
+      },
+      {
+        "seed": 5119,
+        "true": true,
+        "auto": true,
+        "steps": 251,
+        "failure": null
+      },
+      {
+        "seed": 5120,
+        "true": true,
+        "auto": true,
+        "steps": 269,
+        "failure": null
+      },
+      {
+        "seed": 5121,
+        "true": true,
+        "auto": true,
+        "steps": 261,
+        "failure": null
+      },
+      {
+        "seed": 5122,
+        "true": true,
+        "auto": true,
+        "steps": 247,
+        "failure": null
+      },
+      {
+        "seed": 5123,
+        "true": true,
+        "auto": true,
+        "steps": 253,
+        "failure": null
+      },
+      {
+        "seed": 5124,
+        "true": false,
+        "auto": false,
+        "steps": 300,
+        "failure": "grasp_slip"
+      },
+      {
+        "seed": 5125,
+        "true": true,
+        "auto": true,
+        "steps": 271,
+        "failure": null
+      },
+      {
+        "seed": 5126,
+        "true": true,
+        "auto": true,
+        "steps": 268,
+        "failure": null
+      },
+      {
+        "seed": 5127,
+        "true": true,
+        "auto": true,
+        "steps": 252,
+        "failure": null
+      },
+      {
+        "seed": 5128,
+        "true": true,
+        "auto": true,
+        "steps": 235,
+        "failure": null
+      },
+      {
+        "seed": 5129,
+        "true": true,
+        "auto": true,
+        "steps": 279,
+        "failure": null
+      },
+      {
+        "seed": 5130,
+        "true": true,
+        "auto": true,
+        "steps": 264,
+        "failure": null
+      },
+      {
+        "seed": 5131,
+        "true": true,
+        "auto": true,
+        "steps": 279,
+        "failure": null
+      },
+      {
+        "seed": 5132,
+        "true": true,
+        "auto": true,
+        "steps": 276,
+        "failure": null
+      },
+      {
+        "seed": 5133,
+        "true": true,
+        "auto": true,
+        "steps": 276,
+        "failure": null
+      },
+      {
+        "seed": 5134,
+        "true": true,
+        "auto": true,
+        "steps": 257,
+        "failure": null
+      },
+      {
+        "seed": 5135,
+        "true": true,
+        "auto": true,
+        "steps": 272,
+        "failure": null
+      },
+      {
+        "seed": 5136,
+        "true": true,
+        "auto": true,
+        "steps": 234,
+        "failure": null
+      },
+      {
+        "seed": 5137,
+        "true": true,
+        "auto": true,
+        "steps": 289,
+        "failure": null
+      },
+      {
+        "seed": 5138,
+        "true": true,
+        "auto": true,
+        "steps": 259,
+        "failure": null
+      },
+      {
+        "seed": 5139,
+        "true": true,
+        "auto": true,
+        "steps": 258,
+        "failure": null
+      },
+      {
+        "seed": 5140,
+        "true": true,
+        "auto": true,
+        "steps": 250,
+        "failure": null
+      },
+      {
+        "seed": 5141,
+        "true": true,
+        "auto": true,
+        "steps": 264,
+        "failure": null
+      },
+      {
+        "seed": 5142,
+        "true": true,
+        "auto": true,
+        "steps": 244,
+        "failure": null
+      },
+      {
+        "seed": 5143,
+        "true": true,
+        "auto": true,
+        "steps": 237,
+        "failure": null
+      },
+      {
+        "seed": 5144,
+        "true": true,
+        "auto": true,
+        "steps": 265,
+        "failure": null
+      },
+      {
+        "seed": 5145,
+        "true": true,
+        "auto": true,
+        "steps": 266,
+        "failure": null
+      },
+      {
+        "seed": 5146,
+        "true": true,
+        "auto": true,
+        "steps": 255,
+        "failure": null
+      },
+      {
+        "seed": 5147,
+        "true": true,
+        "auto": true,
+        "steps": 288,
+        "failure": null
+      },
+      {
+        "seed": 5148,
+        "true": true,
+        "auto": true,
+        "steps": 272,
+        "failure": null
+      },
+      {
+        "seed": 5149,
+        "true": true,
+        "auto": true,
+        "steps": 272,
+        "failure": null
+      },
+      {
+        "seed": 5150,
+        "true": true,
+        "auto": true,
+        "steps": 294,
+        "failure": null
+      },
+      {
+        "seed": 5151,
+        "true": true,
+        "auto": true,
+        "steps": 256,
+        "failure": null
+      },
+      {
+        "seed": 5152,
+        "true": true,
+        "auto": true,
+        "steps": 278,
+        "failure": null
+      },
+      {
+        "seed": 5153,
+        "true": true,
+        "auto": true,
+        "steps": 274,
+        "failure": null
+      },
+      {
+        "seed": 5154,
+        "true": true,
+        "auto": true,
+        "steps": 246,
+        "failure": null
+      },
+      {
+        "seed": 5155,
+        "true": true,
+        "auto": true,
+        "steps": 256,
+        "failure": null
+      },
+      {
+        "seed": 5156,
+        "true": true,
+        "auto": true,
+        "steps": 271,
+        "failure": null
+      },
+      {
+        "seed": 5157,
+        "true": true,
+        "auto": true,
+        "steps": 263,
+        "failure": null
+      },
+      {
+        "seed": 5158,
+        "true": true,
+        "auto": true,
+        "steps": 262,
+        "failure": null
+      },
+      {
+        "seed": 5159,
+        "true": true,
+        "auto": true,
+        "steps": 298,
+        "failure": null
+      },
+      {
+        "seed": 5160,
+        "true": true,
+        "auto": true,
+        "steps": 256,
+        "failure": null
+      },
+      {
+        "seed": 5161,
+        "true": true,
+        "auto": true,
+        "steps": 279,
+        "failure": null
+      },
+      {
+        "seed": 5162,
+        "true": true,
+        "auto": true,
+        "steps": 255,
+        "failure": null
+      },
+      {
+        "seed": 5163,
+        "true": true,
+        "auto": true,
+        "steps": 265,
+        "failure": null
+      },
+      {
+        "seed": 5164,
+        "true": true,
+        "auto": true,
+        "steps": 265,
+        "failure": null
+      },
+      {
+        "seed": 5165,
+        "true": true,
+        "auto": true,
+        "steps": 254,
+        "failure": null
+      },
+      {
+        "seed": 5166,
+        "true": true,
+        "auto": true,
+        "steps": 285,
+        "failure": null
+      },
+      {
+        "seed": 5167,
+        "true": true,
+        "auto": true,
+        "steps": 272,
+        "failure": null
+      },
+      {
+        "seed": 5168,
+        "true": true,
+        "auto": true,
+        "steps": 272,
+        "failure": null
+      },
+      {
+        "seed": 5169,
+        "true": true,
+        "auto": true,
+        "steps": 264,
+        "failure": null
+      },
+      {
+        "seed": 5170,
+        "true": true,
+        "auto": true,
+        "steps": 250,
+        "failure": null
+      },
+      {
+        "seed": 5171,
+        "true": true,
+        "auto": true,
+        "steps": 268,
+        "failure": null
+      },
+      {
+        "seed": 5172,
+        "true": true,
+        "auto": true,
+        "steps": 265,
+        "failure": null
+      },
+      {
+        "seed": 5173,
+        "true": true,
+        "auto": true,
+        "steps": 235,
+        "failure": null
+      },
+      {
+        "seed": 5174,
+        "true": true,
+        "auto": true,
+        "steps": 263,
+        "failure": null
+      },
+      {
+        "seed": 5175,
+        "true": true,
+        "auto": true,
+        "steps": 258,
+        "failure": null
+      },
+      {
+        "seed": 5176,
+        "true": true,
+        "auto": true,
+        "steps": 242,
+        "failure": null
+      },
+      {
+        "seed": 5177,
+        "true": true,
+        "auto": true,
+        "steps": 245,
+        "failure": null
+      },
+      {
+        "seed": 5178,
+        "true": true,
+        "auto": true,
+        "steps": 274,
+        "failure": null
+      },
+      {
+        "seed": 5179,
+        "true": true,
+        "auto": true,
+        "steps": 253,
+        "failure": null
+      },
+      {
+        "seed": 5180,
+        "true": true,
+        "auto": true,
+        "steps": 259,
+        "failure": null
+      },
+      {
+        "seed": 5181,
+        "true": true,
+        "auto": true,
+        "steps": 254,
+        "failure": null
+      },
+      {
+        "seed": 5182,
+        "true": true,
+        "auto": true,
+        "steps": 257,
+        "failure": null
+      },
+      {
+        "seed": 5183,
+        "true": true,
+        "auto": true,
+        "steps": 249,
+        "failure": null
+      },
+      {
+        "seed": 5184,
+        "true": true,
+        "auto": true,
+        "steps": 256,
+        "failure": null
+      },
+      {
+        "seed": 5185,
+        "true": true,
+        "auto": true,
+        "steps": 263,
+        "failure": null
+      },
+      {
+        "seed": 5186,
+        "true": true,
+        "auto": true,
+        "steps": 258,
+        "failure": null
+      },
+      {
+        "seed": 5187,
+        "true": true,
+        "auto": true,
+        "steps": 298,
+        "failure": null
+      },
+      {
+        "seed": 5188,
+        "true": true,
+        "auto": true,
+        "steps": 270,
+        "failure": null
+      },
+      {
+        "seed": 5189,
+        "true": true,
+        "auto": true,
+        "steps": 280,
+        "failure": null
+      },
+      {
+        "seed": 5190,
+        "true": true,
+        "auto": true,
+        "steps": 253,
+        "failure": null
+      },
+      {
+        "seed": 5191,
+        "true": true,
+        "auto": true,
+        "steps": 259,
+        "failure": null
+      },
+      {
+        "seed": 5192,
+        "true": true,
+        "auto": true,
+        "steps": 259,
+        "failure": null
+      },
+      {
+        "seed": 5193,
+        "true": true,
+        "auto": true,
+        "steps": 253,
+        "failure": null
+      },
+      {
+        "seed": 5194,
+        "true": true,
+        "auto": true,
+        "steps": 271,
+        "failure": null
+      },
+      {
+        "seed": 5195,
+        "true": true,
+        "auto": true,
+        "steps": 279,
+        "failure": null
+      },
+      {
+        "seed": 5196,
+        "true": false,
+        "auto": true,
+        "steps": 264,
+        "failure": "other"
+      },
+      {
+        "seed": 5197,
+        "true": true,
+        "auto": true,
+        "steps": 255,
+        "failure": null
+      },
+      {
+        "seed": 5198,
+        "true": true,
+        "auto": true,
+        "steps": 252,
+        "failure": null
+      },
+      {
+        "seed": 5199,
+        "true": true,
+        "auto": true,
+        "steps": 280,
+        "failure": null
+      }
+    ]
+  },
+  "depth_noisy_color": {
+    "true_success": 197,
+    "estimator_success": 198,
+    "false_success": 1,
+    "missed_success": 0,
+    "n": 200,
+    "median_steps": 263.5,
+    "failures": {
+      "timeout": 1,
+      "grasp_slip": 1,
+      "other": 1
+    },
+    "trials": [
+      {
+        "seed": 5000,
+        "true": true,
+        "auto": true,
+        "steps": 269,
+        "failure": null
+      },
+      {
+        "seed": 5001,
+        "true": true,
+        "auto": true,
+        "steps": 281,
+        "failure": null
+      },
+      {
+        "seed": 5002,
+        "true": true,
+        "auto": true,
+        "steps": 249,
+        "failure": null
+      },
+      {
+        "seed": 5003,
+        "true": true,
+        "auto": true,
+        "steps": 259,
+        "failure": null
+      },
+      {
+        "seed": 5004,
+        "true": true,
+        "auto": true,
+        "steps": 261,
+        "failure": null
+      },
+      {
+        "seed": 5005,
+        "true": true,
+        "auto": true,
+        "steps": 277,
+        "failure": null
+      },
+      {
+        "seed": 5006,
+        "true": true,
+        "auto": true,
+        "steps": 261,
+        "failure": null
+      },
+      {
+        "seed": 5007,
+        "true": true,
+        "auto": true,
+        "steps": 255,
+        "failure": null
+      },
+      {
+        "seed": 5008,
+        "true": true,
+        "auto": true,
+        "steps": 296,
+        "failure": null
+      },
+      {
+        "seed": 5009,
+        "true": true,
+        "auto": true,
+        "steps": 240,
+        "failure": null
+      },
+      {
+        "seed": 5010,
+        "true": true,
+        "auto": true,
+        "steps": 261,
+        "failure": null
+      },
+      {
+        "seed": 5011,
+        "true": true,
+        "auto": true,
+        "steps": 265,
+        "failure": null
+      },
+      {
+        "seed": 5012,
+        "true": true,
+        "auto": true,
+        "steps": 249,
+        "failure": null
+      },
+      {
+        "seed": 5013,
+        "true": true,
+        "auto": true,
+        "steps": 262,
+        "failure": null
+      },
+      {
+        "seed": 5014,
+        "true": true,
+        "auto": true,
+        "steps": 256,
+        "failure": null
+      },
+      {
+        "seed": 5015,
+        "true": true,
+        "auto": true,
+        "steps": 275,
+        "failure": null
+      },
+      {
+        "seed": 5016,
+        "true": true,
+        "auto": true,
+        "steps": 290,
+        "failure": null
+      },
+      {
+        "seed": 5017,
+        "true": true,
+        "auto": true,
+        "steps": 262,
+        "failure": null
+      },
+      {
+        "seed": 5018,
+        "true": true,
+        "auto": true,
+        "steps": 266,
+        "failure": null
+      },
+      {
+        "seed": 5019,
+        "true": true,
+        "auto": true,
+        "steps": 244,
+        "failure": null
+      },
+      {
+        "seed": 5020,
+        "true": true,
+        "auto": true,
+        "steps": 276,
+        "failure": null
+      },
+      {
+        "seed": 5021,
+        "true": true,
+        "auto": true,
+        "steps": 263,
+        "failure": null
+      },
+      {
+        "seed": 5022,
+        "true": true,
+        "auto": true,
+        "steps": 262,
+        "failure": null
+      },
+      {
+        "seed": 5023,
+        "true": true,
+        "auto": true,
+        "steps": 252,
+        "failure": null
+      },
+      {
+        "seed": 5024,
+        "true": true,
+        "auto": true,
+        "steps": 290,
+        "failure": null
+      },
+      {
+        "seed": 5025,
+        "true": true,
+        "auto": true,
+        "steps": 255,
+        "failure": null
+      },
+      {
+        "seed": 5026,
+        "true": true,
+        "auto": true,
+        "steps": 244,
+        "failure": null
+      },
+      {
+        "seed": 5027,
+        "true": true,
+        "auto": true,
+        "steps": 244,
+        "failure": null
+      },
+      {
+        "seed": 5028,
+        "true": true,
+        "auto": true,
+        "steps": 266,
+        "failure": null
+      },
+      {
+        "seed": 5029,
+        "true": true,
+        "auto": true,
+        "steps": 265,
+        "failure": null
+      },
+      {
+        "seed": 5030,
+        "true": true,
+        "auto": true,
+        "steps": 256,
+        "failure": null
+      },
+      {
+        "seed": 5031,
+        "true": true,
+        "auto": true,
+        "steps": 264,
+        "failure": null
+      },
+      {
+        "seed": 5032,
+        "true": true,
+        "auto": true,
+        "steps": 280,
+        "failure": null
+      },
+      {
+        "seed": 5033,
+        "true": true,
+        "auto": true,
+        "steps": 277,
+        "failure": null
+      },
+      {
+        "seed": 5034,
+        "true": true,
+        "auto": true,
+        "steps": 262,
+        "failure": null
+      },
+      {
+        "seed": 5035,
+        "true": true,
+        "auto": true,
+        "steps": 247,
+        "failure": null
+      },
+      {
+        "seed": 5036,
+        "true": true,
+        "auto": true,
+        "steps": 285,
+        "failure": null
+      },
+      {
+        "seed": 5037,
+        "true": true,
+        "auto": true,
+        "steps": 243,
+        "failure": null
+      },
+      {
+        "seed": 5038,
+        "true": true,
+        "auto": true,
+        "steps": 293,
+        "failure": null
+      },
+      {
+        "seed": 5039,
+        "true": true,
+        "auto": true,
+        "steps": 274,
+        "failure": null
+      },
+      {
+        "seed": 5040,
+        "true": true,
+        "auto": true,
+        "steps": 276,
+        "failure": null
+      },
+      {
+        "seed": 5041,
+        "true": true,
+        "auto": true,
+        "steps": 264,
+        "failure": null
+      },
+      {
+        "seed": 5042,
+        "true": true,
+        "auto": true,
+        "steps": 258,
+        "failure": null
+      },
+      {
+        "seed": 5043,
+        "true": true,
+        "auto": true,
+        "steps": 258,
+        "failure": null
+      },
+      {
+        "seed": 5044,
+        "true": true,
+        "auto": true,
+        "steps": 255,
+        "failure": null
+      },
+      {
+        "seed": 5045,
+        "true": true,
+        "auto": true,
+        "steps": 258,
+        "failure": null
+      },
+      {
+        "seed": 5046,
+        "true": true,
+        "auto": true,
+        "steps": 280,
+        "failure": null
+      },
+      {
+        "seed": 5047,
+        "true": true,
+        "auto": true,
+        "steps": 261,
+        "failure": null
+      },
+      {
+        "seed": 5048,
+        "true": true,
+        "auto": true,
+        "steps": 272,
+        "failure": null
+      },
+      {
+        "seed": 5049,
+        "true": true,
+        "auto": true,
+        "steps": 272,
+        "failure": null
+      },
+      {
+        "seed": 5050,
+        "true": true,
+        "auto": true,
+        "steps": 258,
+        "failure": null
+      },
+      {
+        "seed": 5051,
+        "true": true,
+        "auto": true,
+        "steps": 243,
+        "failure": null
+      },
+      {
+        "seed": 5052,
+        "true": true,
+        "auto": true,
+        "steps": 292,
+        "failure": null
+      },
+      {
+        "seed": 5053,
+        "true": true,
+        "auto": true,
+        "steps": 271,
+        "failure": null
+      },
+      {
+        "seed": 5054,
+        "true": true,
+        "auto": true,
+        "steps": 282,
+        "failure": null
+      },
+      {
+        "seed": 5055,
+        "true": true,
+        "auto": true,
+        "steps": 265,
+        "failure": null
+      },
+      {
+        "seed": 5056,
+        "true": true,
+        "auto": true,
+        "steps": 276,
+        "failure": null
+      },
+      {
+        "seed": 5057,
+        "true": true,
+        "auto": true,
+        "steps": 267,
+        "failure": null
+      },
+      {
+        "seed": 5058,
+        "true": true,
+        "auto": true,
+        "steps": 264,
+        "failure": null
+      },
+      {
+        "seed": 5059,
+        "true": false,
+        "auto": false,
+        "steps": 300,
+        "failure": "timeout"
+      },
+      {
+        "seed": 5060,
+        "true": true,
+        "auto": true,
+        "steps": 261,
+        "failure": null
+      },
+      {
+        "seed": 5061,
+        "true": true,
+        "auto": true,
+        "steps": 267,
+        "failure": null
+      },
+      {
+        "seed": 5062,
+        "true": true,
+        "auto": true,
+        "steps": 272,
+        "failure": null
+      },
+      {
+        "seed": 5063,
+        "true": true,
+        "auto": true,
+        "steps": 230,
+        "failure": null
+      },
+      {
+        "seed": 5064,
+        "true": true,
+        "auto": true,
+        "steps": 275,
+        "failure": null
+      },
+      {
+        "seed": 5065,
+        "true": true,
+        "auto": true,
+        "steps": 257,
+        "failure": null
+      },
+      {
+        "seed": 5066,
+        "true": true,
+        "auto": true,
+        "steps": 264,
+        "failure": null
+      },
+      {
+        "seed": 5067,
+        "true": true,
+        "auto": true,
+        "steps": 263,
+        "failure": null
+      },
+      {
+        "seed": 5068,
+        "true": true,
+        "auto": true,
+        "steps": 243,
+        "failure": null
+      },
+      {
+        "seed": 5069,
+        "true": true,
+        "auto": true,
+        "steps": 258,
+        "failure": null
+      },
+      {
+        "seed": 5070,
+        "true": true,
+        "auto": true,
+        "steps": 253,
+        "failure": null
+      },
+      {
+        "seed": 5071,
+        "true": true,
+        "auto": true,
+        "steps": 253,
+        "failure": null
+      },
+      {
+        "seed": 5072,
+        "true": true,
+        "auto": true,
+        "steps": 267,
+        "failure": null
+      },
+      {
+        "seed": 5073,
+        "true": true,
+        "auto": true,
+        "steps": 265,
+        "failure": null
+      },
+      {
+        "seed": 5074,
+        "true": true,
+        "auto": true,
+        "steps": 222,
+        "failure": null
+      },
+      {
+        "seed": 5075,
+        "true": true,
+        "auto": true,
+        "steps": 234,
+        "failure": null
+      },
+      {
+        "seed": 5076,
+        "true": true,
+        "auto": true,
+        "steps": 257,
+        "failure": null
+      },
+      {
+        "seed": 5077,
+        "true": true,
+        "auto": true,
+        "steps": 269,
+        "failure": null
+      },
+      {
+        "seed": 5078,
+        "true": true,
+        "auto": true,
+        "steps": 256,
+        "failure": null
+      },
+      {
+        "seed": 5079,
+        "true": true,
+        "auto": true,
+        "steps": 270,
+        "failure": null
+      },
+      {
+        "seed": 5080,
+        "true": true,
+        "auto": true,
+        "steps": 270,
+        "failure": null
+      },
+      {
+        "seed": 5081,
+        "true": true,
+        "auto": true,
+        "steps": 245,
+        "failure": null
+      },
+      {
+        "seed": 5082,
+        "true": true,
+        "auto": true,
+        "steps": 255,
+        "failure": null
+      },
+      {
+        "seed": 5083,
+        "true": true,
+        "auto": true,
+        "steps": 224,
+        "failure": null
+      },
+      {
+        "seed": 5084,
+        "true": true,
+        "auto": true,
+        "steps": 262,
+        "failure": null
+      },
+      {
+        "seed": 5085,
+        "true": true,
+        "auto": true,
+        "steps": 258,
+        "failure": null
+      },
+      {
+        "seed": 5086,
+        "true": true,
+        "auto": true,
+        "steps": 283,
+        "failure": null
+      },
+      {
+        "seed": 5087,
+        "true": true,
+        "auto": true,
+        "steps": 267,
+        "failure": null
+      },
+      {
+        "seed": 5088,
+        "true": true,
+        "auto": true,
+        "steps": 254,
+        "failure": null
+      },
+      {
+        "seed": 5089,
+        "true": true,
+        "auto": true,
+        "steps": 277,
+        "failure": null
+      },
+      {
+        "seed": 5090,
+        "true": true,
+        "auto": true,
+        "steps": 247,
+        "failure": null
+      },
+      {
+        "seed": 5091,
+        "true": true,
+        "auto": true,
+        "steps": 269,
+        "failure": null
+      },
+      {
+        "seed": 5092,
+        "true": true,
+        "auto": true,
+        "steps": 270,
+        "failure": null
+      },
+      {
+        "seed": 5093,
+        "true": true,
+        "auto": true,
+        "steps": 242,
+        "failure": null
+      },
+      {
+        "seed": 5094,
+        "true": true,
+        "auto": true,
+        "steps": 252,
+        "failure": null
+      },
+      {
+        "seed": 5095,
+        "true": true,
+        "auto": true,
+        "steps": 283,
+        "failure": null
+      },
+      {
+        "seed": 5096,
+        "true": true,
+        "auto": true,
+        "steps": 283,
+        "failure": null
+      },
+      {
+        "seed": 5097,
+        "true": true,
+        "auto": true,
+        "steps": 265,
+        "failure": null
+      },
+      {
+        "seed": 5098,
+        "true": true,
+        "auto": true,
+        "steps": 262,
+        "failure": null
+      },
+      {
+        "seed": 5099,
+        "true": true,
+        "auto": true,
+        "steps": 259,
+        "failure": null
+      },
+      {
+        "seed": 5100,
+        "true": true,
+        "auto": true,
+        "steps": 278,
+        "failure": null
+      },
+      {
+        "seed": 5101,
+        "true": true,
+        "auto": true,
+        "steps": 284,
+        "failure": null
+      },
+      {
+        "seed": 5102,
+        "true": true,
+        "auto": true,
+        "steps": 268,
+        "failure": null
+      },
+      {
+        "seed": 5103,
+        "true": true,
+        "auto": true,
+        "steps": 279,
+        "failure": null
+      },
+      {
+        "seed": 5104,
+        "true": true,
+        "auto": true,
+        "steps": 284,
+        "failure": null
+      },
+      {
+        "seed": 5105,
+        "true": true,
+        "auto": true,
+        "steps": 289,
+        "failure": null
+      },
+      {
+        "seed": 5106,
+        "true": true,
+        "auto": true,
+        "steps": 263,
+        "failure": null
+      },
+      {
+        "seed": 5107,
+        "true": true,
+        "auto": true,
+        "steps": 263,
+        "failure": null
+      },
+      {
+        "seed": 5108,
+        "true": true,
+        "auto": true,
+        "steps": 251,
+        "failure": null
+      },
+      {
+        "seed": 5109,
+        "true": true,
+        "auto": true,
+        "steps": 257,
+        "failure": null
+      },
+      {
+        "seed": 5110,
+        "true": true,
+        "auto": true,
+        "steps": 288,
+        "failure": null
+      },
+      {
+        "seed": 5111,
+        "true": true,
+        "auto": true,
+        "steps": 252,
+        "failure": null
+      },
+      {
+        "seed": 5112,
+        "true": true,
+        "auto": true,
+        "steps": 271,
+        "failure": null
+      },
+      {
+        "seed": 5113,
+        "true": true,
+        "auto": true,
+        "steps": 281,
+        "failure": null
+      },
+      {
+        "seed": 5114,
+        "true": true,
+        "auto": true,
+        "steps": 265,
+        "failure": null
+      },
+      {
+        "seed": 5115,
+        "true": true,
+        "auto": true,
+        "steps": 286,
+        "failure": null
+      },
+      {
+        "seed": 5116,
+        "true": true,
+        "auto": true,
+        "steps": 265,
+        "failure": null
+      },
+      {
+        "seed": 5117,
+        "true": true,
+        "auto": true,
+        "steps": 248,
+        "failure": null
+      },
+      {
+        "seed": 5118,
+        "true": true,
+        "auto": true,
+        "steps": 275,
+        "failure": null
+      },
+      {
+        "seed": 5119,
+        "true": true,
+        "auto": true,
+        "steps": 251,
+        "failure": null
+      },
+      {
+        "seed": 5120,
+        "true": true,
+        "auto": true,
+        "steps": 268,
+        "failure": null
+      },
+      {
+        "seed": 5121,
+        "true": true,
+        "auto": true,
+        "steps": 262,
+        "failure": null
+      },
+      {
+        "seed": 5122,
+        "true": true,
+        "auto": true,
+        "steps": 247,
+        "failure": null
+      },
+      {
+        "seed": 5123,
+        "true": true,
+        "auto": true,
+        "steps": 253,
+        "failure": null
+      },
+      {
+        "seed": 5124,
+        "true": false,
+        "auto": false,
+        "steps": 300,
+        "failure": "grasp_slip"
+      },
+      {
+        "seed": 5125,
+        "true": true,
+        "auto": true,
+        "steps": 271,
+        "failure": null
+      },
+      {
+        "seed": 5126,
+        "true": true,
+        "auto": true,
+        "steps": 268,
+        "failure": null
+      },
+      {
+        "seed": 5127,
+        "true": true,
+        "auto": true,
+        "steps": 252,
+        "failure": null
+      },
+      {
+        "seed": 5128,
+        "true": true,
+        "auto": true,
+        "steps": 235,
+        "failure": null
+      },
+      {
+        "seed": 5129,
+        "true": true,
+        "auto": true,
+        "steps": 279,
+        "failure": null
+      },
+      {
+        "seed": 5130,
+        "true": true,
+        "auto": true,
+        "steps": 264,
+        "failure": null
+      },
+      {
+        "seed": 5131,
+        "true": true,
+        "auto": true,
+        "steps": 279,
+        "failure": null
+      },
+      {
+        "seed": 5132,
+        "true": true,
+        "auto": true,
+        "steps": 276,
+        "failure": null
+      },
+      {
+        "seed": 5133,
+        "true": true,
+        "auto": true,
+        "steps": 275,
+        "failure": null
+      },
+      {
+        "seed": 5134,
+        "true": true,
+        "auto": true,
+        "steps": 257,
+        "failure": null
+      },
+      {
+        "seed": 5135,
+        "true": true,
+        "auto": true,
+        "steps": 271,
+        "failure": null
+      },
+      {
+        "seed": 5136,
+        "true": true,
+        "auto": true,
+        "steps": 234,
+        "failure": null
+      },
+      {
+        "seed": 5137,
+        "true": true,
+        "auto": true,
+        "steps": 289,
+        "failure": null
+      },
+      {
+        "seed": 5138,
+        "true": true,
+        "auto": true,
+        "steps": 259,
+        "failure": null
+      },
+      {
+        "seed": 5139,
+        "true": true,
+        "auto": true,
+        "steps": 259,
+        "failure": null
+      },
+      {
+        "seed": 5140,
+        "true": true,
+        "auto": true,
+        "steps": 250,
+        "failure": null
+      },
+      {
+        "seed": 5141,
+        "true": true,
+        "auto": true,
+        "steps": 264,
+        "failure": null
+      },
+      {
+        "seed": 5142,
+        "true": true,
+        "auto": true,
+        "steps": 244,
+        "failure": null
+      },
+      {
+        "seed": 5143,
+        "true": true,
+        "auto": true,
+        "steps": 236,
+        "failure": null
+      },
+      {
+        "seed": 5144,
+        "true": true,
+        "auto": true,
+        "steps": 265,
+        "failure": null
+      },
+      {
+        "seed": 5145,
+        "true": true,
+        "auto": true,
+        "steps": 266,
+        "failure": null
+      },
+      {
+        "seed": 5146,
+        "true": true,
+        "auto": true,
+        "steps": 254,
+        "failure": null
+      },
+      {
+        "seed": 5147,
+        "true": true,
+        "auto": true,
+        "steps": 288,
+        "failure": null
+      },
+      {
+        "seed": 5148,
+        "true": true,
+        "auto": true,
+        "steps": 272,
+        "failure": null
+      },
+      {
+        "seed": 5149,
+        "true": true,
+        "auto": true,
+        "steps": 271,
+        "failure": null
+      },
+      {
+        "seed": 5150,
+        "true": true,
+        "auto": true,
+        "steps": 294,
+        "failure": null
+      },
+      {
+        "seed": 5151,
+        "true": true,
+        "auto": true,
+        "steps": 256,
+        "failure": null
+      },
+      {
+        "seed": 5152,
+        "true": true,
+        "auto": true,
+        "steps": 278,
+        "failure": null
+      },
+      {
+        "seed": 5153,
+        "true": true,
+        "auto": true,
+        "steps": 274,
+        "failure": null
+      },
+      {
+        "seed": 5154,
+        "true": true,
+        "auto": true,
+        "steps": 246,
+        "failure": null
+      },
+      {
+        "seed": 5155,
+        "true": true,
+        "auto": true,
+        "steps": 255,
+        "failure": null
+      },
+      {
+        "seed": 5156,
+        "true": true,
+        "auto": true,
+        "steps": 271,
+        "failure": null
+      },
+      {
+        "seed": 5157,
+        "true": true,
+        "auto": true,
+        "steps": 263,
+        "failure": null
+      },
+      {
+        "seed": 5158,
+        "true": true,
+        "auto": true,
+        "steps": 262,
+        "failure": null
+      },
+      {
+        "seed": 5159,
+        "true": true,
+        "auto": true,
+        "steps": 297,
+        "failure": null
+      },
+      {
+        "seed": 5160,
+        "true": true,
+        "auto": true,
+        "steps": 255,
+        "failure": null
+      },
+      {
+        "seed": 5161,
+        "true": true,
+        "auto": true,
+        "steps": 279,
+        "failure": null
+      },
+      {
+        "seed": 5162,
+        "true": true,
+        "auto": true,
+        "steps": 255,
+        "failure": null
+      },
+      {
+        "seed": 5163,
+        "true": true,
+        "auto": true,
+        "steps": 265,
+        "failure": null
+      },
+      {
+        "seed": 5164,
+        "true": true,
+        "auto": true,
+        "steps": 265,
+        "failure": null
+      },
+      {
+        "seed": 5165,
+        "true": true,
+        "auto": true,
+        "steps": 254,
+        "failure": null
+      },
+      {
+        "seed": 5166,
+        "true": true,
+        "auto": true,
+        "steps": 285,
+        "failure": null
+      },
+      {
+        "seed": 5167,
+        "true": true,
+        "auto": true,
+        "steps": 272,
+        "failure": null
+      },
+      {
+        "seed": 5168,
+        "true": true,
+        "auto": true,
+        "steps": 272,
+        "failure": null
+      },
+      {
+        "seed": 5169,
+        "true": true,
+        "auto": true,
+        "steps": 264,
+        "failure": null
+      },
+      {
+        "seed": 5170,
+        "true": true,
+        "auto": true,
+        "steps": 250,
+        "failure": null
+      },
+      {
+        "seed": 5171,
+        "true": true,
+        "auto": true,
+        "steps": 268,
+        "failure": null
+      },
+      {
+        "seed": 5172,
+        "true": true,
+        "auto": true,
+        "steps": 265,
+        "failure": null
+      },
+      {
+        "seed": 5173,
+        "true": true,
+        "auto": true,
+        "steps": 234,
+        "failure": null
+      },
+      {
+        "seed": 5174,
+        "true": true,
+        "auto": true,
+        "steps": 262,
+        "failure": null
+      },
+      {
+        "seed": 5175,
+        "true": true,
+        "auto": true,
+        "steps": 258,
+        "failure": null
+      },
+      {
+        "seed": 5176,
+        "true": true,
+        "auto": true,
+        "steps": 242,
+        "failure": null
+      },
+      {
+        "seed": 5177,
+        "true": true,
+        "auto": true,
+        "steps": 245,
+        "failure": null
+      },
+      {
+        "seed": 5178,
+        "true": true,
+        "auto": true,
+        "steps": 274,
+        "failure": null
+      },
+      {
+        "seed": 5179,
+        "true": true,
+        "auto": true,
+        "steps": 254,
+        "failure": null
+      },
+      {
+        "seed": 5180,
+        "true": true,
+        "auto": true,
+        "steps": 259,
+        "failure": null
+      },
+      {
+        "seed": 5181,
+        "true": true,
+        "auto": true,
+        "steps": 254,
+        "failure": null
+      },
+      {
+        "seed": 5182,
+        "true": true,
+        "auto": true,
+        "steps": 257,
+        "failure": null
+      },
+      {
+        "seed": 5183,
+        "true": true,
+        "auto": true,
+        "steps": 249,
+        "failure": null
+      },
+      {
+        "seed": 5184,
+        "true": true,
+        "auto": true,
+        "steps": 256,
+        "failure": null
+      },
+      {
+        "seed": 5185,
+        "true": true,
+        "auto": true,
+        "steps": 263,
+        "failure": null
+      },
+      {
+        "seed": 5186,
+        "true": true,
+        "auto": true,
+        "steps": 257,
+        "failure": null
+      },
+      {
+        "seed": 5187,
+        "true": true,
+        "auto": true,
+        "steps": 297,
+        "failure": null
+      },
+      {
+        "seed": 5188,
+        "true": true,
+        "auto": true,
+        "steps": 270,
+        "failure": null
+      },
+      {
+        "seed": 5189,
+        "true": true,
+        "auto": true,
+        "steps": 280,
+        "failure": null
+      },
+      {
+        "seed": 5190,
+        "true": true,
+        "auto": true,
+        "steps": 253,
+        "failure": null
+      },
+      {
+        "seed": 5191,
+        "true": true,
+        "auto": true,
+        "steps": 259,
+        "failure": null
+      },
+      {
+        "seed": 5192,
+        "true": true,
+        "auto": true,
+        "steps": 259,
+        "failure": null
+      },
+      {
+        "seed": 5193,
+        "true": true,
+        "auto": true,
+        "steps": 252,
+        "failure": null
+      },
+      {
+        "seed": 5194,
+        "true": true,
+        "auto": true,
+        "steps": 271,
+        "failure": null
+      },
+      {
+        "seed": 5195,
+        "true": true,
+        "auto": true,
+        "steps": 279,
+        "failure": null
+      },
+      {
+        "seed": 5196,
+        "true": false,
+        "auto": true,
+        "steps": 264,
+        "failure": "other"
+      },
+      {
+        "seed": 5197,
+        "true": true,
+        "auto": true,
+        "steps": 255,
+        "failure": null
+      },
+      {
+        "seed": 5198,
+        "true": true,
+        "auto": true,
+        "steps": 252,
+        "failure": null
+      },
+      {
+        "seed": 5199,
+        "true": true,
+        "auto": true,
+        "steps": 280,
+        "failure": null
+      }
+    ]
+  }
+}

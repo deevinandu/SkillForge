@@ -651,6 +651,20 @@ def test_robustness_runs_the_same_sweep_in_every_setting(stub_task):
         cli.main(["robustness", "stub_pick_cube_to_bin", "--envs", "true,nope"])
 
 
+def test_fresh_pool_evaluates_like_a_shared_pool_and_reports_each_point(stub_task):
+    from skillforge.eval.parallel import EvalPool
+    from skillforge.eval.regression import source_of
+    from skillforge.perception import cli
+
+    said = []
+    src = source_of(PickPlace)
+    fresh, eps = cli.FreshPool(2, say=said.append).evaluate(make_stub_oracle, src, stub_task, range(6))
+    with EvalPool(2) as pool:
+        shared, _ = pool.evaluate(make_stub_oracle, src, stub_task, range(6))
+    assert (fresh.n_success, fresh.failure_counts) == (shared.n_success, shared.failure_counts)
+    assert [e.seed for e in eps] == list(range(6)) and said == [f"  {fresh.n_success}/6"]
+
+
 def test_yaw_quat_roundtrip():
     for y in (-1.0, 0.0, 0.4):
         assert abs(quat_yaw(yaw_quat(y)) - y) < 1e-12
