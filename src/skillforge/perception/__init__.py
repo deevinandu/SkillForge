@@ -22,9 +22,11 @@ from .frames import (
     overview_camera,
     project,
 )
+from .vlm_judge import Confusion, Verdict, VLMJudge
 
 __all__ = [
     "CameraFrame",
+    "Confusion",
     "DepthEstimator",
     "Estimate",
     "FrameSource",
@@ -34,6 +36,8 @@ __all__ = [
     "PerceptionReport",
     "PoseEstimator",
     "SimFrameSource",
+    "VLMJudge",
+    "Verdict",
     "VirtualCamera",
     "VisualRandomization",
     "backproject",
