@@ -4,7 +4,12 @@
 stress-tests it under domain randomization, fixes what breaks, turns it into training data
 for a learned policy, and (later) validates it on a real arm.
 
-> Status: Phase 0. Contracts and a stub pipeline run end to end. Nothing below is on hardware yet.
+> Status (2026-11-16): Phases 0-2 are done **in simulation** (MuJoCo Franka, agent-written skills,
+> eval and regression harness, a learned policy at parity with its teacher). Phase 3 is in
+> progress: camera-based pose estimation is measured in sim, and the real-robot env, safety
+> limits, session runner and system ID are built and tested against fakes and a simulated twin.
+> **Nothing has run on a real arm yet**, and the VLM success judge has never made a real API
+> call. `HANDOVER.md` has the measurements and what each one does and does not show.
 
 ## The loop
 ```

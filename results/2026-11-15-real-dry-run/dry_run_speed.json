@@ -1,0 +1,246 @@
+{
+  "sim": {
+    "report": {
+      "task_id": "franka_pick_cube_to_bin_hard",
+      "skill": "pick_place",
+      "skill_version": "0.2.2",
+      "n_rollouts": 200,
+      "n_success": 199,
+      "success_rate": 0.995,
+      "ci95": [
+        0.9722256001302286,
+        0.999116854010634
+      ],
+      "failure_counts": {
+        "timeout": 1
+      },
+      "failures": [
+        {
+          "seed": 5038,
+          "tag": "timeout",
+          "detail": "after 300 steps; cause: still holding; events: ['grasp:cube']",
+          "randomization": {
+            "object_xy_jitter": 0.13250090839040443,
+            "object_yaw_jitter": 0.6977506474474846,
+            "friction_scale": 0.742590347215657,
+            "mass_scale": 0.7430904080980584,
+            "actuator_gain_scale": 0.6894192634588278,
+            "obs_noise_std": 0.0,
+            "action_latency_steps": 5.0,
+            "cube.dx": -0.12419320115209186,
+            "cube.dy": -0.013628072703163893,
+            "cube.dyaw": -0.5425966343881719
+          },
+          "video": null
+        }
+      ],
+      "created_at": "2026-11-15T20:56:32+00:00"
+    },
+    "median_steps_success": 91.0,
+    "episodes_with_safety_event": {}
+  },
+  "dry_run_0.5": {
+    "report": {
+      "task_id": "franka_pick_cube_to_bin_hard",
+      "skill": "pick_place",
+      "skill_version": "0.2.2",
+      "n_rollouts": 200,
+      "n_success": 199,
+      "success_rate": 0.995,
+      "ci95": [
+        0.9722256001302286,
+        0.999116854010634
+      ],
+      "failure_counts": {
+        "timeout": 1
+      },
+      "failures": [
+        {
+          "seed": 5038,
+          "tag": "timeout",
+          "detail": "after 300 steps; cause: still holding; events: ['grasp:cube']",
+          "randomization": {
+            "object_xy_jitter": 0.13250090839040443,
+            "object_yaw_jitter": 0.6977506474474846,
+            "friction_scale": 0.742590347215657,
+            "mass_scale": 0.7430904080980584,
+            "actuator_gain_scale": 0.6894192634588278,
+            "obs_noise_std": 0.0,
+            "action_latency_steps": 5.0,
+            "cube.dx": -0.12419320115209186,
+            "cube.dy": -0.013628072703163893,
+            "cube.dyaw": -0.5425966343881719,
+            "real.dry_run": 1.0,
+            "cube.placed_dx": -0.12419320115209187,
+            "cube.placed_dy": -0.01362807270316388,
+            "cube.place_error": 0.0
+          },
+          "video": null
+        }
+      ],
+      "created_at": "2026-11-15T20:56:35+00:00"
+    },
+    "median_steps_success": 91.0,
+    "episodes_with_safety_event": {}
+  },
+  "dry_run_0.25": {
+    "report": {
+      "task_id": "franka_pick_cube_to_bin_hard",
+      "skill": "pick_place",
+      "skill_version": "0.2.2",
+      "n_rollouts": 200,
+      "n_success": 199,
+      "success_rate": 0.995,
+      "ci95": [
+        0.9722256001302286,
+        0.999116854010634
+      ],
+      "failure_counts": {
+        "ik_failure": 1
+      },
+      "failures": [
+        {
+          "seed": 5193,
+          "tag": "ik_failure",
+          "detail": "after 300 steps; cause: ik_failure; events: ['grasp:cube', 'grasp_slip', 'grasp_miss', 'safety:joint_speed', 'ik_failure']",
+          "randomization": {
+            "object_xy_jitter": 0.01734715278437091,
+            "object_yaw_jitter": 0.6663527963647349,
+            "friction_scale": 0.559240700244023,
+            "mass_scale": 1.4968734137085682,
+            "actuator_gain_scale": 1.1549749148150628,
+            "obs_noise_std": 0.0,
+            "action_latency_steps": 1.0,
+            "cube.dx": -0.01635366677207352,
+            "cube.dy": 0.00647105570467563,
+            "cube.dyaw": -0.5479546930670809,
+            "real.dry_run": 1.0,
+            "cube.placed_dx": -0.016353666772073505,
+            "cube.placed_dy": 0.006471055704675627,
+            "cube.place_error": 0.0
+          },
+          "video": null
+        }
+      ],
+      "created_at": "2026-11-15T20:56:38+00:00"
+    },
+    "median_steps_success": 135.0,
+    "episodes_with_safety_event": {
+      "safety:joint_speed": 128
+    }
+  },
+  "dry_run_0.1": {
+    "report": {
+      "task_id": "franka_pick_cube_to_bin_hard",
+      "skill": "pick_place",
+      "skill_version": "0.2.2",
+      "n_rollouts": 200,
+      "n_success": 196,
+      "success_rate": 0.98,
+      "ci95": [
+        0.9497121344948062,
+        0.9921956998236058
+      ],
+      "failure_counts": {
+        "timeout": 1,
+        "grasp_slip": 2,
+        "ik_failure": 1
+      },
+      "failures": [
+        {
+          "seed": 5059,
+          "tag": "timeout",
+          "detail": "after 300 steps; cause: still holding; events: ['safety:joint_speed', 'grasp:cube']",
+          "randomization": {
+            "object_xy_jitter": 0.1370066280119145,
+            "object_yaw_jitter": 0.39498047486280724,
+            "friction_scale": 0.678848286732089,
+            "mass_scale": 1.3030854685000328,
+            "actuator_gain_scale": 1.0429861879224525,
+            "obs_noise_std": 0.0,
+            "action_latency_steps": 5.0,
+            "cube.dx": -0.10774362490640718,
+            "cube.dy": -0.11616056881048399,
+            "cube.dyaw": 0.20298847521728663,
+            "real.dry_run": 1.0,
+            "cube.placed_dx": -0.10774362490640721,
+            "cube.placed_dy": -0.116160568810484,
+            "cube.place_error": 0.0
+          },
+          "video": null
+        },
+        {
+          "seed": 5075,
+          "tag": "grasp_slip",
+          "detail": "after 300 steps; cause: grasp_slip; events: ['safety:joint_speed', 'grasp:cube', 'grasp_slip', 'grasp_miss', 'grasp:cube']",
+          "randomization": {
+            "object_xy_jitter": 0.08651824842583242,
+            "object_yaw_jitter": 0.4354316264731621,
+            "friction_scale": 0.3395814047238357,
+            "mass_scale": 1.4979401486213368,
+            "actuator_gain_scale": 1.2015606039448699,
+            "obs_noise_std": 0.0,
+            "action_latency_steps": 0.0,
+            "cube.dx": -0.04649517239402124,
+            "cube.dy": 0.0711410547895982,
+            "cube.dyaw": 0.29861039477229706,
+            "real.dry_run": 1.0,
+            "cube.placed_dx": -0.046495172394021234,
+            "cube.placed_dy": 0.0711410547895982,
+            "cube.place_error": 0.0
+          },
+          "video": null
+        },
+        {
+          "seed": 5124,
+          "tag": "grasp_slip",
+          "detail": "after 300 steps; cause: grasp_slip; events: ['safety:joint_speed', 'grasp:cube', 'grasp_slip', 'grasp_miss', 'grasp:cube']",
+          "randomization": {
+            "object_xy_jitter": 0.13168814171932774,
+            "object_yaw_jitter": 0.3156364033137511,
+            "friction_scale": 0.5632411914353569,
+            "mass_scale": 0.7820152124295412,
+            "actuator_gain_scale": 1.2667439548468382,
+            "obs_noise_std": 0.0,
+            "action_latency_steps": 4.0,
+            "cube.dx": -0.09359055608992523,
+            "cube.dy": 0.03797893149811085,
+            "cube.dyaw": 0.17157509197445409,
+            "real.dry_run": 1.0,
+            "cube.placed_dx": -0.09359055608992523,
+            "cube.placed_dy": 0.03797893149811085,
+            "cube.place_error": 0.0
+          },
+          "video": null
+        },
+        {
+          "seed": 5168,
+          "tag": "ik_failure",
+          "detail": "after 300 steps; cause: ik_failure; events: ['ik_failure', 'ik_failure', 'ik_failure', 'ik_failure', 'ik_failure', 'ik_failure']",
+          "randomization": {
+            "object_xy_jitter": 0.12489099314099937,
+            "object_yaw_jitter": 0.16978574052582096,
+            "friction_scale": 0.3112068073593013,
+            "mass_scale": 0.971817620079808,
+            "actuator_gain_scale": 1.287139341519271,
+            "obs_noise_std": 0.0,
+            "action_latency_steps": 5.0,
+            "cube.dx": -0.0624615801492514,
+            "cube.dy": 0.02515535837440734,
+            "cube.dyaw": 0.04771659179522575,
+            "real.dry_run": 1.0,
+            "cube.placed_dx": -0.062461580149251406,
+            "cube.placed_dy": 0.02515535837440734,
+            "cube.place_error": 0.0
+          },
+          "video": null
+        }
+      ],
+      "created_at": "2026-11-15T20:56:44+00:00"
+    },
+    "median_steps_success": 263.0,
+    "episodes_with_safety_event": {
+      "safety:joint_speed": 92
+    }
+  }
+}
