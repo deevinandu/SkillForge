@@ -96,3 +96,19 @@ def test_clutter_skill_avoids_the_collisions_pick_place_makes(mj):
     assert all(e.failure == "collision" for e in base)  # hand into a can
     _, ours = evaluate(make_env, PickFromClutter(), task, [3, 4])
     assert all(e.success for e in ours), [(e.seed, e.failure) for e in ours]
+
+
+def test_push_replans_if_the_object_is_seen_outside_after_retreating():
+    from skillforge.contracts import ObjectState, Observation
+
+    task = load("franka_push_box_to_target")
+    sk = PushToRegion()
+    sk.reset(task)
+    outside = np.array([0.40, -0.10, 0.025])
+    obs = Observation(t=0.0, qpos=np.zeros(7), qvel=np.zeros(7), ee_pos=np.array([0.5, 0.0, 0.3]),
+                      ee_quat=DOWN.copy(), gripper_width=0.04,
+                      objects={"box": ObjectState(pos=outside, quat=np.array([1.0, 0, 0, 0]))})  # fmt: skip
+    sk.state, sk.park, sk.u = "done", obs.ee_pos.copy(), np.array([0.0, 1.0])
+    for _ in range(sk.settle_steps + 2):
+        sk.act(obs)
+    assert sk.state in ("above", "down") and sk.replans == 1

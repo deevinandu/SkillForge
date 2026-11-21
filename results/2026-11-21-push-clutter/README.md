@@ -15,7 +15,8 @@ Sim only (MuJoCo Franka), hand-written skills, no agent runs. Gate-style seeds 0
 ## Results
 | Task | Skill | Nominal | Stress x2 |
 | --- | --- | --- | --- |
-| push | `PushToRegion` 0.1.0 (new) | 99/100 (timeout 1) | 91/100 (timeout 8, collision 1) |
+| push | `PushToRegion` 0.2.0 (new) | 100/100 | 98/100 (collision 1, IK 1) |
+| push | `PushToRegion` 0.1.0 (first version) | 99/100 (timeout 1) | 91/100 (timeout 8, collision 1) |
 | push | `PickPlace` 0.2.0 | 0/20 (timeouts: no feasible grasp) | not run |
 | clutter | `PickFromClutter` 0.1.0 (new) | 86/100 (timeout 14) | 83/100 (collision 8, timeout 5, slip 3, IK 1) |
 | clutter | `PickPlace` 0.2.0 | 63/100 (collision 37) | 73/100 (collision 23, ...) |
@@ -27,6 +28,11 @@ objects apart, so fewer hands hit cans.
 - `PushToRegion`: fingers half open with the closing axis across the push direction (two contact
   points ~5 cm apart), pusher placed just behind the object on the line to the region centre and
   re-aimed every step; if the object drifts > 2.5 cm off the line the hand lifts and re-approaches.
+  v0.2, from tracing v0.1's 8 stress timeouts: (a) with up to 1 cm of observation noise it called
+  success early and never looked again, so the object's xy is now smoothed and it keeps checking
+  after retreating (re-pushing if outside); (b) high friction or mass tipped the box, so it pushes
+  below mid-height. 91 -> 98 under stress (v0.1 failed seeds 0, 13, 22, 31, 40, 52, 61, 62, 96;
+  v0.2 fails 18, 97). The three changes were not ablated separately.
 - `PickFromClutter` = `PickPlace` plus three changes, each found by tracing failures:
   1. Grasp choice by hand clearance. The Panda hand is 0.2 m long along the closing axis and its
      underside is only 3.7 cm above the TCP (measured from the menagerie collision geometry; my
@@ -47,5 +53,4 @@ objects apart, so fewer hands hit cans.
   most likely a high-frequency chatter between the two shoulder servos. No contact, IK failure or
   joint limit is involved and no event is raised. The IK's null-space pull goes toward the home
   posture, whose joint 2 is 0, i.e. toward the singular configuration. Reported to T1 (HANDOVER).
-- Push under stress: the 8 timeouts are not traced.
 - Neither skill has been through the agent loop.

@@ -6,7 +6,7 @@ spinning away. Each step the push direction is re-aimed from the object's observ
 region centre and the pusher is placed just behind the object on that line (closed loop). If the
 object drifts sideways off the pusher, the hand lifts, re-plans and comes back down behind it.
 
-States: plan -> above (pre-push point, at hover height) -> down -> push -> retreat -> done.
+States: plan -> above (pre-push point, at hover height) -> down -> push -> retreat -> done; from\ndone it re-plans if the (filtered) object position is outside the region.\n\nv0.2 (from tracing stress x2 timeouts): the object's xy is smoothed before use (1 cm observation\nnoise made it declare success early), it keeps checking after retreating, and it pushes below\nmid-height (high friction or mass tipped the box).
 """
 
 from __future__ import annotations
@@ -19,7 +19,7 @@ from skillforge.skills.grasp import DOWN, quat_angle, quat_from_axis_angle, quat
 
 class PushToRegion:
     name = "push_to_region"
-    version = "0.1.0"
+    version = "0.2.0"
 
     hover = 0.10  # metres above the object's top for moves to and from the pre-push point
     standoff = 0.04  # metres between the pusher and the object's face at the pre-push point
@@ -30,6 +30,9 @@ class PushToRegion:
     tol = 0.008  # metres: "arrived" for the free-space moves
     gripper = 0.4  # half open: finger pads about 5 cm apart (> 0.5 would read as closed)
     max_replans = 6
+    push_height = 0.4  # push this fraction of the half-height below the object's centre (less tipping)
+    smooth = 0.3  # weight of a new observation in the exponential filter on the object's xy
+    settle_steps = 6  # steps to watch the object after retreating before calling it done
 
     def reset(self, task: TaskSpec) -> None:
         if not isinstance(task.success, ObjectInRegion):
@@ -46,6 +49,8 @@ class PushToRegion:
         self.quat = DOWN.copy()
         self.replans = 0
         self.park: np.ndarray | None = None
+        self.xy: np.ndarray | None = None  # filtered object xy (observations are noisy)
+        self.watch = 0
 
     # -- geometry --------------------------------------------------------------
 
@@ -80,7 +85,9 @@ class PushToRegion:
         if o is None:
             return self._go(obs.ee_pos)
         obj = np.asarray(o.pos, float)
-        z_push = obj[2]  # push at the object's mid-height
+        self.xy = obj[:2].copy() if self.xy is None else (1 - self.smooth) * self.xy + self.smooth * obj[:2]
+        obj = np.r_[self.xy, obj[2]]
+        z_push = obj[2] - self.push_height * self.half_z  # below mid-height: less tipping
         z_high = obj[2] + self.half_z + self.hover
         if self.state not in ("retreat", "done") and self._in_region(obj[:2]):
             self.state = "retreat"
@@ -129,6 +136,12 @@ class PushToRegion:
             if self.park is None:
                 self.park = np.r_[obs.ee_pos[:2] - self.u * 0.03, z_high] if hasattr(self, "u") else np.r_[obs.ee_pos[:2], z_high]
             if np.linalg.norm(obs.ee_pos - self.park) < self.tol:
-                self.state = "done"
+                self.state, self.watch = "done", 0
             return self._go(self.park)
+        # done: keep watching; if the filtered position says the object is outside, push again
+        self.watch += 1
+        if self.watch > self.settle_steps and self.replans <= self.max_replans and not self._in_region(obj[:2]):
+            self.park = None
+            self.state = "plan"
+            return self.act(obs)
         return self._go(self.park if self.park is not None else obs.ee_pos)
