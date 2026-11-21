@@ -53,7 +53,9 @@ def test_storage_and_discovery(tmp_path, stub_task):
     assert "pick_place" in lib and lib["pick_place"].entrypoint == "PickPlace"
     tasks = load_tasks(__import__("pathlib").Path(__file__).parent.parent / "tasks")
     assert stub_task.id in tasks
-    paths = update_baselines(make_env, {stub_task.id: stub_task}, lib, tmp_path, seeds=range(10), workers=1)
+    assert {"push_to_region", "pick_from_clutter"} <= set(lib)
+    one = {"pick_place": lib["pick_place"]}  # every exported skill would be baselined; check one
+    paths = update_baselines(make_env, {stub_task.id: stub_task}, one, tmp_path, seeds=range(10), workers=1)
     assert [p.name for p in paths] == [f"{stub_task.id}__pick_place.json"]
     (b,) = load_baselines(tmp_path)
     assert isinstance(b, Baseline) and b.seeds == list(range(10))
