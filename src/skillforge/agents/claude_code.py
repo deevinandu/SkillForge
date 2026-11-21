@@ -140,14 +140,25 @@ def parse_cli_json(stdout: str) -> CLIResult:
             doc = json.loads(stdout)
         except json.JSONDecodeError:
             return CLIResult(False, None, 0.0, {}, "", error=f"no JSON result on stdout: {stdout[-1500:]}")
-    is_error = bool(doc.get("is_error")) or doc.get("subtype", "success") != "success"
+    subtype = str(doc.get("subtype", "success"))
+    is_error = bool(doc.get("is_error")) or subtype != "success"
+    error = ""
+    if is_error:
+        # The CLI can report `is_error` with subtype "success" (e.g. an expired login, an API error);
+        # the real message is then in `result`, the reason in `terminal_reason`.
+        if subtype != "success":
+            error = subtype
+        else:
+            why = str(doc.get("terminal_reason") or "error")
+            msg = str(doc.get("result") or "").strip()
+            error = f"{why}: {msg[:1500]}" if msg else why
     return CLIResult(
         ok=not is_error,
         session_id=doc.get("session_id"),
         cost_usd=float(doc.get("total_cost_usd") or 0.0),
         usage=doc.get("usage") or {},
         text=str(doc.get("result") or ""),
-        error=str(doc.get("subtype")) if is_error else "",
+        error=error,
         duration_s=float(doc.get("duration_ms") or 0) / 1000,
         num_turns=int(doc.get("num_turns") or 0),
     )
