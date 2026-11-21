@@ -39,8 +39,13 @@ objects apart, so fewer hands hit cans.
      within noise, kept). Added to `PickPlace` as `preshape_margin` (default None = unchanged).
 
 ## Open
-- The 14 clutter timeouts: cube yaw 23-37 deg or about 0. The arm holds the cube at carry height
-  and creeps away from its commanded target (4+ cm, for 300 steps) with no contact, IK failure or
-  joint limit flagged. Looks like a controller issue at that wrist configuration (T1); not traced.
+- The 14 clutter timeouts (cube yaw 23-37 deg or about 0): traced to the arm, not the skill. In
+  seed 5 the arm holds the cube at carry height with joint 2 at 0.11 rad, where joints 1 and 3 are
+  nearly coaxial (shoulder singularity). From then on joints 1 and 3 sit at +87 / -87 Nm (their
+  force limits) and joint 7 at its 12 Nm limit, joint 1 reports a steady 1.16 rad/s while its
+  angle moves 0.004 rad per 0.5 s, and the hand creeps several cm from its target for 300 steps:
+  most likely a high-frequency chatter between the two shoulder servos. No contact, IK failure or
+  joint limit is involved and no event is raised. The IK's null-space pull goes toward the home
+  posture, whose joint 2 is 0, i.e. toward the singular configuration. Reported to T1 (HANDOVER).
 - Push under stress: the 8 timeouts are not traced.
 - Neither skill has been through the agent loop.
