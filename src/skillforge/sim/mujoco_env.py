@@ -94,6 +94,7 @@ class MujocoEnv:
         ik_tol: float = 0.01,  # metres; residual above this after the IK solve is an ik_failure
         ik_iters: int = 8,
         damping: float = 0.05,
+        arm_armature: float = 0.5,  # kg m^2 floor on arm joint armature; see _index
     ):
         self.task = task
         self.profile = PandaProfile()
@@ -104,6 +105,7 @@ class MujocoEnv:
         self.ik_tol = ik_tol
         self.ik_iters = ik_iters
         self.damping = damping
+        self.arm_armature = arm_armature
         self.model = self._build()
         self.data = mujoco.MjData(self.model)
         self._scratch = mujoco.MjData(self.model)  # IK works here so physics state is untouched
@@ -218,6 +220,14 @@ class MujocoEnv:
         self._jnt_hi = np.array([m.jnt_range[m.joint(j).id][1] for j in p.arm_joints]) - 1e-3
         self._site = m.site(self.task.scene.robot.ee_site).id
         self._home = np.array(p.home)
+        # The menagerie Panda has armature 0.1 on every arm joint against position servos with
+        # kp ~5000 and kv ~500. At the 3.33 ms step that is numerically stiff: the servos
+        # bang-bang between their force limits on consecutive substeps (hundreds to thousands of
+        # substeps per pick-and-place episode), worst near the shoulder singularity (joint 2 ~ 0),
+        # where joints 1 and 3 counter-oscillate at +-87 Nm and the TCP creeps off its target.
+        # It shook grasps loose (most "grasp_slip" failures on the ball task) and stalled carries.
+        # A 0.5 floor (plausible for the real arm's reflected rotor inertia) removes it.
+        self.model.dof_armature[self._arm_v] = np.maximum(self.model.dof_armature[self._arm_v], self.arm_armature)
         # robot = the base body's subtree
         base = m.body(p.base_body).id
         self._robot_bodies = {b for b in range(m.nbody) if self._is_descendant(b, base)}
