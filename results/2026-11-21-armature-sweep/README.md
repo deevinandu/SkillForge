@@ -27,7 +27,17 @@ Successes out of 100, before -> after:
 What this changes:
 - The background 2-5% failure rate at every point was the artifact: nominal points are now ~100%.
 - Breaking points move: mass 3x 29 -> 61, friction 0.25x 71 -> 87. Gain 2x (74 -> 98) is no longer a
-  weakness, so the 2026-11-16 "gain x observation noise" explanation in
-  `results/2026-11-16-perception-followups/` was measured on the artifact and needs re-checking.
+  weakness.
+- The 2026-11-16 "gain x observation noise" grid (`results/2026-11-16-perception-followups/`),
+  re-run with the fix (same seeds 5000-5099, gain and obs noise pinned, other axes as the task):
+
+  | Obs noise | Gain 1x before -> after | Gain 2x before -> after |
+  | --- | --- | --- |
+  | none | 99 -> 100 | 87 -> 96 |
+  | 5 mm | 98 -> 100 | 84 -> 95 |
+  | 15 mm | 89 -> 96 | 46 -> 84 |
+
+  The interaction is real but was mostly the artifact: 15 mm of noise now costs 4 points at
+  nominal gain and 12 at double gain (before: 10 and 41).
 - Stress x2 is still hard (47%), and still mostly slips: those look real.
 - Every earlier robustness number in `results/` was measured with the artifact.
