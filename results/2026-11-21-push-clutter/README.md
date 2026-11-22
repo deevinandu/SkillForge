@@ -13,6 +13,11 @@ Sim only (MuJoCo Franka), hand-written skills, no agent runs. Gate-style seeds 0
   is blocked by the tall cans and the other is clear over the low block.
 
 ## Results
+The table below was measured before the arm-armature fix (#22, armature 0.1). On the fixed sim
+(armature 0.5), seeds 0-99: clutter `PickFromClutter` 100/100 (the 14 timeouts were the servo
+bang-bang artifact), clutter `PickPlace` 71/100 (collision 26: real hand-into-can geometry),
+push `PushToRegion` 0.2.0 under stress x2 100/100. The other cells were not re-run.
+
 | Task | Skill | Nominal | Stress x2 |
 | --- | --- | --- | --- |
 | push | `PushToRegion` 0.2.0 (new) | 100/100 | 98/100 (collision 1, IK 1) |
