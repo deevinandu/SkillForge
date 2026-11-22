@@ -484,3 +484,29 @@ def test_hard_task_is_wider_than_the_base_task(task):
     obs = env.reset(5)
     _, info = env.step(Action(ee_pos=obs.ee_pos, ee_quat=DOWN))
     assert set(obs.objects) == {"cube"} and not info.terminated
+
+
+def test_stacked_success_on_true_state(task):
+    """object_on_object / all_of in the real env: a cube stacked on another, in and out of the bin."""
+    d = json.loads(with_randomization(task).model_dump_json())
+    cube = d["scene"]["objects"][0]
+    top_z = cube["pose"]["pos"][2] + 2 * cube["size"][2]
+    d["scene"]["objects"].append({**cube, "name": "top", "pose": {"pos": [*cube["pose"]["pos"][:2], top_z]}})
+    on = {"kind": "object_on_object", "object": "top", "support": "cube"}
+    d["success"] = {"kind": "all_of", "conditions": [on, {"kind": "object_in_region", "object": "cube", "region": "bin"}]}
+    t = TaskSpec.model_validate(d)
+    env = MujocoEnv(t)
+    try:
+        obs = env.reset(0)
+        obs, info, _ = hold(env, obs, 3)
+        assert not info.success  # stacked, but not in the bin
+        c = t.scene.region("bin").center
+        teleport(env, "cube", [c[0], c[1], 0.02])
+        teleport(env, "top", [c[0], c[1], 0.06])
+        obs, info, _ = hold(env, obs, 5)
+        assert info.success
+        teleport(env, "top", [c[0] + 0.08, c[1], 0.02])  # knocked off, next to it
+        obs, info, _ = hold(env, obs, 5)
+        assert not info.success
+    finally:
+        env.close()
