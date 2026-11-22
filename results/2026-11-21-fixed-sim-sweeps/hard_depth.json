@@ -1,0 +1,1090 @@
+{
+  "task": "franka_pick_cube_to_bin_hard",
+  "seeds": [
+    5000,
+    5100
+  ],
+  "others": "task",
+  "reports": {
+    "depth": {
+      "task_id": "franka_pick_cube_to_bin_hard",
+      "skill": "pick_place_0.2.2",
+      "skill_version": "file",
+      "seeds": [
+        5000,
+        5001,
+        5002,
+        5003,
+        5004,
+        5005,
+        5006,
+        5007,
+        5008,
+        5009,
+        5010,
+        5011,
+        5012,
+        5013,
+        5014,
+        5015,
+        5016,
+        5017,
+        5018,
+        5019,
+        5020,
+        5021,
+        5022,
+        5023,
+        5024,
+        5025,
+        5026,
+        5027,
+        5028,
+        5029,
+        5030,
+        5031,
+        5032,
+        5033,
+        5034,
+        5035,
+        5036,
+        5037,
+        5038,
+        5039,
+        5040,
+        5041,
+        5042,
+        5043,
+        5044,
+        5045,
+        5046,
+        5047,
+        5048,
+        5049,
+        5050,
+        5051,
+        5052,
+        5053,
+        5054,
+        5055,
+        5056,
+        5057,
+        5058,
+        5059,
+        5060,
+        5061,
+        5062,
+        5063,
+        5064,
+        5065,
+        5066,
+        5067,
+        5068,
+        5069,
+        5070,
+        5071,
+        5072,
+        5073,
+        5074,
+        5075,
+        5076,
+        5077,
+        5078,
+        5079,
+        5080,
+        5081,
+        5082,
+        5083,
+        5084,
+        5085,
+        5086,
+        5087,
+        5088,
+        5089,
+        5090,
+        5091,
+        5092,
+        5093,
+        5094,
+        5095,
+        5096,
+        5097,
+        5098,
+        5099
+      ],
+      "curves": [
+        {
+          "axis": "object_xy_jitter",
+          "others": "task",
+          "points": [
+            {
+              "value": 0.0,
+              "n": 100,
+              "n_success": 100,
+              "success_rate": 1.0,
+              "ci95": [
+                0.9630051925239981,
+                0.9999999999999999
+              ],
+              "failure_counts": {}
+            },
+            {
+              "value": 0.02,
+              "n": 100,
+              "n_success": 100,
+              "success_rate": 1.0,
+              "ci95": [
+                0.9630051925239981,
+                0.9999999999999999
+              ],
+              "failure_counts": {}
+            },
+            {
+              "value": 0.04,
+              "n": 100,
+              "n_success": 100,
+              "success_rate": 1.0,
+              "ci95": [
+                0.9630051925239981,
+                0.9999999999999999
+              ],
+              "failure_counts": {}
+            },
+            {
+              "value": 0.06,
+              "n": 100,
+              "n_success": 100,
+              "success_rate": 1.0,
+              "ci95": [
+                0.9630051925239981,
+                0.9999999999999999
+              ],
+              "failure_counts": {}
+            },
+            {
+              "value": 0.08,
+              "n": 100,
+              "n_success": 100,
+              "success_rate": 1.0,
+              "ci95": [
+                0.9630051925239981,
+                0.9999999999999999
+              ],
+              "failure_counts": {}
+            },
+            {
+              "value": 0.1,
+              "n": 100,
+              "n_success": 100,
+              "success_rate": 1.0,
+              "ci95": [
+                0.9630051925239981,
+                0.9999999999999999
+              ],
+              "failure_counts": {}
+            }
+          ]
+        },
+        {
+          "axis": "object_yaw_jitter",
+          "others": "task",
+          "points": [
+            {
+              "value": 0.0,
+              "n": 100,
+              "n_success": 100,
+              "success_rate": 1.0,
+              "ci95": [
+                0.9630051925239981,
+                0.9999999999999999
+              ],
+              "failure_counts": {}
+            },
+            {
+              "value": 0.314159,
+              "n": 100,
+              "n_success": 99,
+              "success_rate": 0.99,
+              "ci95": [
+                0.9455124752390653,
+                0.9982326134344526
+              ],
+              "failure_counts": {
+                "wrong_placement": 1
+              }
+            },
+            {
+              "value": 0.628319,
+              "n": 100,
+              "n_success": 100,
+              "success_rate": 1.0,
+              "ci95": [
+                0.9630051925239981,
+                0.9999999999999999
+              ],
+              "failure_counts": {}
+            },
+            {
+              "value": 0.942478,
+              "n": 100,
+              "n_success": 100,
+              "success_rate": 1.0,
+              "ci95": [
+                0.9630051925239981,
+                0.9999999999999999
+              ],
+              "failure_counts": {}
+            },
+            {
+              "value": 1.256637,
+              "n": 100,
+              "n_success": 100,
+              "success_rate": 1.0,
+              "ci95": [
+                0.9630051925239981,
+                0.9999999999999999
+              ],
+              "failure_counts": {}
+            },
+            {
+              "value": 1.570796,
+              "n": 100,
+              "n_success": 100,
+              "success_rate": 1.0,
+              "ci95": [
+                0.9630051925239981,
+                0.9999999999999999
+              ],
+              "failure_counts": {}
+            }
+          ]
+        },
+        {
+          "axis": "friction_scale",
+          "others": "task",
+          "points": [
+            {
+              "value": 0.25,
+              "n": 100,
+              "n_success": 87,
+              "success_rate": 0.87,
+              "ci95": [
+                0.7901947810519012,
+                0.9224290614158575
+              ],
+              "failure_counts": {
+                "grasp_slip": 12,
+                "ik_failure": 1
+              }
+            },
+            {
+              "value": 0.5,
+              "n": 100,
+              "n_success": 100,
+              "success_rate": 1.0,
+              "ci95": [
+                0.9630051925239981,
+                0.9999999999999999
+              ],
+              "failure_counts": {}
+            },
+            {
+              "value": 0.75,
+              "n": 100,
+              "n_success": 100,
+              "success_rate": 1.0,
+              "ci95": [
+                0.9630051925239981,
+                0.9999999999999999
+              ],
+              "failure_counts": {}
+            },
+            {
+              "value": 1.0,
+              "n": 100,
+              "n_success": 100,
+              "success_rate": 1.0,
+              "ci95": [
+                0.9630051925239981,
+                0.9999999999999999
+              ],
+              "failure_counts": {}
+            },
+            {
+              "value": 1.5,
+              "n": 100,
+              "n_success": 100,
+              "success_rate": 1.0,
+              "ci95": [
+                0.9630051925239981,
+                0.9999999999999999
+              ],
+              "failure_counts": {}
+            },
+            {
+              "value": 2.0,
+              "n": 100,
+              "n_success": 100,
+              "success_rate": 1.0,
+              "ci95": [
+                0.9630051925239981,
+                0.9999999999999999
+              ],
+              "failure_counts": {}
+            }
+          ]
+        },
+        {
+          "axis": "mass_scale",
+          "others": "task",
+          "points": [
+            {
+              "value": 0.5,
+              "n": 100,
+              "n_success": 100,
+              "success_rate": 1.0,
+              "ci95": [
+                0.9630051925239981,
+                0.9999999999999999
+              ],
+              "failure_counts": {}
+            },
+            {
+              "value": 1.0,
+              "n": 100,
+              "n_success": 100,
+              "success_rate": 1.0,
+              "ci95": [
+                0.9630051925239981,
+                0.9999999999999999
+              ],
+              "failure_counts": {}
+            },
+            {
+              "value": 1.5,
+              "n": 100,
+              "n_success": 100,
+              "success_rate": 1.0,
+              "ci95": [
+                0.9630051925239981,
+                0.9999999999999999
+              ],
+              "failure_counts": {}
+            },
+            {
+              "value": 2.0,
+              "n": 100,
+              "n_success": 93,
+              "success_rate": 0.93,
+              "ci95": [
+                0.8625032899347025,
+                0.965681175635936
+              ],
+              "failure_counts": {
+                "grasp_slip": 6,
+                "wrong_placement": 1
+              }
+            },
+            {
+              "value": 3.0,
+              "n": 100,
+              "n_success": 60,
+              "success_rate": 0.6,
+              "ci95": [
+                0.5020007846184025,
+                0.6906002538863971
+              ],
+              "failure_counts": {
+                "grasp_slip": 38,
+                "ik_failure": 2
+              }
+            },
+            {
+              "value": 4.0,
+              "n": 100,
+              "n_success": 31,
+              "success_rate": 0.31,
+              "ci95": [
+                0.22779563206132378,
+                0.40626239477955695
+              ],
+              "failure_counts": {
+                "grasp_slip": 68,
+                "ik_failure": 1
+              }
+            }
+          ]
+        },
+        {
+          "axis": "actuator_gain_scale",
+          "others": "task",
+          "points": [
+            {
+              "value": 0.25,
+              "n": 100,
+              "n_success": 40,
+              "success_rate": 0.4,
+              "ci95": [
+                0.3093997461136028,
+                0.4979992153815976
+              ],
+              "failure_counts": {
+                "grasp_slip": 60
+              }
+            },
+            {
+              "value": 0.5,
+              "n": 100,
+              "n_success": 97,
+              "success_rate": 0.97,
+              "ci95": [
+                0.915479219195973,
+                0.9897456617765851
+              ],
+              "failure_counts": {
+                "grasp_slip": 2,
+                "ik_failure": 1
+              }
+            },
+            {
+              "value": 0.75,
+              "n": 100,
+              "n_success": 100,
+              "success_rate": 1.0,
+              "ci95": [
+                0.9630051925239981,
+                0.9999999999999999
+              ],
+              "failure_counts": {}
+            },
+            {
+              "value": 1.0,
+              "n": 100,
+              "n_success": 100,
+              "success_rate": 1.0,
+              "ci95": [
+                0.9630051925239981,
+                0.9999999999999999
+              ],
+              "failure_counts": {}
+            },
+            {
+              "value": 1.5,
+              "n": 100,
+              "n_success": 89,
+              "success_rate": 0.89,
+              "ci95": [
+                0.8136853697209698,
+                0.9374586804477487
+              ],
+              "failure_counts": {
+                "wrong_placement": 11
+              }
+            },
+            {
+              "value": 2.0,
+              "n": 100,
+              "n_success": 97,
+              "success_rate": 0.97,
+              "ci95": [
+                0.915479219195973,
+                0.9897456617765851
+              ],
+              "failure_counts": {
+                "wrong_placement": 3
+              }
+            }
+          ]
+        },
+        {
+          "axis": "obs_noise_std",
+          "others": "task",
+          "points": [
+            {
+              "value": 0.0,
+              "n": 100,
+              "n_success": 100,
+              "success_rate": 1.0,
+              "ci95": [
+                0.9630051925239981,
+                0.9999999999999999
+              ],
+              "failure_counts": {}
+            },
+            {
+              "value": 0.002,
+              "n": 100,
+              "n_success": 100,
+              "success_rate": 1.0,
+              "ci95": [
+                0.9630051925239981,
+                0.9999999999999999
+              ],
+              "failure_counts": {}
+            },
+            {
+              "value": 0.004,
+              "n": 100,
+              "n_success": 100,
+              "success_rate": 1.0,
+              "ci95": [
+                0.9630051925239981,
+                0.9999999999999999
+              ],
+              "failure_counts": {}
+            },
+            {
+              "value": 0.006,
+              "n": 100,
+              "n_success": 100,
+              "success_rate": 1.0,
+              "ci95": [
+                0.9630051925239981,
+                0.9999999999999999
+              ],
+              "failure_counts": {}
+            },
+            {
+              "value": 0.008,
+              "n": 100,
+              "n_success": 100,
+              "success_rate": 1.0,
+              "ci95": [
+                0.9630051925239981,
+                0.9999999999999999
+              ],
+              "failure_counts": {}
+            },
+            {
+              "value": 0.01,
+              "n": 100,
+              "n_success": 100,
+              "success_rate": 1.0,
+              "ci95": [
+                0.9630051925239981,
+                0.9999999999999999
+              ],
+              "failure_counts": {}
+            }
+          ]
+        },
+        {
+          "axis": "action_latency_steps",
+          "others": "task",
+          "points": [
+            {
+              "value": 0.0,
+              "n": 100,
+              "n_success": 100,
+              "success_rate": 1.0,
+              "ci95": [
+                0.9630051925239981,
+                0.9999999999999999
+              ],
+              "failure_counts": {}
+            },
+            {
+              "value": 1.0,
+              "n": 100,
+              "n_success": 100,
+              "success_rate": 1.0,
+              "ci95": [
+                0.9630051925239981,
+                0.9999999999999999
+              ],
+              "failure_counts": {}
+            },
+            {
+              "value": 2.0,
+              "n": 100,
+              "n_success": 100,
+              "success_rate": 1.0,
+              "ci95": [
+                0.9630051925239981,
+                0.9999999999999999
+              ],
+              "failure_counts": {}
+            },
+            {
+              "value": 3.0,
+              "n": 100,
+              "n_success": 100,
+              "success_rate": 1.0,
+              "ci95": [
+                0.9630051925239981,
+                0.9999999999999999
+              ],
+              "failure_counts": {}
+            },
+            {
+              "value": 4.0,
+              "n": 100,
+              "n_success": 100,
+              "success_rate": 1.0,
+              "ci95": [
+                0.9630051925239981,
+                0.9999999999999999
+              ],
+              "failure_counts": {}
+            },
+            {
+              "value": 6.0,
+              "n": 100,
+              "n_success": 100,
+              "success_rate": 1.0,
+              "ci95": [
+                0.9630051925239981,
+                0.9999999999999999
+              ],
+              "failure_counts": {}
+            }
+          ]
+        }
+      ],
+      "stress": {
+        "task_id": "franka_pick_cube_to_bin_hard",
+        "skill": "pick_place",
+        "skill_version": "0.2.2",
+        "n_rollouts": 100,
+        "n_success": 69,
+        "success_rate": 0.69,
+        "ci95": [
+          0.5937376052204429,
+          0.7722043679386762
+        ],
+        "failure_counts": {
+          "grasp_slip": 25,
+          "ik_failure": 2,
+          "wrong_placement": 4
+        },
+        "failures": [
+          {
+            "seed": 5001,
+            "tag": "grasp_slip",
+            "detail": "after 300 steps; cause: grasp_slip; events: ['grasp:cube', 'grasp_slip', 'grasp_miss', 'grasp:cube', 'grasp_slip', 'grasp_miss']",
+            "randomization": {
+              "object_xy_jitter": 0.06482418145847184,
+              "object_yaw_jitter": 1.2110579167817563,
+              "friction_scale": 0.09922259657984443,
+              "mass_scale": 1.3330704564318618,
+              "actuator_gain_scale": 1.430204148114704,
+              "obs_noise_std": 0.01778495994177837,
+              "action_latency_steps": 9.0,
+              "cube.dx": -0.0255277867585363,
+              "cube.dy": -0.04880475245212024,
+              "cube.dyaw": 0.8109582070437746
+            },
+            "video": null
+          },
+          {
+            "seed": 5004,
+            "tag": "grasp_slip",
+            "detail": "after 300 steps; cause: grasp_slip; events: ['grasp:cube', 'grasp_slip', 'grasp_miss', 'grasp:cube', 'grasp_slip', 'grasp_miss']",
+            "randomization": {
+              "object_xy_jitter": 0.023427399098947716,
+              "object_yaw_jitter": 0.7469481841672277,
+              "friction_scale": 0.16747374625483868,
+              "mass_scale": 1.419809744907398,
+              "actuator_gain_scale": 0.3054447552580411,
+              "obs_noise_std": 0.011598662578378282,
+              "action_latency_steps": 5.0,
+              "cube.dx": -0.0029518462676164127,
+              "cube.dy": -0.02192313447018773,
+              "cube.dyaw": -0.09225580690716007
+            },
+            "video": null
+          },
+          {
+            "seed": 5007,
+            "tag": "grasp_slip",
+            "detail": "after 300 steps; cause: grasp_slip; events: ['grasp:cube', 'grasp_slip', 'grasp_miss', 'grasp:cube', 'grasp_slip', 'grasp_miss']",
+            "randomization": {
+              "object_xy_jitter": 0.25657817535785965,
+              "object_yaw_jitter": 0.0012166546354420527,
+              "friction_scale": 0.13688390702691577,
+              "mass_scale": 1.295672118216206,
+              "actuator_gain_scale": 0.2886992436765606,
+              "obs_noise_std": 0.0007678059435152506,
+              "action_latency_steps": 10.0,
+              "cube.dx": 0.1965870705345324,
+              "cube.dy": 0.1016295148290528,
+              "cube.dyaw": 0.001041151192423887
+            },
+            "video": null
+          },
+          {
+            "seed": 5008,
+            "tag": "grasp_slip",
+            "detail": "after 300 steps; cause: grasp_slip; events: ['grasp_miss', 'grasp:cube', 'grasp_slip', 'grasp:cube', 'grasp_slip', 'grasp_miss']",
+            "randomization": {
+              "object_xy_jitter": 0.1545568392256803,
+              "object_yaw_jitter": 0.3062112642909405,
+              "friction_scale": 0.6088432304581859,
+              "mass_scale": 1.4744584909393001,
+              "actuator_gain_scale": 0.2020602610696265,
+              "obs_noise_std": 0.010410967417646173,
+              "action_latency_steps": 10.0,
+              "cube.dx": -0.0697490784743944,
+              "cube.dy": -0.14623752562071185,
+              "cube.dyaw": 0.23220072674271086
+            },
+            "video": null
+          },
+          {
+            "seed": 5019,
+            "tag": "grasp_slip",
+            "detail": "after 300 steps; cause: grasp_slip; events: ['grasp:cube', 'grasp_slip', 'grasp_miss', 'grasp:cube', 'grasp_slip', 'grasp_miss']",
+            "randomization": {
+              "object_xy_jitter": 0.2368789486337715,
+              "object_yaw_jitter": 0.2943688490013521,
+              "friction_scale": 0.24875970387673207,
+              "mass_scale": 1.3767493070446029,
+              "actuator_gain_scale": 0.3852286822909995,
+              "obs_noise_std": 0.013727151801000589,
+              "action_latency_steps": 5.0,
+              "cube.dx": 0.18966074832273766,
+              "cube.dy": 0.11812421864055705,
+              "cube.dyaw": 0.0855452743882909
+            },
+            "video": null
+          },
+          {
+            "seed": 5021,
+            "tag": "grasp_slip",
+            "detail": "after 300 steps; cause: grasp_slip; events: ['grasp:cube', 'grasp_slip', 'grasp_miss', 'grasp:cube', 'grasp_slip', 'grasp_miss']",
+            "randomization": {
+              "object_xy_jitter": 0.13538929559807872,
+              "object_yaw_jitter": 0.8399909557100116,
+              "friction_scale": 0.2187549139233816,
+              "mass_scale": 1.5568816761054485,
+              "actuator_gain_scale": 0.8351717802035531,
+              "obs_noise_std": 0.003955837008233746,
+              "action_latency_steps": 10.0,
+              "cube.dx": 0.03740377979285339,
+              "cube.dy": 0.06838733414094528,
+              "cube.dyaw": 0.4610762800205055
+            },
+            "video": null
+          },
+          {
+            "seed": 5023,
+            "tag": "grasp_slip",
+            "detail": "after 300 steps; cause: grasp_slip; events: ['grasp:cube', 'grasp_slip', 'grasp_miss', 'grasp:cube', 'grasp_slip', 'grasp_miss']",
+            "randomization": {
+              "object_xy_jitter": 0.2584322403220528,
+              "object_yaw_jitter": 0.4596467981222624,
+              "friction_scale": 0.08057107691539829,
+              "mass_scale": 1.048065857019823,
+              "actuator_gain_scale": 1.2314017942573803,
+              "obs_noise_std": 0.012215940823127184,
+              "action_latency_steps": 4.0,
+              "cube.dx": 0.09982961716218386,
+              "cube.dy": 0.0162485127784614,
+              "cube.dyaw": 0.31119646854496164
+            },
+            "video": null
+          },
+          {
+            "seed": 5035,
+            "tag": "ik_failure",
+            "detail": "after 300 steps; cause: ik_failure; events: ['grasp_slip', 'grasp_miss', 'ik_failure', 'ik_failure', 'ik_failure', 'ik_failure']",
+            "randomization": {
+              "object_xy_jitter": 0.16184319336764247,
+              "object_yaw_jitter": 0.8631990829616978,
+              "friction_scale": 0.06612324434666776,
+              "mass_scale": 0.6237192472481004,
+              "actuator_gain_scale": 0.6421785539096991,
+              "obs_noise_std": 0.005188030820707474,
+              "action_latency_steps": 7.0,
+              "cube.dx": -0.03788869015065757,
+              "cube.dy": 0.15119595604619712,
+              "cube.dyaw": -0.01204294405494577
+            },
+            "video": null
+          },
+          {
+            "seed": 5036,
+            "tag": "grasp_slip",
+            "detail": "after 300 steps; cause: grasp_slip; events: ['grasp:cube', 'grasp_slip', 'grasp_miss', 'grasp:cube', 'grasp_slip', 'grasp_miss']",
+            "randomization": {
+              "object_xy_jitter": 0.1823484468978621,
+              "object_yaw_jitter": 1.43189613260106,
+              "friction_scale": 0.16140878854588625,
+              "mass_scale": 1.5833610787687278,
+              "actuator_gain_scale": 0.9298597727730054,
+              "obs_noise_std": 0.026350450943696667,
+              "action_latency_steps": 6.0,
+              "cube.dx": -0.14261790021861692,
+              "cube.dy": -0.11541303890063374,
+              "cube.dyaw": 0.5001923510021773
+            },
+            "video": null
+          },
+          {
+            "seed": 5037,
+            "tag": "wrong_placement",
+            "detail": "after 300 steps; cause: grasp:cube; events: ['grasp:cube', 'release:cube']",
+            "randomization": {
+              "object_xy_jitter": 0.2596811694776965,
+              "object_yaw_jitter": 0.036192570348459234,
+              "friction_scale": 0.4460067437446609,
+              "mass_scale": 0.9490540803228211,
+              "actuator_gain_scale": 1.447983217088338,
+              "obs_noise_std": 0.024234598975680016,
+              "action_latency_steps": 8.0,
+              "cube.dx": -0.047038068721409504,
+              "cube.dy": 0.24749561342960869,
+              "cube.dyaw": 0.015823481322148072
+            },
+            "video": null
+          },
+          {
+            "seed": 5040,
+            "tag": "grasp_slip",
+            "detail": "after 300 steps; cause: grasp_slip; events: ['grasp:cube', 'grasp_slip', 'grasp_miss', 'grasp:cube', 'grasp_slip', 'grasp_miss']",
+            "randomization": {
+              "object_xy_jitter": 0.026889638458807083,
+              "object_yaw_jitter": 1.0644894579543753,
+              "friction_scale": 0.11951329702003631,
+              "mass_scale": 1.3979310878083697,
+              "actuator_gain_scale": 1.4424377942406676,
+              "obs_noise_std": 0.007683692998405783,
+              "action_latency_steps": 10.0,
+              "cube.dx": 0.010066242107986532,
+              "cube.dy": -0.025458321609436913,
+              "cube.dyaw": 0.3058363683022447
+            },
+            "video": null
+          },
+          {
+            "seed": 5041,
+            "tag": "wrong_placement",
+            "detail": "after 300 steps; cause: grasp:cube; events: ['grasp:cube', 'release:cube']",
+            "randomization": {
+              "object_xy_jitter": 0.017469946856575144,
+              "object_yaw_jitter": 0.3601322702176574,
+              "friction_scale": 0.6007193782915288,
+              "mass_scale": 0.7414575144863883,
+              "actuator_gain_scale": 1.5968237942528143,
+              "obs_noise_std": 0.017970295448627462,
+              "action_latency_steps": 5.0,
+              "cube.dx": 0.015682776516002347,
+              "cube.dy": -0.008055124305503298,
+              "cube.dyaw": 0.285069659650024
+            },
+            "video": null
+          },
+          {
+            "seed": 5047,
+            "tag": "grasp_slip",
+            "detail": "after 300 steps; cause: grasp_slip; events: ['grasp:cube', 'grasp_slip', 'grasp_miss', 'grasp:cube', 'grasp_slip', 'grasp_miss']",
+            "randomization": {
+              "object_xy_jitter": 0.019743525411171563,
+              "object_yaw_jitter": 1.1709131016132754,
+              "friction_scale": 0.12479283306448012,
+              "mass_scale": 1.346619191537871,
+              "actuator_gain_scale": 0.21895360389440816,
+              "obs_noise_std": 0.02569144051377138,
+              "action_latency_steps": 7.0,
+              "cube.dx": 0.006975470406291793,
+              "cube.dy": 0.010380517820060872,
+              "cube.dyaw": 0.3183097484947712
+            },
+            "video": null
+          },
+          {
+            "seed": 5048,
+            "tag": "grasp_slip",
+            "detail": "after 300 steps; cause: grasp_slip; events: ['grasp_miss', 'grasp:cube', 'grasp_slip', 'grasp:cube', 'grasp_slip', 'grasp_miss']",
+            "randomization": {
+              "object_xy_jitter": 0.057582654855357004,
+              "object_yaw_jitter": 1.2614465284385554,
+              "friction_scale": 0.5054250928871135,
+              "mass_scale": 1.5636462774562425,
+              "actuator_gain_scale": 0.34254626941801897,
+              "obs_noise_std": 0.010235747494483641,
+              "action_latency_steps": 9.0,
+              "cube.dx": 0.05750001038469252,
+              "cube.dy": -0.04481884179385727,
+              "cube.dyaw": 0.9160827504819582
+            },
+            "video": null
+          },
+          {
+            "seed": 5049,
+            "tag": "wrong_placement",
+            "detail": "after 300 steps; cause: grasp:cube; events: ['grasp:cube', 'release:cube']",
+            "randomization": {
+              "object_xy_jitter": 0.027700437049194088,
+              "object_yaw_jitter": 0.20331268644043052,
+              "friction_scale": 0.4299577298616278,
+              "mass_scale": 1.8351228218037998,
+              "actuator_gain_scale": 1.638411040941839,
+              "obs_noise_std": 0.01377364109163883,
+              "action_latency_steps": 11.0,
+              "cube.dx": 0.007171613428595312,
+              "cube.dy": -0.0006920937772787461,
+              "cube.dyaw": 0.0630157569151987
+            },
+            "video": null
+          },
+          {
+            "seed": 5050,
+            "tag": "grasp_slip",
+            "detail": "after 300 steps; cause: grasp_slip; events: ['grasp:cube', 'grasp_slip', 'grasp_miss', 'grasp:cube', 'grasp_slip', 'grasp_miss']",
+            "randomization": {
+              "object_xy_jitter": 0.1555135885091289,
+              "object_yaw_jitter": 0.6248244112943505,
+              "friction_scale": 0.4001711556854864,
+              "mass_scale": 1.863454747022255,
+              "actuator_gain_scale": 0.4295556938434641,
+              "obs_noise_std": 0.02180661925911133,
+              "action_latency_steps": 6.0,
+              "cube.dx": 0.046249602598229855,
+              "cube.dy": 0.020695252642460832,
+              "cube.dyaw": 0.26236006743288676
+            },
+            "video": null
+          },
+          {
+            "seed": 5060,
+            "tag": "grasp_slip",
+            "detail": "after 300 steps; cause: grasp_slip; events: ['grasp:cube', 'grasp_slip', 'grasp_miss', 'grasp:cube', 'grasp_slip', 'grasp_miss']",
+            "randomization": {
+              "object_xy_jitter": 0.10256481533870723,
+              "object_yaw_jitter": 0.5402616788816355,
+              "friction_scale": 0.6759979324979514,
+              "mass_scale": 1.8259758023864994,
+              "actuator_gain_scale": 0.29008579787076855,
+              "obs_noise_std": 0.01850584221610795,
+              "action_latency_steps": 2.0,
+              "cube.dx": 0.06974768147776292,
+              "cube.dy": -0.08065681025160387,
+              "cube.dyaw": -0.29674224459194454
+            },
+            "video": null
+          },
+          {
+            "seed": 5062,
+            "tag": "grasp_slip",
+            "detail": "after 300 steps; cause: grasp_slip; events: ['grasp:cube', 'grasp_slip', 'grasp_miss', 'grasp:cube', 'grasp_slip', 'grasp_miss']",
+            "randomization": {
+              "object_xy_jitter": 0.17878543798909227,
+              "object_yaw_jitter": 1.1749363260819836,
+              "friction_scale": 0.45839101224648887,
+              "mass_scale": 1.956703362255834,
+              "actuator_gain_scale": 0.46485497421363986,
+              "obs_noise_std": 0.02326603818084567,
+              "action_latency_steps": 10.0,
+              "cube.dx": -0.01375475716292332,
+              "cube.dy": 0.009606133421986823,
+              "cube.dyaw": -0.41416407393969257
+            },
+            "video": null
+          },
+          {
+            "seed": 5064,
+            "tag": "grasp_slip",
+            "detail": "after 300 steps; cause: grasp_slip; events: ['grasp:cube', 'grasp_slip', 'grasp_miss', 'grasp:cube', 'grasp_slip', 'grasp_miss']",
+            "randomization": {
+              "object_xy_jitter": 0.2220830300838129,
+              "object_yaw_jitter": 0.05904832044742043,
+              "friction_scale": 0.06226602334952254,
+              "mass_scale": 1.576882959480387,
+              "actuator_gain_scale": 1.3851172277852177,
+              "obs_noise_std": 0.01493213955642995,
+              "action_latency_steps": 3.0,
+              "cube.dx": 0.047864930320186044,
+              "cube.dy": -0.1498584057973627,
+              "cube.dyaw": -0.014551592602142907
+            },
+            "video": null
+          },
+          {
+            "seed": 5067,
+            "tag": "grasp_slip",
+            "detail": "after 300 steps; cause: grasp_slip; events: ['grasp:cube', 'grasp_slip', 'grasp_miss', 'grasp:cube', 'grasp_slip', 'grasp_miss']",
+            "randomization": {
+              "object_xy_jitter": 0.278042577873963,
+              "object_yaw_jitter": 1.2192193489190972,
+              "friction_scale": 0.15481317127914662,
+              "mass_scale": 1.592286148355271,
+              "actuator_gain_scale": 0.6788710555738932,
+              "obs_noise_std": 0.025717469604266054,
+              "action_latency_steps": 6.0,
+              "cube.dx": 0.1078235315142485,
+              "cube.dy": -0.022214847637925306,
+              "cube.dyaw": 0.5221805715728272
+            },
+            "video": null
+          }
+        ],
+        "created_at": "2026-11-22T01:00:06+00:00"
+      },
+      "stress_factor": 2.0,
+      "created_at": "2026-11-22T01:00:06+00:00"
+    }
+  },
+  "depth_noise": [
+    {
+      "value": 0.0,
+      "n": 100,
+      "n_success": 100,
+      "success_rate": 1.0,
+      "ci95": [
+        0.9630051925239981,
+        0.9999999999999999
+      ],
+      "failure_counts": {}
+    },
+    {
+      "value": 0.0015,
+      "n": 100,
+      "n_success": 100,
+      "success_rate": 1.0,
+      "ci95": [
+        0.9630051925239981,
+        0.9999999999999999
+      ],
+      "failure_counts": {}
+    },
+    {
+      "value": 0.003,
+      "n": 100,
+      "n_success": 100,
+      "success_rate": 1.0,
+      "ci95": [
+        0.9630051925239981,
+        0.9999999999999999
+      ],
+      "failure_counts": {}
+    },
+    {
+      "value": 0.006,
+      "n": 100,
+      "n_success": 98,
+      "success_rate": 0.98,
+      "ci95": [
+        0.9299868370580063,
+        0.9944981477650318
+      ],
+      "failure_counts": {
+        "wrong_placement": 1,
+        "grasp_slip": 1
+      }
+    },
+    {
+      "value": 0.012,
+      "n": 100,
+      "n_success": 99,
+      "success_rate": 0.99,
+      "ci95": [
+        0.9455124752390653,
+        0.9982326134344526
+      ],
+      "failure_counts": {
+        "grasp_slip": 1
+      }
+    }
+  ]
+}
