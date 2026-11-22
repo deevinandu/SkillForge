@@ -1,0 +1,26 @@
+{
+ "id": "franka_pick_cube_from_clutter",
+ "instruction": "Pick the red cube out from between the other objects and put it in the bin.",
+ "scene": {
+  "robot": {"name": "franka_panda", "source": "menagerie:franka_emika_panda", "ee_site": "tcp", "gripper": "parallel", "max_gripper_width": 0.08},
+  "objects": [
+   {"name": "cube", "shape": "box", "size": [0.02, 0.02, 0.02], "mass": 0.05, "friction": 1.0, "pose": {"pos": [0.5, -0.15, 0.02]}},
+   {"name": "can_east", "shape": "cylinder", "size": [0.025, 0.05, 0.0], "mass": 0.2, "friction": 1.0, "pose": {"pos": [0.5, -0.065, 0.05]}},
+   {"name": "can_west", "shape": "cylinder", "size": [0.025, 0.05, 0.0], "mass": 0.2, "friction": 1.0, "pose": {"pos": [0.5, -0.235, 0.05]}},
+   {"name": "block_north", "shape": "box", "size": [0.025, 0.025, 0.015], "mass": 0.1, "friction": 1.0, "pose": {"pos": [0.585, -0.15, 0.015]}}
+  ],
+  "regions": [{"name": "bin", "center": [0.5, 0.2, 0.03], "half_extents": [0.06, 0.06, 0.03]}],
+  "randomization": {
+   "object_xy_jitter": {"lo": 0.0, "hi": 0.01},
+   "object_yaw_jitter": {"lo": 0.0, "hi": 0.785},
+   "friction_scale": {"lo": 0.5, "hi": 1.2},
+   "mass_scale": {"lo": 0.7, "hi": 1.5},
+   "actuator_gain_scale": {"lo": 0.8, "hi": 1.2},
+   "obs_noise_std": {"lo": 0.0, "hi": 0.005},
+   "action_latency_steps": {"lo": 0, "hi": 3}
+  }
+ },
+ "success": {"kind": "object_in_region", "object": "cube", "region": "bin"},
+ "max_steps": 400,
+ "control_hz": 20
+}

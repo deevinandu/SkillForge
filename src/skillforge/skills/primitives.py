@@ -398,7 +398,7 @@ def move_to(target: Vec, gripper: float = 0.0, **kw) -> MoveTo:
     return MoveTo(target, gripper=gripper, **kw)
 
 
-def approach(target: Vec, hover: float = 0.10, direction: Vec | None = None, **kw) -> MoveTo:
+def approach(target: Vec, hover: float = 0.10, direction: Vec | None = None, gripper: float = 0.0, **kw) -> MoveTo:
     """Go to a pre-grasp point `hover` metres back along the approach direction (default: above).
 
     `direction` is the approach direction (world, unit); None reads it from `ctx.quat`'s z axis.
@@ -409,7 +409,7 @@ def approach(target: Vec, hover: float = 0.10, direction: Vec | None = None, **k
         return _resolve(target, obs, ctx) - hover * d
 
     kw.setdefault("name", "approach")
-    return MoveTo(pre, gripper=0.0, **kw)
+    return MoveTo(pre, gripper=gripper, **kw)
 
 
 def descend_until(
