@@ -4,16 +4,54 @@ from __future__ import annotations
 
 import numpy as np
 
-from skillforge.contracts import ObjectInRegion, ObjectLifted, TaskSpec
+from skillforge.contracts import (
+    ObjectInRegion,
+    ObjectLifted,
+    ObjectOnObject,
+    ObjectSpec,
+    TaskSpec,
+    success_conditions,
+)
 
 
-def is_success(task: TaskSpec, true_obj_pos: dict[str, np.ndarray], start_obj_pos: dict[str, np.ndarray]) -> bool:
-    """Evaluate on TRUE object positions (not noisy observations)."""
-    s = task.success
-    p = true_obj_pos[s.object]
+def resting_half_height(o: ObjectSpec) -> float:
+    """Centre height above a flat surface the object rests on upright (mesh: 0, unknown)."""
+    if o.shape == "box":
+        return float(o.size[2])
+    if o.shape == "cylinder":
+        return float(o.size[1])
+    if o.shape == "sphere":
+        return float(o.size[0])
+    return 0.0
+
+
+def footprint_radius(o: ObjectSpec) -> float:
+    """Radius of a disc that fits inside the object's top face at ANY yaw (box: the inscribed
+    circle, which is conservative at the corners; positions alone do not give the yaw)."""
+    if o.shape == "box":
+        return float(min(o.size[0], o.size[1]))
+    if o.shape == "cylinder":
+        return float(o.size[0])
+    return 0.0  # a sphere or mesh is not a support
+
+
+def _leaf(task: TaskSpec, s, pos: dict[str, np.ndarray], start: dict[str, np.ndarray]) -> bool:
+    p = pos[s.object]
     if isinstance(s, ObjectInRegion):
         r = task.scene.region(s.region)
         return bool(np.all(np.abs(p - np.asarray(r.center)) <= np.asarray(r.half_extents)))
     if isinstance(s, ObjectLifted):
-        return bool(p[2] - start_obj_pos[s.object][2] >= s.min_height)
+        return bool(p[2] - start[s.object][2] >= s.min_height)
+    if isinstance(s, ObjectOnObject):
+        top, sup = task.scene.object(s.object), task.scene.object(s.support)
+        q = pos[s.support]
+        dxy = float(np.linalg.norm(p[:2] - q[:2]))
+        dz = float(p[2] - q[2])
+        want = resting_half_height(top) + resting_half_height(sup)
+        return dxy <= footprint_radius(sup) - s.xy_margin and abs(dz - want) <= s.z_tol
     raise TypeError(f"unknown success spec {type(s).__name__}")
+
+
+def is_success(task: TaskSpec, true_obj_pos: dict[str, np.ndarray], start_obj_pos: dict[str, np.ndarray]) -> bool:
+    """Evaluate on TRUE object positions (not noisy observations). AllOf: every leaf at once."""
+    return all(_leaf(task, s, true_obj_pos, start_obj_pos) for s in success_conditions(task.success))
