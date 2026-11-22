@@ -3,6 +3,10 @@
 One round of the agent loop, run to watch it work: score the current skill, let the headless
 Claude Code improver rewrite it, score the rewrite on the same seeds, gate it. Sim only.
 
+Caveat, found afterwards: this ran before the arm-armature fix (#22). Most of the "grasp slip"
+failures the improver tried to fix were the servo bang-bang artifact; on the fixed sim the same
+seed skill scores 97/100 on these seeds (was 85).
+
 ## Command
 ```bash
 MUJOCO_GL=egl skillforge forge tasks/franka_pick_ball_to_bin.json \
