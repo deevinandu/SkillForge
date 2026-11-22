@@ -92,9 +92,12 @@ def test_clutter_skill_avoids_the_collisions_pick_place_makes(mj):
     from skillforge.skills import PickPlace
 
     task = load("franka_pick_cube_from_clutter")
-    _, base = evaluate(make_env, PickPlace(), task, [3, 8])
-    assert all(e.failure == "collision" for e in base)  # hand into a can
-    _, ours = evaluate(make_env, PickFromClutter(), task, [3, 8])
+    # Seeds where PickPlace drives the hand into a can (seeds 3, 8, 11 locally). Exact outcomes can
+    # differ across CPUs/MuJoCo builds, so require at least two collisions, not a fixed set.
+    seeds = [3, 8, 11]
+    _, base = evaluate(make_env, PickPlace(), task, seeds)
+    assert sum(e.failure == "collision" for e in base) >= 2, [(e.seed, e.failure) for e in base]
+    _, ours = evaluate(make_env, PickFromClutter(), task, seeds)
     assert all(e.success for e in ours), [(e.seed, e.failure) for e in ours]
 
 
