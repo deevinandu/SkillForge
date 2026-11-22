@@ -260,7 +260,8 @@ def update_baselines(
 
     A pair "applies" when the skill succeeds at least once; a skill built for another
     kind of task (e.g. PickPlace on a lift task) would only record a 0% baseline.
-    Tasks whose env backend is not available yet (NotImplementedError) are skipped.
+    Tasks whose env backend is not available yet (NotImplementedError) are skipped, and so are
+    pairs where the skill rejects the task in `reset` (ValueError, e.g. PickPlace on a lift task).
     """
     written = []
     with EvalPool(workers) as pool:
@@ -270,6 +271,8 @@ def update_baselines(
                     b = make_baseline(make_env, src, task, seeds, pool=pool)
                 except NotImplementedError:
                     break
+                except ValueError:
+                    continue
                 if b.n_success > 0:
                     written.append(save_baseline(b, directory))
     return written

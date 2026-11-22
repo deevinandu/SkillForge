@@ -2,8 +2,8 @@
   "task_id": "stub_pick_cube_to_bin",
   "task_sha": "87ab2fc071317fc4",
   "skill": "pick_place",
-  "skill_version": "0.1.0",
-  "code_sha": "89926ea87b0236f3",
+  "skill_version": "0.2.0",
+  "code_sha": "8679359f9835caca",
   "seeds": [
     0,
     1,
@@ -216,5 +216,5 @@
     99
   ],
   "min_success": null,
-  "created_at": "2026-11-04T22:16:18+00:00"
+  "created_at": "2026-11-22T00:37:11+00:00"
 }
