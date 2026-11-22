@@ -61,3 +61,15 @@ def test_storage_and_discovery(tmp_path, stub_task):
     assert isinstance(b, Baseline) and b.seeds == list(range(10))
     save_baseline(b, tmp_path)  # overwrite is fine
     assert len(load_baselines(tmp_path)) == 1
+
+
+def test_update_skips_skills_that_reject_the_task(tmp_path, stub_task):
+    from skillforge.contracts import ObjectLifted
+    from skillforge.sim import make_env
+
+    obj = stub_task.success.object
+    lift = stub_task.model_copy(update={"id": "stub_lift", "success": ObjectLifted(object=obj)})
+    one = {"pick_place": library_sources()["pick_place"]}  # PickPlace raises ValueError on a lift task
+    tasks = {lift.id: lift, stub_task.id: stub_task}
+    paths = update_baselines(make_env, tasks, one, tmp_path, seeds=range(5), workers=1)
+    assert [p.name for p in paths] == [f"{stub_task.id}__pick_place.json"]

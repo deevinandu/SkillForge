@@ -1,0 +1,677 @@
+{
+  "task": "franka_push_box_to_target",
+  "seeds": [
+    5000,
+    5100
+  ],
+  "others": "task",
+  "reports": {
+    "true": {
+      "task_id": "franka_push_box_to_target",
+      "skill": "push",
+      "skill_version": "file",
+      "seeds": [
+        5000,
+        5001,
+        5002,
+        5003,
+        5004,
+        5005,
+        5006,
+        5007,
+        5008,
+        5009,
+        5010,
+        5011,
+        5012,
+        5013,
+        5014,
+        5015,
+        5016,
+        5017,
+        5018,
+        5019,
+        5020,
+        5021,
+        5022,
+        5023,
+        5024,
+        5025,
+        5026,
+        5027,
+        5028,
+        5029,
+        5030,
+        5031,
+        5032,
+        5033,
+        5034,
+        5035,
+        5036,
+        5037,
+        5038,
+        5039,
+        5040,
+        5041,
+        5042,
+        5043,
+        5044,
+        5045,
+        5046,
+        5047,
+        5048,
+        5049,
+        5050,
+        5051,
+        5052,
+        5053,
+        5054,
+        5055,
+        5056,
+        5057,
+        5058,
+        5059,
+        5060,
+        5061,
+        5062,
+        5063,
+        5064,
+        5065,
+        5066,
+        5067,
+        5068,
+        5069,
+        5070,
+        5071,
+        5072,
+        5073,
+        5074,
+        5075,
+        5076,
+        5077,
+        5078,
+        5079,
+        5080,
+        5081,
+        5082,
+        5083,
+        5084,
+        5085,
+        5086,
+        5087,
+        5088,
+        5089,
+        5090,
+        5091,
+        5092,
+        5093,
+        5094,
+        5095,
+        5096,
+        5097,
+        5098,
+        5099
+      ],
+      "curves": [
+        {
+          "axis": "object_xy_jitter",
+          "others": "task",
+          "points": [
+            {
+              "value": 0.0,
+              "n": 100,
+              "n_success": 100,
+              "success_rate": 1.0,
+              "ci95": [
+                0.9630051925239981,
+                0.9999999999999999
+              ],
+              "failure_counts": {}
+            },
+            {
+              "value": 0.02,
+              "n": 100,
+              "n_success": 100,
+              "success_rate": 1.0,
+              "ci95": [
+                0.9630051925239981,
+                0.9999999999999999
+              ],
+              "failure_counts": {}
+            },
+            {
+              "value": 0.04,
+              "n": 100,
+              "n_success": 98,
+              "success_rate": 0.98,
+              "ci95": [
+                0.9299868370580063,
+                0.9944981477650318
+              ],
+              "failure_counts": {
+                "collision": 1,
+                "ik_failure": 1
+              }
+            },
+            {
+              "value": 0.06,
+              "n": 100,
+              "n_success": 99,
+              "success_rate": 0.99,
+              "ci95": [
+                0.9455124752390653,
+                0.9982326134344526
+              ],
+              "failure_counts": {
+                "ik_failure": 1
+              }
+            },
+            {
+              "value": 0.08,
+              "n": 100,
+              "n_success": 98,
+              "success_rate": 0.98,
+              "ci95": [
+                0.9299868370580063,
+                0.9944981477650318
+              ],
+              "failure_counts": {
+                "ik_failure": 1,
+                "timeout": 1
+              }
+            },
+            {
+              "value": 0.1,
+              "n": 100,
+              "n_success": 98,
+              "success_rate": 0.98,
+              "ci95": [
+                0.9299868370580063,
+                0.9944981477650318
+              ],
+              "failure_counts": {
+                "ik_failure": 2
+              }
+            }
+          ]
+        },
+        {
+          "axis": "object_yaw_jitter",
+          "others": "task",
+          "points": [
+            {
+              "value": 0.0,
+              "n": 100,
+              "n_success": 100,
+              "success_rate": 1.0,
+              "ci95": [
+                0.9630051925239981,
+                0.9999999999999999
+              ],
+              "failure_counts": {}
+            },
+            {
+              "value": 0.314159,
+              "n": 100,
+              "n_success": 100,
+              "success_rate": 1.0,
+              "ci95": [
+                0.9630051925239981,
+                0.9999999999999999
+              ],
+              "failure_counts": {}
+            },
+            {
+              "value": 0.628319,
+              "n": 100,
+              "n_success": 100,
+              "success_rate": 1.0,
+              "ci95": [
+                0.9630051925239981,
+                0.9999999999999999
+              ],
+              "failure_counts": {}
+            },
+            {
+              "value": 0.942478,
+              "n": 100,
+              "n_success": 100,
+              "success_rate": 1.0,
+              "ci95": [
+                0.9630051925239981,
+                0.9999999999999999
+              ],
+              "failure_counts": {}
+            },
+            {
+              "value": 1.256637,
+              "n": 100,
+              "n_success": 99,
+              "success_rate": 0.99,
+              "ci95": [
+                0.9455124752390653,
+                0.9982326134344526
+              ],
+              "failure_counts": {
+                "collision": 1
+              }
+            },
+            {
+              "value": 1.570796,
+              "n": 100,
+              "n_success": 100,
+              "success_rate": 1.0,
+              "ci95": [
+                0.9630051925239981,
+                0.9999999999999999
+              ],
+              "failure_counts": {}
+            }
+          ]
+        },
+        {
+          "axis": "friction_scale",
+          "others": "task",
+          "points": [
+            {
+              "value": 0.25,
+              "n": 100,
+              "n_success": 100,
+              "success_rate": 1.0,
+              "ci95": [
+                0.9630051925239981,
+                0.9999999999999999
+              ],
+              "failure_counts": {}
+            },
+            {
+              "value": 0.5,
+              "n": 100,
+              "n_success": 100,
+              "success_rate": 1.0,
+              "ci95": [
+                0.9630051925239981,
+                0.9999999999999999
+              ],
+              "failure_counts": {}
+            },
+            {
+              "value": 0.75,
+              "n": 100,
+              "n_success": 100,
+              "success_rate": 1.0,
+              "ci95": [
+                0.9630051925239981,
+                0.9999999999999999
+              ],
+              "failure_counts": {}
+            },
+            {
+              "value": 1.0,
+              "n": 100,
+              "n_success": 100,
+              "success_rate": 1.0,
+              "ci95": [
+                0.9630051925239981,
+                0.9999999999999999
+              ],
+              "failure_counts": {}
+            },
+            {
+              "value": 1.5,
+              "n": 100,
+              "n_success": 100,
+              "success_rate": 1.0,
+              "ci95": [
+                0.9630051925239981,
+                0.9999999999999999
+              ],
+              "failure_counts": {}
+            },
+            {
+              "value": 2.0,
+              "n": 100,
+              "n_success": 99,
+              "success_rate": 0.99,
+              "ci95": [
+                0.9455124752390653,
+                0.9982326134344526
+              ],
+              "failure_counts": {
+                "ik_failure": 1
+              }
+            }
+          ]
+        },
+        {
+          "axis": "mass_scale",
+          "others": "task",
+          "points": [
+            {
+              "value": 0.5,
+              "n": 100,
+              "n_success": 100,
+              "success_rate": 1.0,
+              "ci95": [
+                0.9630051925239981,
+                0.9999999999999999
+              ],
+              "failure_counts": {}
+            },
+            {
+              "value": 1.0,
+              "n": 100,
+              "n_success": 99,
+              "success_rate": 0.99,
+              "ci95": [
+                0.9455124752390653,
+                0.9982326134344526
+              ],
+              "failure_counts": {
+                "ik_failure": 1
+              }
+            },
+            {
+              "value": 1.5,
+              "n": 100,
+              "n_success": 100,
+              "success_rate": 1.0,
+              "ci95": [
+                0.9630051925239981,
+                0.9999999999999999
+              ],
+              "failure_counts": {}
+            },
+            {
+              "value": 2.0,
+              "n": 100,
+              "n_success": 100,
+              "success_rate": 1.0,
+              "ci95": [
+                0.9630051925239981,
+                0.9999999999999999
+              ],
+              "failure_counts": {}
+            },
+            {
+              "value": 3.0,
+              "n": 100,
+              "n_success": 100,
+              "success_rate": 1.0,
+              "ci95": [
+                0.9630051925239981,
+                0.9999999999999999
+              ],
+              "failure_counts": {}
+            },
+            {
+              "value": 4.0,
+              "n": 100,
+              "n_success": 97,
+              "success_rate": 0.97,
+              "ci95": [
+                0.915479219195973,
+                0.9897456617765851
+              ],
+              "failure_counts": {
+                "ik_failure": 3
+              }
+            }
+          ]
+        },
+        {
+          "axis": "actuator_gain_scale",
+          "others": "task",
+          "points": [
+            {
+              "value": 0.25,
+              "n": 100,
+              "n_success": 93,
+              "success_rate": 0.93,
+              "ci95": [
+                0.8625032899347025,
+                0.965681175635936
+              ],
+              "failure_counts": {
+                "ik_failure": 6,
+                "timeout": 1
+              }
+            },
+            {
+              "value": 0.5,
+              "n": 100,
+              "n_success": 100,
+              "success_rate": 1.0,
+              "ci95": [
+                0.9630051925239981,
+                0.9999999999999999
+              ],
+              "failure_counts": {}
+            },
+            {
+              "value": 0.75,
+              "n": 100,
+              "n_success": 99,
+              "success_rate": 0.99,
+              "ci95": [
+                0.9455124752390653,
+                0.9982326134344526
+              ],
+              "failure_counts": {
+                "ik_failure": 1
+              }
+            },
+            {
+              "value": 1.0,
+              "n": 100,
+              "n_success": 100,
+              "success_rate": 1.0,
+              "ci95": [
+                0.9630051925239981,
+                0.9999999999999999
+              ],
+              "failure_counts": {}
+            },
+            {
+              "value": 1.5,
+              "n": 100,
+              "n_success": 99,
+              "success_rate": 0.99,
+              "ci95": [
+                0.9455124752390653,
+                0.9982326134344526
+              ],
+              "failure_counts": {
+                "ik_failure": 1
+              }
+            },
+            {
+              "value": 2.0,
+              "n": 100,
+              "n_success": 100,
+              "success_rate": 1.0,
+              "ci95": [
+                0.9630051925239981,
+                0.9999999999999999
+              ],
+              "failure_counts": {}
+            }
+          ]
+        },
+        {
+          "axis": "obs_noise_std",
+          "others": "task",
+          "points": [
+            {
+              "value": 0.0,
+              "n": 100,
+              "n_success": 100,
+              "success_rate": 1.0,
+              "ci95": [
+                0.9630051925239981,
+                0.9999999999999999
+              ],
+              "failure_counts": {}
+            },
+            {
+              "value": 0.002,
+              "n": 100,
+              "n_success": 100,
+              "success_rate": 1.0,
+              "ci95": [
+                0.9630051925239981,
+                0.9999999999999999
+              ],
+              "failure_counts": {}
+            },
+            {
+              "value": 0.004,
+              "n": 100,
+              "n_success": 100,
+              "success_rate": 1.0,
+              "ci95": [
+                0.9630051925239981,
+                0.9999999999999999
+              ],
+              "failure_counts": {}
+            },
+            {
+              "value": 0.006,
+              "n": 100,
+              "n_success": 98,
+              "success_rate": 0.98,
+              "ci95": [
+                0.9299868370580063,
+                0.9944981477650318
+              ],
+              "failure_counts": {
+                "collision": 2
+              }
+            },
+            {
+              "value": 0.008,
+              "n": 100,
+              "n_success": 98,
+              "success_rate": 0.98,
+              "ci95": [
+                0.9299868370580063,
+                0.9944981477650318
+              ],
+              "failure_counts": {
+                "collision": 1,
+                "ik_failure": 1
+              }
+            },
+            {
+              "value": 0.01,
+              "n": 100,
+              "n_success": 99,
+              "success_rate": 0.99,
+              "ci95": [
+                0.9455124752390653,
+                0.9982326134344526
+              ],
+              "failure_counts": {
+                "ik_failure": 1
+              }
+            }
+          ]
+        },
+        {
+          "axis": "action_latency_steps",
+          "others": "task",
+          "points": [
+            {
+              "value": 0.0,
+              "n": 100,
+              "n_success": 97,
+              "success_rate": 0.97,
+              "ci95": [
+                0.915479219195973,
+                0.9897456617765851
+              ],
+              "failure_counts": {
+                "ik_failure": 3
+              }
+            },
+            {
+              "value": 1.0,
+              "n": 100,
+              "n_success": 100,
+              "success_rate": 1.0,
+              "ci95": [
+                0.9630051925239981,
+                0.9999999999999999
+              ],
+              "failure_counts": {}
+            },
+            {
+              "value": 2.0,
+              "n": 100,
+              "n_success": 100,
+              "success_rate": 1.0,
+              "ci95": [
+                0.9630051925239981,
+                0.9999999999999999
+              ],
+              "failure_counts": {}
+            },
+            {
+              "value": 3.0,
+              "n": 100,
+              "n_success": 100,
+              "success_rate": 1.0,
+              "ci95": [
+                0.9630051925239981,
+                0.9999999999999999
+              ],
+              "failure_counts": {}
+            },
+            {
+              "value": 4.0,
+              "n": 100,
+              "n_success": 99,
+              "success_rate": 0.99,
+              "ci95": [
+                0.9455124752390653,
+                0.9982326134344526
+              ],
+              "failure_counts": {
+                "collision": 1
+              }
+            },
+            {
+              "value": 6.0,
+              "n": 100,
+              "n_success": 100,
+              "success_rate": 1.0,
+              "ci95": [
+                0.9630051925239981,
+                0.9999999999999999
+              ],
+              "failure_counts": {}
+            }
+          ]
+        }
+      ],
+      "stress": {
+        "task_id": "franka_push_box_to_target",
+        "skill": "push_to_region",
+        "skill_version": "0.2.0",
+        "n_rollouts": 100,
+        "n_success": 100,
+        "success_rate": 1.0,
+        "ci95": [
+          0.9630051925239981,
+          0.9999999999999999
+        ],
+        "failure_counts": {},
+        "failures": [],
+        "created_at": "2026-11-22T01:09:06+00:00"
+      },
+      "stress_factor": 2.0,
+      "created_at": "2026-11-22T01:09:06+00:00"
+    }
+  },
+  "depth_noise": null
+}

@@ -1,0 +1,1150 @@
+{
+  "task": "franka_pick_ball_to_bin",
+  "seeds": [
+    5000,
+    5100
+  ],
+  "others": "task",
+  "reports": {
+    "true": {
+      "task_id": "franka_pick_ball_to_bin",
+      "skill": "pick_place",
+      "skill_version": "0.2.0",
+      "seeds": [
+        5000,
+        5001,
+        5002,
+        5003,
+        5004,
+        5005,
+        5006,
+        5007,
+        5008,
+        5009,
+        5010,
+        5011,
+        5012,
+        5013,
+        5014,
+        5015,
+        5016,
+        5017,
+        5018,
+        5019,
+        5020,
+        5021,
+        5022,
+        5023,
+        5024,
+        5025,
+        5026,
+        5027,
+        5028,
+        5029,
+        5030,
+        5031,
+        5032,
+        5033,
+        5034,
+        5035,
+        5036,
+        5037,
+        5038,
+        5039,
+        5040,
+        5041,
+        5042,
+        5043,
+        5044,
+        5045,
+        5046,
+        5047,
+        5048,
+        5049,
+        5050,
+        5051,
+        5052,
+        5053,
+        5054,
+        5055,
+        5056,
+        5057,
+        5058,
+        5059,
+        5060,
+        5061,
+        5062,
+        5063,
+        5064,
+        5065,
+        5066,
+        5067,
+        5068,
+        5069,
+        5070,
+        5071,
+        5072,
+        5073,
+        5074,
+        5075,
+        5076,
+        5077,
+        5078,
+        5079,
+        5080,
+        5081,
+        5082,
+        5083,
+        5084,
+        5085,
+        5086,
+        5087,
+        5088,
+        5089,
+        5090,
+        5091,
+        5092,
+        5093,
+        5094,
+        5095,
+        5096,
+        5097,
+        5098,
+        5099
+      ],
+      "curves": [
+        {
+          "axis": "object_xy_jitter",
+          "others": "task",
+          "points": [
+            {
+              "value": 0.0,
+              "n": 100,
+              "n_success": 97,
+              "success_rate": 0.97,
+              "ci95": [
+                0.915479219195973,
+                0.9897456617765851
+              ],
+              "failure_counts": {
+                "grasp_slip": 1,
+                "timeout": 2
+              }
+            },
+            {
+              "value": 0.02,
+              "n": 100,
+              "n_success": 96,
+              "success_rate": 0.96,
+              "ci95": [
+                0.9016278276739262,
+                0.984336949448152
+              ],
+              "failure_counts": {
+                "grasp_slip": 2,
+                "timeout": 2
+              }
+            },
+            {
+              "value": 0.04,
+              "n": 100,
+              "n_success": 95,
+              "success_rate": 0.95,
+              "ci95": [
+                0.8882480347279118,
+                0.9784566385436864
+              ],
+              "failure_counts": {
+                "ik_failure": 1,
+                "grasp_slip": 2,
+                "timeout": 2
+              }
+            },
+            {
+              "value": 0.06,
+              "n": 100,
+              "n_success": 95,
+              "success_rate": 0.95,
+              "ci95": [
+                0.8882480347279118,
+                0.9784566385436864
+              ],
+              "failure_counts": {
+                "grasp_slip": 2,
+                "ik_failure": 1,
+                "timeout": 2
+              }
+            },
+            {
+              "value": 0.08,
+              "n": 100,
+              "n_success": 94,
+              "success_rate": 0.94,
+              "ci95": [
+                0.8752303146877748,
+                0.9722142547333433
+              ],
+              "failure_counts": {
+                "timeout": 3,
+                "grasp_slip": 2,
+                "ik_failure": 1
+              }
+            },
+            {
+              "value": 0.1,
+              "n": 100,
+              "n_success": 93,
+              "success_rate": 0.93,
+              "ci95": [
+                0.8625032899347025,
+                0.965681175635936
+              ],
+              "failure_counts": {
+                "timeout": 3,
+                "ik_failure": 1,
+                "grasp_slip": 3
+              }
+            }
+          ]
+        },
+        {
+          "axis": "object_yaw_jitter",
+          "others": "task",
+          "points": [
+            {
+              "value": 0.0,
+              "n": 100,
+              "n_success": 95,
+              "success_rate": 0.95,
+              "ci95": [
+                0.8882480347279118,
+                0.9784566385436864
+              ],
+              "failure_counts": {
+                "timeout": 3,
+                "grasp_slip": 1,
+                "ik_failure": 1
+              }
+            },
+            {
+              "value": 0.314159,
+              "n": 100,
+              "n_success": 96,
+              "success_rate": 0.96,
+              "ci95": [
+                0.9016278276739262,
+                0.984336949448152
+              ],
+              "failure_counts": {
+                "grasp_slip": 1,
+                "timeout": 3
+              }
+            },
+            {
+              "value": 0.628319,
+              "n": 100,
+              "n_success": 95,
+              "success_rate": 0.95,
+              "ci95": [
+                0.8882480347279118,
+                0.9784566385436864
+              ],
+              "failure_counts": {
+                "timeout": 3,
+                "grasp_slip": 2
+              }
+            },
+            {
+              "value": 0.942478,
+              "n": 100,
+              "n_success": 97,
+              "success_rate": 0.97,
+              "ci95": [
+                0.915479219195973,
+                0.9897456617765851
+              ],
+              "failure_counts": {
+                "grasp_slip": 1,
+                "timeout": 2
+              }
+            },
+            {
+              "value": 1.256637,
+              "n": 100,
+              "n_success": 95,
+              "success_rate": 0.95,
+              "ci95": [
+                0.8882480347279118,
+                0.9784566385436864
+              ],
+              "failure_counts": {
+                "timeout": 4,
+                "grasp_slip": 1
+              }
+            },
+            {
+              "value": 1.570796,
+              "n": 100,
+              "n_success": 96,
+              "success_rate": 0.96,
+              "ci95": [
+                0.9016278276739262,
+                0.984336949448152
+              ],
+              "failure_counts": {
+                "ik_failure": 1,
+                "grasp_slip": 1,
+                "timeout": 2
+              }
+            }
+          ]
+        },
+        {
+          "axis": "friction_scale",
+          "others": "task",
+          "points": [
+            {
+              "value": 0.25,
+              "n": 100,
+              "n_success": 84,
+              "success_rate": 0.84,
+              "ci95": [
+                0.7557955544110557,
+                0.8990479765052628
+              ],
+              "failure_counts": {
+                "grasp_slip": 10,
+                "ik_failure": 3,
+                "timeout": 3
+              }
+            },
+            {
+              "value": 0.5,
+              "n": 100,
+              "n_success": 94,
+              "success_rate": 0.94,
+              "ci95": [
+                0.8752303146877748,
+                0.9722142547333433
+              ],
+              "failure_counts": {
+                "ik_failure": 1,
+                "grasp_slip": 2,
+                "timeout": 3
+              }
+            },
+            {
+              "value": 0.75,
+              "n": 100,
+              "n_success": 95,
+              "success_rate": 0.95,
+              "ci95": [
+                0.8882480347279118,
+                0.9784566385436864
+              ],
+              "failure_counts": {
+                "ik_failure": 1,
+                "timeout": 3,
+                "grasp_slip": 1
+              }
+            },
+            {
+              "value": 1.0,
+              "n": 100,
+              "n_success": 95,
+              "success_rate": 0.95,
+              "ci95": [
+                0.8882480347279118,
+                0.9784566385436864
+              ],
+              "failure_counts": {
+                "grasp_slip": 1,
+                "ik_failure": 1,
+                "timeout": 3
+              }
+            },
+            {
+              "value": 1.5,
+              "n": 100,
+              "n_success": 97,
+              "success_rate": 0.97,
+              "ci95": [
+                0.915479219195973,
+                0.9897456617765851
+              ],
+              "failure_counts": {
+                "ik_failure": 1,
+                "timeout": 1,
+                "grasp_slip": 1
+              }
+            },
+            {
+              "value": 2.0,
+              "n": 100,
+              "n_success": 98,
+              "success_rate": 0.98,
+              "ci95": [
+                0.9299868370580063,
+                0.9944981477650318
+              ],
+              "failure_counts": {
+                "timeout": 1,
+                "grasp_slip": 1
+              }
+            }
+          ]
+        },
+        {
+          "axis": "mass_scale",
+          "others": "task",
+          "points": [
+            {
+              "value": 0.5,
+              "n": 100,
+              "n_success": 97,
+              "success_rate": 0.97,
+              "ci95": [
+                0.915479219195973,
+                0.9897456617765851
+              ],
+              "failure_counts": {
+                "grasp_slip": 1,
+                "timeout": 2
+              }
+            },
+            {
+              "value": 1.0,
+              "n": 100,
+              "n_success": 95,
+              "success_rate": 0.95,
+              "ci95": [
+                0.8882480347279118,
+                0.9784566385436864
+              ],
+              "failure_counts": {
+                "timeout": 3,
+                "grasp_slip": 1,
+                "ik_failure": 1
+              }
+            },
+            {
+              "value": 1.5,
+              "n": 100,
+              "n_success": 94,
+              "success_rate": 0.94,
+              "ci95": [
+                0.8752303146877748,
+                0.9722142547333433
+              ],
+              "failure_counts": {
+                "grasp_slip": 3,
+                "timeout": 3
+              }
+            },
+            {
+              "value": 2.0,
+              "n": 100,
+              "n_success": 94,
+              "success_rate": 0.94,
+              "ci95": [
+                0.8752303146877748,
+                0.9722142547333433
+              ],
+              "failure_counts": {
+                "ik_failure": 1,
+                "grasp_slip": 2,
+                "timeout": 3
+              }
+            },
+            {
+              "value": 3.0,
+              "n": 100,
+              "n_success": 95,
+              "success_rate": 0.95,
+              "ci95": [
+                0.8882480347279118,
+                0.9784566385436864
+              ],
+              "failure_counts": {
+                "grasp_slip": 3,
+                "timeout": 2
+              }
+            },
+            {
+              "value": 4.0,
+              "n": 100,
+              "n_success": 93,
+              "success_rate": 0.93,
+              "ci95": [
+                0.8625032899347025,
+                0.965681175635936
+              ],
+              "failure_counts": {
+                "grasp_slip": 3,
+                "ik_failure": 2,
+                "timeout": 2
+              }
+            }
+          ]
+        },
+        {
+          "axis": "actuator_gain_scale",
+          "others": "task",
+          "points": [
+            {
+              "value": 0.25,
+              "n": 100,
+              "n_success": 96,
+              "success_rate": 0.96,
+              "ci95": [
+                0.9016278276739262,
+                0.984336949448152
+              ],
+              "failure_counts": {
+                "ik_failure": 1,
+                "object_dropped": 1,
+                "grasp_slip": 1,
+                "timeout": 1
+              }
+            },
+            {
+              "value": 0.5,
+              "n": 100,
+              "n_success": 96,
+              "success_rate": 0.96,
+              "ci95": [
+                0.9016278276739262,
+                0.984336949448152
+              ],
+              "failure_counts": {
+                "grasp_slip": 1,
+                "timeout": 3
+              }
+            },
+            {
+              "value": 0.75,
+              "n": 100,
+              "n_success": 95,
+              "success_rate": 0.95,
+              "ci95": [
+                0.8882480347279118,
+                0.9784566385436864
+              ],
+              "failure_counts": {
+                "timeout": 3,
+                "grasp_slip": 2
+              }
+            },
+            {
+              "value": 1.0,
+              "n": 100,
+              "n_success": 95,
+              "success_rate": 0.95,
+              "ci95": [
+                0.8882480347279118,
+                0.9784566385436864
+              ],
+              "failure_counts": {
+                "ik_failure": 1,
+                "grasp_slip": 2,
+                "timeout": 2
+              }
+            },
+            {
+              "value": 1.5,
+              "n": 100,
+              "n_success": 82,
+              "success_rate": 0.82,
+              "ci95": [
+                0.7333246397578691,
+                0.8829986834574896
+              ],
+              "failure_counts": {
+                "grasp_slip": 9,
+                "ik_failure": 7,
+                "wrong_placement": 1,
+                "timeout": 1
+              }
+            },
+            {
+              "value": 2.0,
+              "n": 100,
+              "n_success": 67,
+              "success_rate": 0.67,
+              "ci95": [
+                0.5730516033971139,
+                0.7543701620610456
+              ],
+              "failure_counts": {
+                "grasp_slip": 17,
+                "ik_failure": 13,
+                "collision": 1,
+                "timeout": 2
+              }
+            }
+          ]
+        },
+        {
+          "axis": "obs_noise_std",
+          "others": "task",
+          "points": [
+            {
+              "value": 0.0,
+              "n": 100,
+              "n_success": 100,
+              "success_rate": 1.0,
+              "ci95": [
+                0.9630051925239981,
+                0.9999999999999999
+              ],
+              "failure_counts": {}
+            },
+            {
+              "value": 0.002,
+              "n": 100,
+              "n_success": 100,
+              "success_rate": 1.0,
+              "ci95": [
+                0.9630051925239981,
+                0.9999999999999999
+              ],
+              "failure_counts": {}
+            },
+            {
+              "value": 0.004,
+              "n": 100,
+              "n_success": 100,
+              "success_rate": 1.0,
+              "ci95": [
+                0.9630051925239981,
+                0.9999999999999999
+              ],
+              "failure_counts": {}
+            },
+            {
+              "value": 0.006,
+              "n": 100,
+              "n_success": 100,
+              "success_rate": 1.0,
+              "ci95": [
+                0.9630051925239981,
+                0.9999999999999999
+              ],
+              "failure_counts": {}
+            },
+            {
+              "value": 0.008,
+              "n": 100,
+              "n_success": 97,
+              "success_rate": 0.97,
+              "ci95": [
+                0.915479219195973,
+                0.9897456617765851
+              ],
+              "failure_counts": {
+                "ik_failure": 2,
+                "grasp_slip": 1
+              }
+            },
+            {
+              "value": 0.01,
+              "n": 100,
+              "n_success": 89,
+              "success_rate": 0.89,
+              "ci95": [
+                0.8136853697209698,
+                0.9374586804477487
+              ],
+              "failure_counts": {
+                "wrong_placement": 3,
+                "grasp_slip": 3,
+                "ik_failure": 4,
+                "timeout": 1
+              }
+            }
+          ]
+        },
+        {
+          "axis": "action_latency_steps",
+          "others": "task",
+          "points": [
+            {
+              "value": 0.0,
+              "n": 100,
+              "n_success": 95,
+              "success_rate": 0.95,
+              "ci95": [
+                0.8882480347279118,
+                0.9784566385436864
+              ],
+              "failure_counts": {
+                "ik_failure": 3,
+                "grasp_slip": 1,
+                "timeout": 1
+              }
+            },
+            {
+              "value": 1.0,
+              "n": 100,
+              "n_success": 99,
+              "success_rate": 0.99,
+              "ci95": [
+                0.9455124752390653,
+                0.9982326134344526
+              ],
+              "failure_counts": {
+                "ik_failure": 1
+              }
+            },
+            {
+              "value": 2.0,
+              "n": 100,
+              "n_success": 94,
+              "success_rate": 0.94,
+              "ci95": [
+                0.8752303146877748,
+                0.9722142547333433
+              ],
+              "failure_counts": {
+                "ik_failure": 2,
+                "grasp_slip": 3,
+                "wrong_placement": 1
+              }
+            },
+            {
+              "value": 3.0,
+              "n": 100,
+              "n_success": 97,
+              "success_rate": 0.97,
+              "ci95": [
+                0.915479219195973,
+                0.9897456617765851
+              ],
+              "failure_counts": {
+                "grasp_slip": 1,
+                "ik_failure": 1,
+                "timeout": 1
+              }
+            },
+            {
+              "value": 4.0,
+              "n": 100,
+              "n_success": 94,
+              "success_rate": 0.94,
+              "ci95": [
+                0.8752303146877748,
+                0.9722142547333433
+              ],
+              "failure_counts": {
+                "ik_failure": 3,
+                "timeout": 1,
+                "wrong_placement": 1,
+                "grasp_slip": 1
+              }
+            },
+            {
+              "value": 6.0,
+              "n": 100,
+              "n_success": 93,
+              "success_rate": 0.93,
+              "ci95": [
+                0.8625032899347025,
+                0.965681175635936
+              ],
+              "failure_counts": {
+                "timeout": 1,
+                "grasp_slip": 2,
+                "wrong_placement": 4
+              }
+            }
+          ]
+        }
+      ],
+      "stress": {
+        "task_id": "franka_pick_ball_to_bin",
+        "skill": "pick_place",
+        "skill_version": "0.2.0",
+        "n_rollouts": 100,
+        "n_success": 38,
+        "success_rate": 0.38,
+        "ci95": [
+          0.2909744920013438,
+          0.47790426179289663
+        ],
+        "failure_counts": {
+          "timeout": 15,
+          "grasp_slip": 11,
+          "wrong_placement": 14,
+          "collision": 12,
+          "ik_failure": 10
+        },
+        "failures": [
+          {
+            "seed": 5003,
+            "tag": "timeout",
+            "detail": "after 300 steps; events: []",
+            "randomization": {
+              "object_xy_jitter": 0.09446212265238774,
+              "object_yaw_jitter": 0.0,
+              "friction_scale": 0.5286259488430877,
+              "mass_scale": 0.8632223420616296,
+              "actuator_gain_scale": 0.8735698769910161,
+              "obs_noise_std": 0.015374887397166321,
+              "action_latency_steps": 7.0,
+              "ball.dx": 0.027214987861960818,
+              "ball.dy": 0.05063736046502021,
+              "ball.dyaw": 0.0
+            },
+            "video": null
+          },
+          {
+            "seed": 5004,
+            "tag": "grasp_slip",
+            "detail": "after 300 steps; cause: grasp_slip; events: ['grasp:ball', 'grasp_slip', 'grasp_miss', 'grasp:ball', 'grasp_slip', 'grasp_miss']",
+            "randomization": {
+              "object_xy_jitter": 0.02008062779909804,
+              "object_yaw_jitter": 0.0,
+              "friction_scale": 0.19880007858946236,
+              "mass_scale": 1.419809744907398,
+              "actuator_gain_scale": 0.3054447552580411,
+              "obs_noise_std": 0.009278930062702626,
+              "action_latency_steps": 4.0,
+              "ball.dx": -0.002530153943671211,
+              "ball.dy": -0.01879125811730377,
+              "ball.dyaw": 0.0
+            },
+            "video": null
+          },
+          {
+            "seed": 5005,
+            "tag": "wrong_placement",
+            "detail": "after 300 steps; cause: grasp:ball; events: ['grasp:ball', 'release:ball']",
+            "randomization": {
+              "object_xy_jitter": 0.05449586524549124,
+              "object_yaw_jitter": 0.0,
+              "friction_scale": 0.2950278065934764,
+              "mass_scale": 1.3173602701821645,
+              "actuator_gain_scale": 1.6539793501675182,
+              "obs_noise_std": 0.012728211569634518,
+              "action_latency_steps": 6.0,
+              "ball.dx": -0.041442305336778514,
+              "ball.dy": -0.04155105552715348,
+              "ball.dyaw": 0.0
+            },
+            "video": null
+          },
+          {
+            "seed": 5006,
+            "tag": "collision",
+            "detail": "after 254 steps; cause: collision:left_finger-table; events: ['release:ball', 'collision:left_finger-table', 'collision:right_finger-table', 'grasp:ball', 'grasp_slip', 'grasp_miss']",
+            "randomization": {
+              "object_xy_jitter": 0.20694477490664986,
+              "object_yaw_jitter": 0.0,
+              "friction_scale": 0.5189997894844904,
+              "mass_scale": 1.1111587186615504,
+              "actuator_gain_scale": 0.9529383411678991,
+              "obs_noise_std": 0.016422111211637874,
+              "action_latency_steps": 4.0,
+              "ball.dx": -0.004201715792097299,
+              "ball.dy": 0.01031974786611739,
+              "ball.dyaw": 0.0
+            },
+            "video": null
+          },
+          {
+            "seed": 5007,
+            "tag": "grasp_slip",
+            "detail": "after 300 steps; cause: grasp_slip; events: ['grasp:ball', 'grasp_slip', 'grasp_miss', 'grasp:ball', 'grasp_slip', 'grasp_miss']",
+            "randomization": {
+              "object_xy_jitter": 0.21992415030673684,
+              "object_yaw_jitter": 0.0,
+              "friction_scale": 0.16005294890076,
+              "mass_scale": 1.295672118216206,
+              "actuator_gain_scale": 0.2886992436765606,
+              "obs_noise_std": 0.0006142447548122006,
+              "action_latency_steps": 8.0,
+              "ball.dx": 0.1685032033153135,
+              "ball.dy": 0.08711101271061666,
+              "ball.dyaw": 0.0
+            },
+            "video": null
+          },
+          {
+            "seed": 5010,
+            "tag": "timeout",
+            "detail": "after 300 steps; events: []",
+            "randomization": {
+              "object_xy_jitter": 0.09200982538518199,
+              "object_yaw_jitter": 0.0,
+              "friction_scale": 0.7548271511571127,
+              "mass_scale": 0.49665083952889233,
+              "actuator_gain_scale": 1.6349981801184232,
+              "obs_noise_std": 0.012926710536204524,
+              "action_latency_steps": 7.0,
+              "ball.dx": -0.03520110146199532,
+              "ball.dy": 0.06702096941405125,
+              "ball.dyaw": 0.0
+            },
+            "video": null
+          },
+          {
+            "seed": 5014,
+            "tag": "timeout",
+            "detail": "after 300 steps; events: []",
+            "randomization": {
+              "object_xy_jitter": 0.1498427919544277,
+              "object_yaw_jitter": 0.0,
+              "friction_scale": 0.6693580748633462,
+              "mass_scale": 1.2653878973958679,
+              "actuator_gain_scale": 1.3230742076167432,
+              "obs_noise_std": 0.021032219939989768,
+              "action_latency_steps": 6.0,
+              "ball.dx": -0.09544043150489323,
+              "ball.dy": 0.10137695404237987,
+              "ball.dyaw": 0.0
+            },
+            "video": null
+          },
+          {
+            "seed": 5015,
+            "tag": "collision",
+            "detail": "after 300 steps; cause: collision:left_finger-table; events: ['collision:left_finger-table', 'collision:right_finger-table', 'grasp:ball', 'release:ball']",
+            "randomization": {
+              "object_xy_jitter": 0.07398649809546523,
+              "object_yaw_jitter": 0.0,
+              "friction_scale": 0.27459148383267346,
+              "mass_scale": 1.0794583976912353,
+              "actuator_gain_scale": 0.815314394545611,
+              "obs_noise_std": 0.01872425110327529,
+              "action_latency_steps": 10.0,
+              "ball.dx": 0.00227312319354811,
+              "ball.dy": 0.01720859117956297,
+              "ball.dyaw": 0.0
+            },
+            "video": null
+          },
+          {
+            "seed": 5016,
+            "tag": "collision",
+            "detail": "after 300 steps; cause: collision:left_finger-table; events: ['collision:left_finger-table', 'collision:right_finger-table', 'grasp:ball', 'release:ball']",
+            "randomization": {
+              "object_xy_jitter": 0.1796402193060559,
+              "object_yaw_jitter": 0.0,
+              "friction_scale": 0.3096888019992355,
+              "mass_scale": 1.4867932403295199,
+              "actuator_gain_scale": 1.0876747662054842,
+              "obs_noise_std": 0.020880442310502612,
+              "action_latency_steps": 9.0,
+              "ball.dx": -0.0011782607797578282,
+              "ball.dy": -0.1037392131665895,
+              "ball.dyaw": 0.0
+            },
+            "video": null
+          },
+          {
+            "seed": 5017,
+            "tag": "wrong_placement",
+            "detail": "after 300 steps; cause: grasp:ball; events: ['grasp:ball', 'release:ball']",
+            "randomization": {
+              "object_xy_jitter": 0.008319335228768274,
+              "object_yaw_jitter": 0.0,
+              "friction_scale": 0.5961089563206672,
+              "mass_scale": 1.4164824996537375,
+              "actuator_gain_scale": 1.0434476635555043,
+              "obs_noise_std": 0.014311073844056527,
+              "action_latency_steps": 5.0,
+              "ball.dx": -0.006897175492907748,
+              "ball.dy": 0.0030364971367880782,
+              "ball.dyaw": 0.0
+            },
+            "video": null
+          },
+          {
+            "seed": 5020,
+            "tag": "timeout",
+            "detail": "after 300 steps; events: []",
+            "randomization": {
+              "object_xy_jitter": 0.12987134437138284,
+              "object_yaw_jitter": 0.0,
+              "friction_scale": 0.8772331957358924,
+              "mass_scale": 1.1220266978596203,
+              "actuator_gain_scale": 0.9500876999513218,
+              "obs_noise_std": 0.019816796770315767,
+              "action_latency_steps": 6.0,
+              "ball.dx": -0.007075870836428619,
+              "ball.dy": -0.08584315206334966,
+              "ball.dyaw": 0.0
+            },
+            "video": null
+          },
+          {
+            "seed": 5022,
+            "tag": "wrong_placement",
+            "detail": "after 300 steps; cause: grasp:ball; events: ['grasp:ball', 'release:ball']",
+            "randomization": {
+              "object_xy_jitter": 0.13959247761308752,
+              "object_yaw_jitter": 0.0,
+              "friction_scale": 0.36560894742626193,
+              "mass_scale": 0.9994245028575441,
+              "actuator_gain_scale": 1.3040510019870843,
+              "obs_noise_std": 0.017494461115183636,
+              "action_latency_steps": 3.0,
+              "ball.dx": -0.10564724424337893,
+              "ball.dy": 0.01727564060423739,
+              "ball.dyaw": 0.0
+            },
+            "video": null
+          },
+          {
+            "seed": 5023,
+            "tag": "ik_failure",
+            "detail": "after 103 steps; cause: ik_failure; events: ['grasp:ball', 'grasp_slip', 'grasp_miss', 'ik_failure']",
+            "randomization": {
+              "object_xy_jitter": 0.2215133488474738,
+              "object_yaw_jitter": 0.0,
+              "friction_scale": 0.08872336409283783,
+              "mass_scale": 1.048065857019823,
+              "actuator_gain_scale": 1.2314017942573803,
+              "obs_noise_std": 0.009772752658501749,
+              "action_latency_steps": 4.0,
+              "ball.dx": 0.08556824328187185,
+              "ball.dy": 0.013927296667252648,
+              "ball.dyaw": 0.0
+            },
+            "video": null
+          },
+          {
+            "seed": 5026,
+            "tag": "ik_failure",
+            "detail": "after 285 steps; cause: ik_failure; events: ['grasp:ball', 'release:ball', 'grasp_miss', 'ik_failure', 'ik_failure', 'ik_failure']",
+            "randomization": {
+              "object_xy_jitter": 0.15695618709610665,
+              "object_yaw_jitter": 0.0,
+              "friction_scale": 0.9477465020739793,
+              "mass_scale": 1.448969014945178,
+              "actuator_gain_scale": 0.3490032230636595,
+              "obs_noise_std": 0.020144912116869012,
+              "action_latency_steps": 7.0,
+              "ball.dx": 0.1398855278468613,
+              "ball.dy": 0.137734850873859,
+              "ball.dyaw": 0.0
+            },
+            "video": null
+          },
+          {
+            "seed": 5027,
+            "tag": "timeout",
+            "detail": "after 300 steps; events: []",
+            "randomization": {
+              "object_xy_jitter": 0.09484928769798813,
+              "object_yaw_jitter": 0.0,
+              "friction_scale": 0.12616255421043496,
+              "mass_scale": 0.61867121742473,
+              "actuator_gain_scale": 0.8618997326832216,
+              "obs_noise_std": 0.02221085442244969,
+              "action_latency_steps": 1.0,
+              "ball.dx": -0.002653551851655514,
+              "ball.dy": 0.06142693679594803,
+              "ball.dyaw": 0.0
+            },
+            "video": null
+          },
+          {
+            "seed": 5028,
+            "tag": "timeout",
+            "detail": "after 300 steps; events: []",
+            "randomization": {
+              "object_xy_jitter": 0.19318609511697069,
+              "object_yaw_jitter": 0.0,
+              "friction_scale": 0.8658001780352418,
+              "mass_scale": 1.3649159090870344,
+              "actuator_gain_scale": 0.4978083263841847,
+              "obs_noise_std": 0.017462001578486232,
+              "action_latency_steps": 8.0,
+              "ball.dx": 0.029646299253360292,
+              "ball.dy": 0.03589434727234042,
+              "ball.dyaw": 0.0
+            },
+            "video": null
+          },
+          {
+            "seed": 5029,
+            "tag": "collision",
+            "detail": "after 300 steps; cause: collision:left_finger-table; events: ['collision:left_finger-table', 'collision:right_finger-table', 'grasp:ball', 'release:ball']",
+            "randomization": {
+              "object_xy_jitter": 0.07353084004564586,
+              "object_yaw_jitter": 0.0,
+              "friction_scale": 0.4302936208441014,
+              "mass_scale": 1.0608335231843813,
+              "actuator_gain_scale": 1.1079682601472003,
+              "obs_noise_std": 0.018616818444941417,
+              "action_latency_steps": 2.0,
+              "ball.dx": -0.01124219757361012,
+              "ball.dy": -0.07292940809991054,
+              "ball.dyaw": 0.0
+            },
+            "video": null
+          },
+          {
+            "seed": 5030,
+            "tag": "wrong_placement",
+            "detail": "after 300 steps; cause: grasp:ball; events: ['grasp:ball', 'release:ball']",
+            "randomization": {
+              "object_xy_jitter": 0.06889366785207296,
+              "object_yaw_jitter": 0.0,
+              "friction_scale": 0.7579364252789204,
+              "mass_scale": 1.6351392035297951,
+              "actuator_gain_scale": 0.8777600205073407,
+              "obs_noise_std": 0.015343006390647791,
+              "action_latency_steps": 2.0,
+              "ball.dx": -0.05960932470580044,
+              "ball.dy": 9.665431643494926e-05,
+              "ball.dyaw": 0.0
+            },
+            "video": null
+          },
+          {
+            "seed": 5031,
+            "tag": "grasp_slip",
+            "detail": "after 120 steps; cause: grasp_slip; events: ['grasp:ball', 'grasp_slip', 'grasp_miss']",
+            "randomization": {
+              "object_xy_jitter": 0.08724665376698883,
+              "object_yaw_jitter": 0.0,
+              "friction_scale": 0.8089149879041145,
+              "mass_scale": 0.5434800328996954,
+              "actuator_gain_scale": 1.683106794381718,
+              "obs_noise_std": 0.0030604220987951927,
+              "action_latency_steps": 8.0,
+              "ball.dx": -0.05771773588248742,
+              "ball.dy": 0.07922017035720773,
+              "ball.dyaw": 0.0
+            },
+            "video": null
+          },
+          {
+            "seed": 5033,
+            "tag": "timeout",
+            "detail": "after 300 steps; cause: still holding; events: ['grasp:ball', 'release:ball', 'grasp:ball', 'release:ball', 'grasp:ball']",
+            "randomization": {
+              "object_xy_jitter": 0.0799535495973037,
+              "object_yaw_jitter": 0.0,
+              "friction_scale": 0.1476114776134952,
+              "mass_scale": 0.7957350402094039,
+              "actuator_gain_scale": 0.9126989346917516,
+              "obs_noise_std": 0.010776284612105162,
+              "action_latency_steps": 10.0,
+              "ball.dx": 0.011508446845506545,
+              "ball.dy": 0.0038499152935667774,
+              "ball.dyaw": 0.0
+            },
+            "video": null
+          }
+        ],
+        "created_at": "2026-11-22T01:05:26+00:00"
+      },
+      "stress_factor": 2.0,
+      "created_at": "2026-11-22T01:05:27+00:00"
+    }
+  },
+  "depth_noise": null
+}
