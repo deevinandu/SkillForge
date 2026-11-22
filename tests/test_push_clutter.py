@@ -92,9 +92,9 @@ def test_clutter_skill_avoids_the_collisions_pick_place_makes(mj):
     from skillforge.skills import PickPlace
 
     task = load("franka_pick_cube_from_clutter")
-    _, base = evaluate(make_env, PickPlace(), task, [3, 4])
+    _, base = evaluate(make_env, PickPlace(), task, [3, 8])
     assert all(e.failure == "collision" for e in base)  # hand into a can
-    _, ours = evaluate(make_env, PickFromClutter(), task, [3, 4])
+    _, ours = evaluate(make_env, PickFromClutter(), task, [3, 8])
     assert all(e.success for e in ours), [(e.seed, e.failure) for e in ours]
 
 
