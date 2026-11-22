@@ -64,6 +64,19 @@ def test_parse_cli_json_success_and_error():
     assert not parse_cli_json("not json").ok
 
 
+def test_parse_cli_json_error_reported_as_success_keeps_the_message():
+    # What `claude -p` printed with an expired login: is_error true, subtype "success".
+    doc = {"type": "result", "subtype": "success", "is_error": True, "terminal_reason": "api_error",
+           "result": "Failed to authenticate: OAuth session expired and could not be refreshed",
+           "session_id": "s", "total_cost_usd": 0, "num_turns": 1, "usage": {}}  # fmt: skip
+    r = parse_cli_json(json.dumps(doc))
+    assert not r.ok
+    assert r.error == "api_error: Failed to authenticate: OAuth session expired and could not be refreshed"
+    doc.pop("terminal_reason")
+    doc.pop("result")
+    assert parse_cli_json(json.dumps(doc)).error == "error"
+
+
 def test_propose_returns_checked_candidate_and_records_cost(tmp_path, stub_task):
     seed = load_seed_skill("pick_place_v01")
     runner = Script(_tighter, run_dev_eval=True, cost=0.4)
