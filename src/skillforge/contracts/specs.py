@@ -130,7 +130,53 @@ class ObjectLifted(Spec):
     min_height: float = Field(0.05, gt=0, description="metres above its start height")
 
 
-SuccessSpec = Annotated[ObjectInRegion | ObjectLifted, Field(discriminator="kind")]
+class ObjectOnObject(Spec):
+    """`object` rests on top of `support`, judged on TRUE positions by the env:
+    - horizontal: the object's centre lies within `support`'s footprint, shrunk by `xy_margin`
+      (box: its x/y half-sizes in the support's frame; cylinder/sphere: its radius);
+    - vertical: centre-to-centre height is the two resting half-heights summed, within `z_tol`.
+    Upright stacks only: orientation is not part of the condition."""
+
+    kind: Literal["object_on_object"] = "object_on_object"
+    object: str
+    support: str
+    xy_margin: float = Field(0.0, ge=0, description="metres the object's centre must sit inside the support's edge")
+    z_tol: float = Field(0.01, gt=0, description="metres of slack on the stacked height")
+
+    @model_validator(mode="after")
+    def _distinct(self) -> ObjectOnObject:
+        if self.object == self.support:
+            raise ValueError("object_on_object needs two different objects")
+        return self
+
+
+LeafSuccessSpec = Annotated[ObjectInRegion | ObjectLifted | ObjectOnObject, Field(discriminator="kind")]
+
+
+class AllOf(Spec):
+    """Every condition holds at the same step. Leaves only (no nesting), so a task stays a flat
+    list of checks: e.g. sorting = several object_in_region, stacking = object_on_object chain."""
+
+    kind: Literal["all_of"] = "all_of"
+    conditions: tuple[LeafSuccessSpec, ...] = Field(min_length=1)
+
+
+SuccessSpec = Annotated[ObjectInRegion | ObjectLifted | ObjectOnObject | AllOf, Field(discriminator="kind")]
+
+
+def success_conditions(success: ObjectInRegion | ObjectLifted | ObjectOnObject | AllOf) -> tuple:
+    """The leaf conditions of a success spec, in order (one for a leaf, all of them for AllOf)."""
+    return tuple(success.conditions) if isinstance(success, AllOf) else (success,)
+
+
+def success_objects(success: ObjectInRegion | ObjectLifted | ObjectOnObject | AllOf) -> tuple[str, ...]:
+    """Every object a success spec mentions (supports included), first mention first, no repeats."""
+    names: list[str] = []
+    for c in success_conditions(success):
+        for n in (c.object, getattr(c, "support", None)):
+            if n is not None and n not in names:
+                names.append(n)
+    return tuple(names)
 
 
 class TaskSpec(Spec):
@@ -144,9 +190,12 @@ class TaskSpec(Spec):
     @model_validator(mode="after")
     def _success_refs_exist(self) -> TaskSpec:
         try:
-            self.scene.object(self.success.object)
-            if isinstance(self.success, ObjectInRegion):
-                self.scene.region(self.success.region)
+            for c in success_conditions(self.success):
+                self.scene.object(c.object)
+                if isinstance(c, ObjectInRegion):
+                    self.scene.region(c.region)
+                if isinstance(c, ObjectOnObject):
+                    self.scene.object(c.support)
         except KeyError as e:
             raise ValueError(f"success refers to a missing name: {e.args[0]}") from None
         return self
