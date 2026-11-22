@@ -14,8 +14,11 @@ from .runtime import (
     StepInfo,
 )
 from .specs import (
+    AllOf,
+    LeafSuccessSpec,
     ObjectInRegion,
     ObjectLifted,
+    ObjectOnObject,
     ObjectSpec,
     Pose,
     RandomizationSpec,
@@ -25,16 +28,21 @@ from .specs import (
     SceneSpec,
     SuccessSpec,
     TaskSpec,
+    success_conditions,
+    success_objects,
 )
 
 __all__ = [
     "Action",
+    "AllOf",
     "Episode",
     "EvalReport",
     "FailureCase",
     "FailureTag",
+    "LeafSuccessSpec",
     "ObjectInRegion",
     "ObjectLifted",
+    "ObjectOnObject",
     "ObjectSpec",
     "ObjectState",
     "Observation",
@@ -51,5 +59,7 @@ __all__ = [
     "SkillSource",
     "StepInfo",
     "SuccessSpec",
+    "success_conditions",
+    "success_objects",
     "TaskSpec",
 ]
