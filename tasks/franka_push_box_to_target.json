@@ -1,0 +1,85 @@
+{
+ "id": "franka_push_box_to_target",
+ "instruction": "The box is too wide to pick up; push it diagonally into the small marked square.",
+ "scene": {
+  "robot": {
+   "name": "franka_panda",
+   "source": "menagerie:franka_emika_panda",
+   "ee_site": "tcp",
+   "gripper": "parallel",
+   "max_gripper_width": 0.08
+  },
+  "objects": [
+   {
+    "name": "box",
+    "shape": "box",
+    "size": [
+     0.05,
+     0.05,
+     0.025
+    ],
+    "mass": 0.3,
+    "friction": 0.5,
+    "pose": {
+     "pos": [
+      0.42,
+      -0.15,
+      0.025
+     ]
+    }
+   }
+  ],
+  "regions": [
+   {
+    "name": "target",
+    "center": [
+     0.6,
+     0.12,
+     0.025
+    ],
+    "half_extents": [
+     0.03,
+     0.03,
+     0.03
+    ]
+   }
+  ],
+  "randomization": {
+   "object_xy_jitter": {
+    "lo": 0.0,
+    "hi": 0.04
+   },
+   "object_yaw_jitter": {
+    "lo": 0.0,
+    "hi": 0.6
+   },
+   "friction_scale": {
+    "lo": 0.6,
+    "hi": 1.4
+   },
+   "mass_scale": {
+    "lo": 0.7,
+    "hi": 1.8
+   },
+   "actuator_gain_scale": {
+    "lo": 0.8,
+    "hi": 1.2
+   },
+   "obs_noise_std": {
+    "lo": 0.0,
+    "hi": 0.005
+   },
+   "action_latency_steps": {
+    "lo": 0,
+    "hi": 2
+   }
+  }
+ },
+ "success": {
+  "kind": "object_in_region",
+  "object": "box",
+  "region": "target"
+ },
+ "max_steps": 400,
+ "control_hz": 20
+}

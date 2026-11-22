@@ -64,6 +64,7 @@ class PickPlace:
     slip_regrasps = 2
     place_retries = 1
     verify_margin = 0.01  # metres: slack on the region check, which uses noisy observations
+    preshape_margin: float | None = None  # metres: open only to the widest grasp + this (None = fully open)
 
     def reset(self, task: TaskSpec) -> None:
         if not isinstance(task.success, ObjectInRegion):
@@ -107,8 +108,8 @@ class PickPlace:
                 Do(self._disarm, name="disarm"),
                 retreat(safe_z, tol=tol, name="clear"),
                 Do(self._plan, name="plan_grasp"),
-                approach(grasp_target, hover=hv, tol=tol),
-                descend_until(grasp_target, tol=tol),
+                approach(grasp_target, hover=hv, tol=tol, gripper=self._open_cmd()),
+                descend_until(grasp_target, tol=tol, gripper=self._open_cmd()),
                 grip(settle=st),
                 lift(safe_z, tol=tol),
                 transport(above_place, tol=tol),
@@ -121,6 +122,17 @@ class PickPlace:
         )
         budgets = {"grasp_miss": self.miss_retries, "grasp_slip": self.slip_regrasps, "wrong_placement": self.place_retries}
         return Retry(attempt, budgets, on_retry=self._on_retry)
+
+    def _open_cmd(self) -> float:
+        """Gripper command for the approach: fully open, or (with `preshape_margin`) just wide
+        enough for the widest planned grasp, so the fingers do not land on neighbours."""
+        if self.preshape_margin is None:
+            return 0.0
+        grasps = plan_grasps(self.spec, self.max_width)
+        if not grasps:
+            return 0.0
+        width = max(g.width for g in grasps) + self.preshape_margin
+        return float(np.clip(1.0 - width / self.max_width, 0.0, 0.45))  # > 0.5 reads as "closed"
 
     # -- steps ---------------------------------------------------------------
 
