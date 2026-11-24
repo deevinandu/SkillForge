@@ -1,0 +1,193 @@
+{
+  "id": "franka_tube_into_rack",
+  "instruction": "Pick up the test tube and stand it in the middle slot of the rack.",
+  "scene": {
+    "robot": {
+      "name": "franka_panda",
+      "source": "menagerie:franka_emika_panda",
+      "ee_site": "tcp",
+      "gripper": "parallel",
+      "max_gripper_width": 0.08
+    },
+    "objects": [
+      {
+        "name": "tube",
+        "shape": "cylinder",
+        "size": [
+          0.008,
+          0.05,
+          0.0
+        ],
+        "mass": 0.02,
+        "friction": 1.0,
+        "pose": {
+          "pos": [
+            0.5,
+            -0.15,
+            0.05
+          ]
+        }
+      },
+      {
+        "name": "rack_front",
+        "shape": "box",
+        "size": [
+          0.0025,
+          0.039999999999999994,
+          0.025
+        ],
+        "mass": 1.0,
+        "fixed": true,
+        "pose": {
+          "pos": [
+            0.5375000000000001,
+            0.12,
+            0.025
+          ]
+        }
+      },
+      {
+        "name": "rack_back",
+        "shape": "box",
+        "size": [
+          0.0025,
+          0.039999999999999994,
+          0.025
+        ],
+        "mass": 1.0,
+        "fixed": true,
+        "pose": {
+          "pos": [
+            0.5625,
+            0.12,
+            0.025
+          ]
+        }
+      },
+      {
+        "name": "rack_sep0",
+        "shape": "box",
+        "size": [
+          0.01,
+          0.0025,
+          0.025
+        ],
+        "mass": 1.0,
+        "fixed": true,
+        "pose": {
+          "pos": [
+            0.55,
+            0.0825,
+            0.025
+          ]
+        }
+      },
+      {
+        "name": "rack_sep1",
+        "shape": "box",
+        "size": [
+          0.01,
+          0.0025,
+          0.025
+        ],
+        "mass": 1.0,
+        "fixed": true,
+        "pose": {
+          "pos": [
+            0.55,
+            0.1075,
+            0.025
+          ]
+        }
+      },
+      {
+        "name": "rack_sep2",
+        "shape": "box",
+        "size": [
+          0.01,
+          0.0025,
+          0.025
+        ],
+        "mass": 1.0,
+        "fixed": true,
+        "pose": {
+          "pos": [
+            0.55,
+            0.1325,
+            0.025
+          ]
+        }
+      },
+      {
+        "name": "rack_sep3",
+        "shape": "box",
+        "size": [
+          0.01,
+          0.0025,
+          0.025
+        ],
+        "mass": 1.0,
+        "fixed": true,
+        "pose": {
+          "pos": [
+            0.55,
+            0.1575,
+            0.025
+          ]
+        }
+      }
+    ],
+    "regions": [
+      {
+        "name": "slot_middle",
+        "center": [
+          0.55,
+          0.12,
+          0.05
+        ],
+        "half_extents": [
+          0.004,
+          0.004,
+          0.004
+        ]
+      }
+    ],
+    "randomization": {
+      "object_xy_jitter": {
+        "lo": 0.0,
+        "hi": 0.03
+      },
+      "object_yaw_jitter": {
+        "lo": 0.0,
+        "hi": 3.14
+      },
+      "friction_scale": {
+        "lo": 0.7,
+        "hi": 1.3
+      },
+      "mass_scale": {
+        "lo": 0.8,
+        "hi": 1.5
+      },
+      "actuator_gain_scale": {
+        "lo": 0.9,
+        "hi": 1.1
+      },
+      "obs_noise_std": {
+        "lo": 0.0,
+        "hi": 0.002
+      },
+      "action_latency_steps": {
+        "lo": 0,
+        "hi": 2
+      }
+    }
+  },
+  "success": {
+    "kind": "object_in_region",
+    "object": "tube",
+    "region": "slot_middle"
+  },
+  "max_steps": 500,
+  "control_hz": 20
+}
