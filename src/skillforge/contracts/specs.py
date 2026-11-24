@@ -11,6 +11,8 @@ from typing import Annotated, Literal
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 Vec3 = tuple[float, float, float]
+# Named colours an object can have. The env maps each to an RGBA; perception and success use the name.
+ColorName = Literal["red", "blue", "green", "yellow", "orange", "purple", "white", "grey", "black"]
 Quat = tuple[float, float, float, float]  # w, x, y, z (MuJoCo order)
 
 
@@ -62,6 +64,7 @@ class ObjectSpec(Spec):
     friction: float = Field(1.0, gt=0)
     pose: Pose = Pose()
     fixed: bool = False
+    color: ColorName | None = Field(None, description="None: the env picks one by the object's index")
 
     @model_validator(mode="after")
     def _mesh_needs_path(self) -> ObjectSpec:
@@ -89,6 +92,9 @@ class RandomizationSpec(Spec):
     actuator_gain_scale: Range = Range.fixed(1.0)
     obs_noise_std: Range = Range.fixed(0.0)  # metres, added to object positions
     action_latency_steps: Range = Range.fixed(0.0)  # rounded to int
+    # Permute the colours among the movable objects that have one, per episode (from the env seed):
+    # which object is which colour is then only knowable by looking.
+    shuffle_colors: bool = False
 
 
 class SceneSpec(Spec):
@@ -96,6 +102,8 @@ class SceneSpec(Spec):
     objects: tuple[ObjectSpec, ...] = ()
     regions: tuple[Region, ...] = ()
     randomization: RandomizationSpec = RandomizationSpec()
+    # Cameras the env renders into `Observation.images` every step (e.g. "wrist", "front").
+    obs_cameras: tuple[str, ...] = ()
 
     @model_validator(mode="after")
     def _unique_names(self) -> SceneSpec:
@@ -150,7 +158,20 @@ class ObjectOnObject(Spec):
         return self
 
 
-LeafSuccessSpec = Annotated[ObjectInRegion | ObjectLifted | ObjectOnObject, Field(discriminator="kind")]
+class ColorInRegion(Spec):
+    """Every movable object whose colour this episode is `color` lies inside `region` (on TRUE state).
+
+    The colour is the one the env gave the object this episode, which differs from the spec when
+    `shuffle_colors` is on. A region may span several slots; each object only has to be in one."""
+
+    kind: Literal["color_in_region"] = "color_in_region"
+    color: ColorName
+    region: str
+
+
+LeafSuccessSpec = Annotated[
+    ObjectInRegion | ObjectLifted | ObjectOnObject | ColorInRegion, Field(discriminator="kind")
+]
 
 
 class AllOf(Spec):
@@ -161,19 +182,22 @@ class AllOf(Spec):
     conditions: tuple[LeafSuccessSpec, ...] = Field(min_length=1)
 
 
-SuccessSpec = Annotated[ObjectInRegion | ObjectLifted | ObjectOnObject | AllOf, Field(discriminator="kind")]
+SuccessSpec = Annotated[
+    ObjectInRegion | ObjectLifted | ObjectOnObject | ColorInRegion | AllOf, Field(discriminator="kind")
+]
 
 
-def success_conditions(success: ObjectInRegion | ObjectLifted | ObjectOnObject | AllOf) -> tuple:
+def success_conditions(success: ObjectInRegion | ObjectLifted | ObjectOnObject | ColorInRegion | AllOf) -> tuple:
     """The leaf conditions of a success spec, in order (one for a leaf, all of them for AllOf)."""
     return tuple(success.conditions) if isinstance(success, AllOf) else (success,)
 
 
-def success_objects(success: ObjectInRegion | ObjectLifted | ObjectOnObject | AllOf) -> tuple[str, ...]:
-    """Every object a success spec mentions (supports included), first mention first, no repeats."""
+def success_objects(success: ObjectInRegion | ObjectLifted | ObjectOnObject | ColorInRegion | AllOf) -> tuple[str, ...]:
+    """Every object a success spec mentions BY NAME (supports included), first mention first, no
+    repeats. `color_in_region` names no object: which objects it covers depends on the episode."""
     names: list[str] = []
     for c in success_conditions(success):
-        for n in (c.object, getattr(c, "support", None)):
+        for n in (getattr(c, "object", None), getattr(c, "support", None)):
             if n is not None and n not in names:
                 names.append(n)
     return tuple(names)
@@ -191,6 +215,11 @@ class TaskSpec(Spec):
     def _success_refs_exist(self) -> TaskSpec:
         try:
             for c in success_conditions(self.success):
+                if isinstance(c, ColorInRegion):
+                    self.scene.region(c.region)
+                    if not any(o.color == c.color and not o.fixed for o in self.scene.objects):
+                        raise KeyError(f"no movable object is {c.color}")
+                    continue
                 self.scene.object(c.object)
                 if isinstance(c, ObjectInRegion):
                     self.scene.region(c.region)
