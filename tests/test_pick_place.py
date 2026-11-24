@@ -22,9 +22,9 @@ def rollout(env, skill, task, seed):
 
 def test_v02_implements_skill_and_loads_from_source():
     assert isinstance(PickPlace(), Skill)
-    src = SkillSource(name="pick_place", version="0.2.0", code=inspect.getsource(pick_place_module), entrypoint="PickPlace")
+    src = SkillSource(name="pick_place", version="0.3.0", code=inspect.getsource(pick_place_module), entrypoint="PickPlace")
     sk = load_skill(src)
-    assert sk.version == "0.2.0"
+    assert sk.version == "0.3.0"
 
 
 def test_v02_solves_randomized_stub(stub_task):
@@ -55,7 +55,8 @@ def test_fixture_is_seeded_and_leaves_stub_draws_alone(stub_task):
 
 def test_injected_slip_triggers_regrasp(stub_task):
     """Every episode gets exactly one slip mid-carry; v0.2 re-grasps and succeeds, v0.1 does not."""
-    env = PerturbedStubEnv(stub_task, p_slip=1.0, max_slips=1, slip_after=(8, 12))
+    st = PickPlace.settle_steps  # slip after the grip settles and the lift starts: mid-carry
+    env = PerturbedStubEnv(stub_task, p_slip=1.0, max_slips=1, slip_after=(st + 4, st + 8))
     for seed in range(10):
         ep, log = rollout(env, PickPlace(), stub_task, seed)
         assert env.n_slips == 1
@@ -69,7 +70,8 @@ def test_injected_slip_triggers_regrasp(stub_task):
 @pytest.mark.parametrize("honest", [False, True])
 def test_slip_detection_signal(stub_task, honest):
     """With an honest width the width collapse fires; without it, object tracking does."""
-    env = PerturbedStubEnv(stub_task, p_slip=1.0, max_slips=1, slip_after=(10, 10), honest_width=honest)
+    st = PickPlace.settle_steps
+    env = PerturbedStubEnv(stub_task, p_slip=1.0, max_slips=1, slip_after=(st + 6, st + 6), honest_width=honest)
     ep, log = rollout(env, PickPlace(), stub_task, 0)
     assert ep.success
     slip = next(e for e in log if ":retry:grasp_slip" in e)
