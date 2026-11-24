@@ -2,8 +2,8 @@
   "task_id": "franka_pick_cube_to_bin",
   "task_sha": "1b37a0cda162edc0",
   "skill": "pick_place",
-  "skill_version": "0.2.0",
-  "code_sha": "8679359f9835caca",
+  "skill_version": "0.3.0",
+  "code_sha": "0f57173becc51d96",
   "seeds": [
     0,
     1,
@@ -216,5 +216,5 @@
     99
   ],
   "min_success": null,
-  "created_at": "2026-11-22T00:36:55+00:00"
+  "created_at": "2026-11-24T03:18:38+00:00"
 }

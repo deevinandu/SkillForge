@@ -18,8 +18,8 @@ def test_cli_forge_with_fake_improver(tmp_path, capsys):
     doc = json.loads(hist.read_text())
     assert doc["meta"]["improver"] == "fake" and len(doc["rounds"]) == 2
     assert doc["meta"]["gate"] == "paired" and doc["gate"]["alpha"] == 0.1
-    assert "paired vs 0.2.0 +" in out and " p=" in out  # the round line shows the paired counts
-    assert (tmp_path / "lib" / "stub_pick_cube_to_bin" / "0.2.0" / "skill.py").exists()
+    assert "paired vs 0.3.0 +" in out and " p=" in out  # the round line shows the paired counts
+    assert (tmp_path / "lib" / "stub_pick_cube_to_bin" / "0.3.0" / "skill.py").exists()
 
 
 def test_cli_claude_without_key_exits_cleanly(tmp_path, monkeypatch, capsys):
@@ -31,7 +31,7 @@ def test_cli_claude_without_key_exits_cleanly(tmp_path, monkeypatch, capsys):
 
 def test_seed_skill_resolution(tmp_path):
     s = load_seed_skill("pick_place")
-    assert (s.name, s.version, s.entrypoint) == ("pick_place", "0.2.0", "PickPlace")
+    assert (s.name, s.version, s.entrypoint) == ("pick_place", "0.3.0", "PickPlace")
     s = load_seed_skill("pick_place_v01")
     assert (s.name, s.version, s.entrypoint) == ("pick_place", "0.1.0", "PickPlaceV01")
     f = tmp_path / "my_skill.py"

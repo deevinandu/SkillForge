@@ -114,7 +114,7 @@ def test_dataset_layout_append_and_success_only(stub_task, tmp_path):
     ds, summ = collect_to(root, stub_task, range(3), _cfg())
     assert summ["kept"] == 3 and ds.info["total_episodes"] == 3
     info = json.loads((root / "meta" / "info.json").read_text())
-    assert info["format"] == "skillforge.dataset/1" and info["teacher"]["version"] == "0.2.0"
+    assert info["format"] == "skillforge.dataset/1" and info["teacher"]["version"] == "0.3.0"
     assert info["features"]["observation.state"]["names"] == ds.state_names
     assert (root / "meta" / "stats.json").exists()
     assert (root / ds.episodes[0]["file"]).exists()
@@ -280,7 +280,7 @@ def test_load_object_accepts_a_file_path(tmp_path):
         load_object(str(two))
     with pytest.raises(FileNotFoundError):
         load_object(str(tmp_path / "missing.py"))
-    assert load_object("skillforge.skills.pick_place:PickPlace").version == "0.2.0"
+    assert load_object("skillforge.skills.pick_place:PickPlace").version == "0.3.0"
     assert resolve_spec("skillforge.skills.pick_place:PickPlace") == "skillforge.skills.pick_place:PickPlace"
     assert resolve_spec(f"{f}:FilePickPlace") == f"{f.resolve()}:FilePickPlace"
 
