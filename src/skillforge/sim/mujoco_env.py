@@ -22,6 +22,7 @@ import sys
 import warnings
 from collections import deque
 from dataclasses import dataclass
+from typing import get_args
 
 import numpy as np
 
@@ -31,7 +32,7 @@ default_mujoco_gl()  # must happen before mujoco is first imported; see sim/__in
 
 import mujoco  # noqa: E402
 
-from skillforge.contracts import Action, ObjectState, Observation, StepInfo, TaskSpec  # noqa: E402
+from skillforge.contracts import Action, ColorName, ObjectState, Observation, StepInfo, TaskSpec  # noqa: E402
 
 from .assets import resolve_robot_source  # noqa: E402
 from .success import is_success  # noqa: E402
@@ -62,6 +63,13 @@ MAX_TIMESTEP = 0.0035  # s; physics step is the largest dt / n <= this (20 Hz co
 GRIP_KP = 1000.0
 GRIP_KV = 20.0
 OBJECT_COLORS = [(0.85, 0.15, 0.15, 1), (0.15, 0.35, 0.85, 1), (0.95, 0.75, 0.1, 1), (0.2, 0.7, 0.3, 1)]
+COLOR_NAMES: tuple[str, ...] = get_args(ColorName)
+COLOR_RGBA: dict[str, tuple[float, float, float, float]] = {
+    "red": (0.85, 0.15, 0.15, 1), "blue": (0.15, 0.35, 0.85, 1), "green": (0.2, 0.7, 0.3, 1),
+    "yellow": (0.95, 0.75, 0.1, 1), "orange": (0.95, 0.5, 0.1, 1), "purple": (0.55, 0.25, 0.75, 1),
+    "white": (0.92, 0.92, 0.92, 1), "grey": (0.55, 0.55, 0.55, 1), "black": (0.08, 0.08, 0.08, 1),
+}
+assert set(COLOR_RGBA) == set(COLOR_NAMES)
 
 
 @dataclass(frozen=True)
@@ -99,7 +107,8 @@ class MujocoEnv:
         self.task = task
         self.profile = PandaProfile()
         self.render_size = render_size
-        self.obs_cameras = tuple(obs_cameras)
+        # the ctor's cameras plus the ones the task asks for, in order, no repeats
+        self.obs_cameras = tuple(dict.fromkeys((*obs_cameras, *task.scene.obs_cameras)))
         self.max_ee_speed = max_ee_speed
         self.max_ee_ang_speed = max_ee_ang_speed
         self.ik_tol = ik_tol
@@ -189,7 +198,7 @@ class MujocoEnv:
             g = dict(
                 name=o.name, mass=o.mass, friction=[o.friction, 0.005, 0.0001], condim=4,
                 priority=1,  # the object's friction governs its contacts, so friction_scale is real
-                rgba=list(OBJECT_COLORS[i % len(OBJECT_COLORS)]),
+                rgba=list(COLOR_RGBA[o.color] if o.color else OBJECT_COLORS[i % len(OBJECT_COLORS)]),
             )
             if o.shape == "box":
                 body.add_geom(type=mujoco.mjtGeom.mjGEOM_BOX, size=list(o.size), **g)
@@ -281,12 +290,23 @@ class MujocoEnv:
             dyaw = rng.uniform(-s["object_yaw_jitter"], s["object_yaw_jitter"])
             offsets[o.name] = (float(dx), float(dy), float(dyaw))
             s[f"{o.name}.dx"], s[f"{o.name}.dy"], s[f"{o.name}.dyaw"] = offsets[o.name]
+        # colours: the spec's, or (shuffle_colors) a permutation of them among the movable objects
+        # that have one. Drawn last, so tasks without it keep every earlier draw unchanged.
+        coloured = [o for o in self.task.scene.objects if o.color and not o.fixed]
+        names = [o.color for o in coloured]
+        if rnd.shuffle_colors and len(coloured) > 1:
+            names = [names[j] for j in rng.permutation(len(coloured))]
+        self._colors = {o.name: c for o, c in zip(coloured, names, strict=True)}
+        for o, c in self._colors.items():
+            s[f"{o}.color"] = float(COLOR_NAMES.index(c))
         self._sample = s
 
         # physical parameters, re-applied from nominal every reset
         n = self._nominal
         m.geom_friction[:] = n["geom_friction"]
         m.geom_friction[self._obj_geoms, 0] *= s["friction_scale"]
+        for name, c in self._colors.items():  # this episode's colours (shuffled or as specified)
+            m.geom_rgba[m.geom(name).id] = COLOR_RGBA[c]
         m.body_mass[:] = n["body_mass"]
         m.body_inertia[:] = n["body_inertia"]
         ob = list(self._obj_bodies)
@@ -356,7 +376,7 @@ class MujocoEnv:
             events += self._contact_events()
         pos = self._true_obj_pos()
         info = StepInfo(
-            success=not self._unstable_seen and is_success(self.task, pos, self._start),
+            success=not self._unstable_seen and is_success(self.task, pos, self._start, colors=self._colors),
             terminated=self._unstable_seen or any(p[2] < DROP_Z for p in pos.values()),
             events=events,
         )
