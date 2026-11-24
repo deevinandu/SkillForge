@@ -1,4 +1,5 @@
-"""T2: the tube-into-rack task and TubeIntoRack, a tight insertion (about 2 mm clearance per side)."""
+"""T2: the tube-into-rack and rack-fill tasks, TubeIntoRack (a tight insertion, about 2 mm clearance
+per side) and FillRack (several tubes, one after another)."""
 
 import inspect
 from pathlib import Path
@@ -38,8 +39,8 @@ def test_task_geometry():
 
 def test_skill_protocol_and_source():
     assert isinstance(TubeIntoRack(), Skill)
-    src = SkillSource(name="tube_into_rack", version="0.1.0", code=inspect.getsource(tube_rack_module), entrypoint="TubeIntoRack")
-    assert load_skill(src).version == "0.1.0"
+    src = SkillSource(name="tube_into_rack", version="0.2.0", code=inspect.getsource(tube_rack_module), entrypoint="TubeIntoRack")
+    assert load_skill(src).version == "0.2.0"
 
 
 def test_rack_top_from_fixed_objects():
@@ -95,3 +96,32 @@ def test_lying_tube_is_reported_not_grasped(mj):
     finally:
         env.close()
     assert not ep.success and any("not upright" in line for line in sk.ctx.log), sk.ctx.log
+
+
+def test_fill_task_and_skill_setup():
+    from skillforge.contracts import AllOf, success_conditions
+    from skillforge.skills import FillRack
+
+    t = load("franka_fill_tube_rack")
+    assert isinstance(t.success, AllOf)
+    conds = success_conditions(t.success)
+    assert [c.object for c in conds] == ["tube_a", "tube_b", "tube_c"]
+    sk = FillRack()
+    sk.reset(t)
+    assert isinstance(sk, Skill) and len(sk.skills) == 3
+    # slots run along y, so every tube is gripped with the fingers closing along x, and released narrow
+    assert all(s.closing_axis == (1.0, 0.0, 0.0) and s.release_margin == sk.release_margin for s in sk.skills)
+    assert all(s._release_cmd() > 0.0 for s in sk.skills)
+    with pytest.raises(ValueError):
+        FillRack().reset(load("franka_tube_into_rack"))  # not an all_of task
+
+
+def test_rack_fill_runs_the_tubes_in_order(mj):
+    evaluate, make_env = mj
+    from skillforge.skills import FillRack
+
+    task = load("franka_fill_tube_rack")
+    _, (ep,) = evaluate(make_env, FillRack(), task, [0])
+    assert ep.success, (ep.failure, ep.failure_detail)
+    # the episode ends the moment all three are seated, which can be before the last release
+    assert [e for e in ep.events if e.startswith("grasp:")] == ["grasp:tube_a", "grasp:tube_b", "grasp:tube_c"]

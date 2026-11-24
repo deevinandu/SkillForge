@@ -487,15 +487,15 @@ def place(target: Vec, contact_force: float | None = 5.0, **kw) -> MoveTo:
     return descend_until(target, contact_force=contact_force, gripper=1.0, check=hold_check("grasp_slip"), **kw)
 
 
-def release(settle: int = 4, **kw) -> Hold:
-    """Open the gripper and wait `settle` steps; disarm the hold monitor."""
+def release(settle: int = 4, gripper: float = 0.0, **kw) -> Hold:
+    """Open the gripper (to `gripper`: 0 = fully) and wait `settle` steps; disarm the hold monitor."""
 
     def done(obs, ctx):
         ctx.monitor.disarm()
         return None
 
     kw.setdefault("name", "release")
-    return Hold(0.0, steps=settle, on_done=done, **kw)
+    return Hold(gripper, steps=settle, on_done=done, **kw)
 
 
 def retreat(height: float | Callable[[Observation, Context], float], gripper: float = 0.0, **kw) -> MoveTo:
