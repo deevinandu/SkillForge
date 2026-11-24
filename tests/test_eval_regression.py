@@ -73,3 +73,15 @@ def test_update_skips_skills_that_reject_the_task(tmp_path, stub_task):
     tasks = {lift.id: lift, stub_task.id: stub_task}
     paths = update_baselines(make_env, tasks, one, tmp_path, seeds=range(5), workers=1)
     assert [p.name for p in paths] == [f"{stub_task.id}__pick_place.json"]
+
+
+def test_task_hash_ignores_default_valued_fields(stub_task):
+    """A field added to the contract with a default must not make existing baselines stale."""
+    from skillforge.eval.regression import _content, task_hash
+
+    c = _content(stub_task)
+    assert c["success"]["kind"] == "object_in_region"  # union tags are kept
+    rebuilt = type(stub_task).model_validate(c)
+    assert rebuilt == stub_task and task_hash(rebuilt) == task_hash(stub_task)
+    changed = stub_task.model_copy(update={"max_steps": stub_task.max_steps + 1})
+    assert task_hash(changed) != task_hash(stub_task)

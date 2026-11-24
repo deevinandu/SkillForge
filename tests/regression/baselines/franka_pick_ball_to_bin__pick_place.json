@@ -1,6 +1,6 @@
 {
   "task_id": "franka_pick_ball_to_bin",
-  "task_sha": "4c306d933c90bbf7",
+  "task_sha": "e041a576585722ae",
   "skill": "pick_place",
   "skill_version": "0.3.0",
   "code_sha": "0f57173becc51d96",

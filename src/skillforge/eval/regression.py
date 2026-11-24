@@ -33,8 +33,29 @@ def sha(text: str) -> str:
     return hashlib.sha256(text.encode()).hexdigest()[:16]
 
 
+def _content(v: object) -> object:
+    """JSON-able content of a spec with default-valued fields left out, except the `kind` tags
+    that tell union members apart."""
+    if isinstance(v, BaseModel):
+        out = {}
+        for name, f in type(v).model_fields.items():
+            x = getattr(v, name)
+            if name != "kind" and not f.is_required() and x == f.get_default(call_default_factory=True):
+                continue
+            out[name] = _content(x)
+        return out
+    if isinstance(v, (list, tuple)):
+        return [_content(x) for x in v]
+    if isinstance(v, dict):
+        return {str(k): _content(x) for k, x in v.items()}
+    return v
+
+
 def task_hash(task: TaskSpec) -> str:
-    return sha(task.model_dump_json())
+    """Hash of the task's non-default content, so a field added to the contract with a default
+    leaves existing tasks (and their baselines) unchanged. Changing a field's default does not
+    change the hash."""
+    return sha(json.dumps(_content(task), sort_keys=True, separators=(",", ":")))
 
 
 class Baseline(BaseModel):

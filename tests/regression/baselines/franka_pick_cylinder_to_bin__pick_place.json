@@ -1,6 +1,6 @@
 {
   "task_id": "franka_pick_cylinder_to_bin",
-  "task_sha": "b5027279e03fc0df",
+  "task_sha": "16e2128072eeda4a",
   "skill": "pick_place",
   "skill_version": "0.3.0",
   "code_sha": "0f57173becc51d96",

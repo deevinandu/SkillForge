@@ -1,6 +1,6 @@
 {
   "task_id": "franka_pick_cube_from_clutter",
-  "task_sha": "4b64121356bfcb11",
+  "task_sha": "583bb84d64238506",
   "skill": "pick_place",
   "skill_version": "0.3.0",
   "code_sha": "0f57173becc51d96",

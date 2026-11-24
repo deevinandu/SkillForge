@@ -77,3 +77,10 @@ def test_sweep_parallel_matches_serial(stub_task):
     with EvalPool(2) as pool:
         b = sweep(StubEnv, pick_place_source(), stub_task, pool=pool, **kw)
     assert a.curves == b.curves and b.stress is None
+
+
+def test_axes_are_the_numeric_range_fields():
+    from skillforge.contracts import RandomizationSpec, Range
+    from skillforge.eval.robustness import AXES
+
+    assert AXES and all(RandomizationSpec.model_fields[a].annotation is Range for a in AXES)
