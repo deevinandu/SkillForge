@@ -120,7 +120,10 @@ class TubeIntoRack(PickPlace):
             return np.array([slot[0] - o[0], slot[1] - o[1], bottom_z + self.half_len - o[2]])
 
         def over_slot(obs, c):
-            return ee_for(self.rack_top + self.clear_height, offset(obs, c))
+            # align with the bottom `clear_height` above the rack, or above the seated height when
+            # the spot is higher than the rack (e.g. on top of other objects in a stack)
+            bottom = max(self.rack_top, slot[2] - self.half_len)
+            return ee_for(bottom + self.clear_height, offset(obs, c))
 
         def seated(obs, c):
             return ee_for(slot[2] - self.half_len, offset(obs, c))
