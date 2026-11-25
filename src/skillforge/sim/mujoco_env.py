@@ -541,7 +541,7 @@ class MujocoEnv:
         mujoco.mju_mat2Quat(q, d.site_xmat[self._site])
         return q
 
-    def _knock_over(self, count: int, radius: float) -> list[str]:
+    def _knock_over(self, count: int, radius: float, names: list[str] | None = None) -> list[str]:
         """Lay `count` movable objects (not the held one) on their side, at rest, on a free spot of
         the table within `radius` of where they stood. What rested on them falls by itself."""
         m, d, rng = self.model, self.data, self._knock_rng
@@ -551,10 +551,28 @@ class MujocoEnv:
         cands = [n for n in specs if np.linalg.norm(pos[n] - tcp) > 0.06]  # near the fingertips = held
         if count <= 0 or not cands:
             return []
-        chosen = [cands[i] for i in rng.choice(len(cands), size=min(count, len(cands)), replace=False)]
+        if names is not None:  # explicit choice (tests)
+            chosen = [n for n in names if n in cands]
+        else:
+            chosen = [cands[i] for i in rng.choice(len(cands), size=min(count, len(cands)), replace=False)]
 
         def footprint(o) -> float:  # radius of the object's footprint lying down (generous)
             return float(np.linalg.norm(o.size[:2])) if o.shape == "box" else float(max(o.size[0], o.size[1]))
+
+        def width(o) -> float:  # horizontal half-size standing up
+            return float(np.linalg.norm(o.size[:2])) if o.shape == "box" else float(o.size[0])
+
+        # whatever rests on a knocked object comes down with it (and what rests on that, ...)
+        down = list(chosen)
+        for name in down:
+            for n in cands:
+                if n in down:
+                    continue
+                above = pos[n][2] - pos[name][2] > 0.01
+                touching = float(np.linalg.norm(pos[n][:2] - pos[name][:2])) < width(specs[n]) + width(specs[name])
+                if above and touching:
+                    down.append(n)
+        chosen = down
 
         events, placed = [], {}
         for name in chosen:

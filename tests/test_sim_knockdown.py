@@ -72,3 +72,32 @@ def test_no_knockdown_by_default(MujocoEnv):
         assert "knockdown_step" not in env.randomization_sample()
     finally:
         env.close()
+
+
+def test_knocking_a_support_brings_down_what_stands_on_it(MujocoEnv):
+    import mujoco
+
+    t = _task({"at_step": {"lo": 2, "hi": 2}, "count": {"lo": 1, "hi": 1}})
+    env = MujocoEnv(t)
+    try:
+        obs = env.reset(0)
+        # build a 2-high stack by hand: block_2 on block_1, everything else far away
+        d = env.data
+        for i, name in enumerate(o.name for o in t.scene.objects):
+            a = env.model.joint(f"{name}_free").qposadr[0]
+            d.qpos[a : a + 7] = [0.45, -0.3 + 0.1 * i, 0.02, 1, 0, 0, 0]
+        a1, a2 = (env.model.joint(f"block_{k}_free").qposadr[0] for k in (1, 2))
+        d.qpos[a1 : a1 + 3] = [0.5, 0.15, 0.02]
+        d.qpos[a2 : a2 + 3] = [0.5, 0.15, 0.06]
+        d.qvel[:] = 0
+        mujoco.mj_forward(env.model, d)
+        env._knock_rng = __import__("numpy").random.default_rng(0)
+        knocked = [e.split(":")[1] for e in env._knock_over(1, 0.08, names=["block_1"])]
+        assert knocked == ["block_1", "block_2"]  # the one standing on it came down too
+        hold = Action(ee_pos=obs.ee_pos, ee_quat=obs.ee_quat)
+        for _ in range(20):
+            env.step(hold)
+        for n in knocked:
+            assert env.data.xpos[env.model.body(n).id][2] < 0.03  # on the table
+    finally:
+        env.close()
