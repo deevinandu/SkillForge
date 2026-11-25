@@ -115,6 +115,9 @@ class PickPlace:
     place_retries = 1
     verify_margin = 0.01  # metres: slack on the region check, which uses noisy observations
     preshape_margin: float | None = None  # metres: open only to the widest grasp + this (None = fully open)
+    # World axis the fingers should close along (None = any). Placing next to neighbours: close
+    # across the row so the fingers stay clear of them. Falls back to any grasp if none fits.
+    closing_axis: tuple[float, float, float] | None = None
     offset_window = 40  # most recent carry samples averaged for the object-to-EE offset
     verify_samples = 12 # raw observations averaged before the region check (noise up to 1.5 cm)
 
@@ -218,6 +221,9 @@ class PickPlace:
         c.bb["rest_z"] = float(c.obj_pos[2])
         q_obj = c.obj_quat if c.obj_quat is not None else np.array([1.0, 0, 0, 0])
         grasps = plan_grasps(self.spec, self.max_width, obj_quat=q_obj)
+        if grasps and self.closing_axis is not None:
+            r, ax = quat_to_mat(q_obj), np.asarray(self.closing_axis, dtype=float)
+            grasps = [g for g in grasps if abs(float(np.dot(r @ quat_to_mat(g.quat)[:, 1], ax))) > 0.9] or grasps
         if grasps:
             _, quat, g = select_grasp(grasps, c.obj_pos, q_obj, ee_quat=obs.ee_quat, rank=c.bb["rank"])
             c.bb["grasp"], c.bb["grasp_obj_quat"] = g.pos, q_obj

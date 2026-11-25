@@ -13,9 +13,10 @@ from .loader import load_skill
 from .pick_clutter import PickFromClutter
 from .pick_place import PickPlace
 from .pick_place_v01 import PickPlaceV01
+from .place_in_order import PlaceInOrder
 from .push import PushToRegion
 from .rack_fill import FillRack
 from .sort_tubes import SortTubes
 from .tube_rack import TubeIntoRack
 
-__all__ = ["FillRack", "Grasp", "PickFromClutter", "PickPlace", "PickPlaceV01", "PushToRegion", "SortTubes", "TubeIntoRack", "grasp_to_world", "load_skill", "plan_grasps", "select_grasp"]
+__all__ = ["FillRack", "Grasp", "PickFromClutter", "PickPlace", "PickPlaceV01", "PlaceInOrder", "PushToRegion", "SortTubes", "TubeIntoRack", "grasp_to_world", "load_skill", "plan_grasps", "select_grasp"]
