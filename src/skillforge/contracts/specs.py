@@ -85,9 +85,10 @@ class Knockdown(Spec):
     """Someone knocks objects over mid-episode (a disturbance to recover from).
 
     At the control step drawn from `at_step`, `count` movable objects (drawn from the seed, never
-    the one in the gripper) are laid on their side on the table, at a free spot within `radius`
-    of where they stood, at rest. Anything that was resting on them falls under physics. Both
-    ranges are rounded to integers."""
+    the one in the gripper) are knocked over, and so is everything resting on them (in a stack,
+    knocking a lower object brings down what stands on it). Each knocked object is laid on its
+    side on the table, at rest, at a free spot within `radius` of where it stood. Both ranges are
+    rounded to integers."""
 
     at_step: Range
     count: Range = Range.fixed(1.0)
