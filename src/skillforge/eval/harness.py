@@ -45,7 +45,8 @@ def _classify(events: list[str], terminated: bool, timed_out: bool) -> tuple[Fai
     Event names follow StepInfo's convention: 'ik_failure[:...]', 'collision[:a-b]',
     'grasp_slip[:obj]', 'grasp:<obj>', 'grasp_miss', 'release:<obj>'.
     A sim artifact ('sim_unstable', 'object_ejected[:obj]': the physics, not the skill, is at
-    fault) outranks everything, so an improver is never told its skill caused it.
+    fault) outranks everything, so an improver is never told its skill caused it. A disturbance
+    ('disturbance:<kind>:<obj>') with no physical cause before it is 'unrecovered_disturbance'.
     Returns (tag, the event that decided it or '').
     """
     if e := _first(events, lambda e: e == "sim_unstable" or e == "object_ejected" or e.startswith("object_ejected:")):
@@ -58,6 +59,11 @@ def _classify(events: list[str], terminated: bool, timed_out: bool) -> tuple[Fai
         return "grasp_slip", e
     if terminated:
         return "object_dropped", ""
+    # The env disturbed the scene (SceneSpec.disturbances) and no physical cause above explains the
+    # failure: the skill did not recover. Ranked above the grasp-based guesses below, which would
+    # blame a placement the disturbance undid.
+    if e := _first(events, lambda e: e.startswith("disturbance:")):
+        return "unrecovered_disturbance", e
     grasped = any(e.startswith("grasp:") for e in events)
     if not grasped:
         if "grasp_miss" in events:
