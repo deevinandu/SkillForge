@@ -97,6 +97,54 @@ class RandomizationSpec(Spec):
     shuffle_colors: bool = False
 
 
+class Disturbance(Spec):
+    """A perturbation the env applies to objects DURING an episode (someone bumps the table, a
+    domino gets nudged after it was placed). Everything about it is drawn from the env seed at
+    reset, so the same seed disturbs the same object at the same step by the same amount.
+
+    When it fires: `at_step` steps (drawn, rounded) after reset, or after the first event whose
+    name starts with `after_event` (e.g. "release:" = right after the robot lets go of something).
+    It is cancelled if an event starting with `before_event` has happened by then (e.g.
+    "toppled:" = once the chain is falling, stop disturbing it). It fires at all with `prob`.
+
+    What it does to each of `count` objects, chosen from `objects` (empty = every movable one;
+    `target="event_object"` = the object named in the triggering event, after its first colon):
+    - kind "pose": teleport the object, at rest, by an xy offset of magnitude ~ U(xy) in a uniform
+      direction, and a yaw about world z of magnitude ~ U(yaw) with a random sign;
+    - kind "knock": give it an angular velocity of magnitude ~ U(ang_vel) about a horizontal axis,
+      so its top moves toward `knock_dir` (world xy) or, if None, a uniform random direction.
+    The env never disturbs an object the gripper is touching; it waits for it to be let go."""
+
+    kind: Literal["pose", "knock"] = "pose"
+    objects: tuple[str, ...] = ()
+    count: int = Field(1, ge=1)
+    prob: float = Field(1.0, ge=0.0, le=1.0)
+    after_event: str | None = None
+    at_step: Range = Range.fixed(0.0)  # control steps after reset / after `after_event`, rounded
+    before_event: str | None = None
+    target: Literal["random", "event_object"] = "random"
+    xy: Range = Range.fixed(0.0)  # metres (pose)
+    yaw: Range = Range.fixed(0.0)  # radians (pose)
+    ang_vel: Range = Range.fixed(0.0)  # rad/s (knock)
+    knock_dir: tuple[float, float] | None = None
+
+    @model_validator(mode="after")
+    def _consistent(self) -> Disturbance:
+        if self.at_step.lo < 0:
+            raise ValueError("disturbance at_step must be >= 0")
+        if min(self.xy.lo, self.yaw.lo, self.ang_vel.lo) < 0:
+            raise ValueError("disturbance magnitudes (xy, yaw, ang_vel) must be >= 0")
+        if self.kind == "pose" and self.xy.hi == 0 and self.yaw.hi == 0:
+            raise ValueError("a 'pose' disturbance needs a non-zero xy or yaw range")
+        if self.kind == "knock" and self.ang_vel.hi == 0:
+            raise ValueError("a 'knock' disturbance needs a non-zero ang_vel range")
+        if self.target == "event_object" and not self.after_event:
+            raise ValueError("target 'event_object' needs after_event")
+        if self.knock_dir is not None and self.knock_dir[0] ** 2 + self.knock_dir[1] ** 2 < 1e-12:
+            raise ValueError("knock_dir must be a non-zero xy vector")
+        return self
+
+
 class SceneSpec(Spec):
     robot: RobotSpec
     objects: tuple[ObjectSpec, ...] = ()
@@ -104,6 +152,8 @@ class SceneSpec(Spec):
     randomization: RandomizationSpec = RandomizationSpec()
     # Cameras the env renders into `Observation.images` every step (e.g. "wrist", "front").
     obs_cameras: tuple[str, ...] = ()
+    # Mid-episode perturbations (see Disturbance). Empty = none, and every existing task is unchanged.
+    disturbances: tuple[Disturbance, ...] = ()
 
     @model_validator(mode="after")
     def _unique_names(self) -> SceneSpec:
@@ -111,6 +161,11 @@ class SceneSpec(Spec):
         dupes = {n for n in names if names.count(n) > 1}
         if dupes:
             raise ValueError(f"duplicate object/region names: {sorted(dupes)}")
+        movable = {o.name for o in self.objects if not o.fixed}
+        for i, d in enumerate(self.disturbances):
+            bad = [n for n in d.objects if n not in movable]
+            if bad:
+                raise ValueError(f"disturbance {i} names objects that are missing or fixed: {bad}")
         return self
 
     def object(self, name: str) -> ObjectSpec:
@@ -169,8 +224,30 @@ class ColorInRegion(Spec):
     region: str
 
 
+class ObjectToppled(Spec):
+    """`object` has fallen over, judged on TRUE pose by the env: its own z axis (a box's height
+    axis; spawn it upright) is tilted at least `min_tilt` from world up. Optionally:
+    - `direction`: it fell that way. The horizontal projection of its z axis (where its top went)
+      is within `dir_tol` of this world xy direction;
+    - `region`: its centre lies inside this region (e.g. the lane the chain stands in).
+    A domino leaning on the next one counts: a chain rarely ends up flat."""
+
+    kind: Literal["object_toppled"] = "object_toppled"
+    object: str
+    min_tilt: float = Field(0.6, gt=0, lt=3.1416, description="radians from upright")
+    direction: tuple[float, float] | None = None
+    dir_tol: float = Field(0.8, gt=0, le=3.1416, description="radians")
+    region: str | None = None
+
+    @model_validator(mode="after")
+    def _direction(self) -> ObjectToppled:
+        if self.direction is not None and self.direction[0] ** 2 + self.direction[1] ** 2 < 1e-12:
+            raise ValueError("object_toppled direction must be a non-zero xy vector")
+        return self
+
+
 LeafSuccessSpec = Annotated[
-    ObjectInRegion | ObjectLifted | ObjectOnObject | ColorInRegion, Field(discriminator="kind")
+    ObjectInRegion | ObjectLifted | ObjectOnObject | ColorInRegion | ObjectToppled, Field(discriminator="kind")
 ]
 
 
@@ -183,16 +260,18 @@ class AllOf(Spec):
 
 
 SuccessSpec = Annotated[
-    ObjectInRegion | ObjectLifted | ObjectOnObject | ColorInRegion | AllOf, Field(discriminator="kind")
+    ObjectInRegion | ObjectLifted | ObjectOnObject | ColorInRegion | ObjectToppled | AllOf,
+    Field(discriminator="kind"),
 ]
+_AnySuccess = ObjectInRegion | ObjectLifted | ObjectOnObject | ColorInRegion | ObjectToppled | AllOf
 
 
-def success_conditions(success: ObjectInRegion | ObjectLifted | ObjectOnObject | ColorInRegion | AllOf) -> tuple:
+def success_conditions(success: _AnySuccess) -> tuple:
     """The leaf conditions of a success spec, in order (one for a leaf, all of them for AllOf)."""
     return tuple(success.conditions) if isinstance(success, AllOf) else (success,)
 
 
-def success_objects(success: ObjectInRegion | ObjectLifted | ObjectOnObject | ColorInRegion | AllOf) -> tuple[str, ...]:
+def success_objects(success: _AnySuccess) -> tuple[str, ...]:
     """Every object a success spec mentions BY NAME (supports included), first mention first, no
     repeats. `color_in_region` names no object: which objects it covers depends on the episode."""
     names: list[str] = []
@@ -225,6 +304,8 @@ class TaskSpec(Spec):
                     self.scene.region(c.region)
                 if isinstance(c, ObjectOnObject):
                     self.scene.object(c.support)
+                if isinstance(c, ObjectToppled) and c.region is not None:
+                    self.scene.region(c.region)
         except KeyError as e:
             raise ValueError(f"success refers to a missing name: {e.args[0]}") from None
         return self
