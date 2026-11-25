@@ -151,3 +151,18 @@ def test_bad_color_sorting_rejected(stub_task, change, match):
     change(d)
     with pytest.raises(ValidationError, match=match):
         TaskSpec.model_validate(d)
+
+
+def test_knockdown_roundtrip_and_validation(stub_task):
+    from skillforge.contracts import Knockdown
+
+    d = json.loads(stub_task.model_dump_json())
+    assert stub_task.scene.randomization.knockdown is None
+    d["scene"]["randomization"]["knockdown"] = {"at_step": {"lo": 100, "hi": 200}, "count": {"lo": 1, "hi": 3}}
+    t = TaskSpec.model_validate(d)
+    k = t.scene.randomization.knockdown
+    assert isinstance(k, Knockdown) and k.radius == 0.08 and k.count.hi == 3
+    assert TaskSpec.model_validate_json(t.model_dump_json()) == t
+    d["scene"]["randomization"]["knockdown"] = {"at_step": {"lo": -5, "hi": 10}}
+    with pytest.raises(ValidationError, match=">= 0"):
+        TaskSpec.model_validate(d)
