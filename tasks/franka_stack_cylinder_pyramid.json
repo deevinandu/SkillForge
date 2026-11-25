@@ -1,0 +1,276 @@
+{
+  "id": "franka_stack_cylinder_pyramid",
+  "instruction": "Stand the six cylinders up into a pyramid: three in a row 8 mm apart, two on top straddling the gaps, one on top.",
+  "scene": {
+    "robot": {
+      "name": "franka_panda",
+      "source": "menagerie:franka_emika_panda",
+      "ee_site": "tcp",
+      "gripper": "parallel",
+      "max_gripper_width": 0.08
+    },
+    "objects": [
+      {
+        "name": "cyl_1",
+        "shape": "cylinder",
+        "size": [
+          0.0254,
+          0.0419,
+          0.0
+        ],
+        "mass": 0.1,
+        "friction": 1.0,
+        "color": "blue",
+        "pose": {
+          "pos": [
+            0.4,
+            -0.32,
+            0.0419
+          ]
+        }
+      },
+      {
+        "name": "cyl_2",
+        "shape": "cylinder",
+        "size": [
+          0.0254,
+          0.0419,
+          0.0
+        ],
+        "mass": 0.1,
+        "friction": 1.0,
+        "color": "black",
+        "pose": {
+          "pos": [
+            0.4,
+            -0.21,
+            0.0419
+          ]
+        }
+      },
+      {
+        "name": "cyl_3",
+        "shape": "cylinder",
+        "size": [
+          0.0254,
+          0.0419,
+          0.0
+        ],
+        "mass": 0.1,
+        "friction": 1.0,
+        "color": "orange",
+        "pose": {
+          "pos": [
+            0.4,
+            -0.1,
+            0.0419
+          ]
+        }
+      },
+      {
+        "name": "cyl_4",
+        "shape": "cylinder",
+        "size": [
+          0.0254,
+          0.0419,
+          0.0
+        ],
+        "mass": 0.1,
+        "friction": 1.0,
+        "color": "white",
+        "pose": {
+          "pos": [
+            0.52,
+            -0.32,
+            0.0419
+          ]
+        }
+      },
+      {
+        "name": "cyl_5",
+        "shape": "cylinder",
+        "size": [
+          0.0254,
+          0.0419,
+          0.0
+        ],
+        "mass": 0.1,
+        "friction": 1.0,
+        "color": "yellow",
+        "pose": {
+          "pos": [
+            0.52,
+            -0.21,
+            0.0419
+          ]
+        }
+      },
+      {
+        "name": "cyl_6",
+        "shape": "cylinder",
+        "size": [
+          0.0254,
+          0.0419,
+          0.0
+        ],
+        "mass": 0.1,
+        "friction": 1.0,
+        "color": "red",
+        "pose": {
+          "pos": [
+            0.52,
+            -0.1,
+            0.0419
+          ]
+        }
+      }
+    ],
+    "regions": [
+      {
+        "name": "spot_cyl_1",
+        "center": [
+          0.55,
+          0.0612,
+          0.0419
+        ],
+        "half_extents": [
+          0.008,
+          0.008,
+          0.006
+        ]
+      },
+      {
+        "name": "spot_cyl_2",
+        "center": [
+          0.55,
+          0.12,
+          0.0419
+        ],
+        "half_extents": [
+          0.008,
+          0.008,
+          0.006
+        ]
+      },
+      {
+        "name": "spot_cyl_3",
+        "center": [
+          0.55,
+          0.1788,
+          0.0419
+        ],
+        "half_extents": [
+          0.008,
+          0.008,
+          0.006
+        ]
+      },
+      {
+        "name": "spot_cyl_4",
+        "center": [
+          0.55,
+          0.0906,
+          0.1257
+        ],
+        "half_extents": [
+          0.008,
+          0.008,
+          0.006
+        ]
+      },
+      {
+        "name": "spot_cyl_5",
+        "center": [
+          0.55,
+          0.1494,
+          0.1257
+        ],
+        "half_extents": [
+          0.008,
+          0.008,
+          0.006
+        ]
+      },
+      {
+        "name": "spot_cyl_6",
+        "center": [
+          0.55,
+          0.12,
+          0.2095
+        ],
+        "half_extents": [
+          0.008,
+          0.008,
+          0.006
+        ]
+      }
+    ],
+    "randomization": {
+      "object_xy_jitter": {
+        "lo": 0.0,
+        "hi": 0.015
+      },
+      "object_yaw_jitter": {
+        "lo": 0.0,
+        "hi": 0.3
+      },
+      "friction_scale": {
+        "lo": 0.5,
+        "hi": 1.2
+      },
+      "mass_scale": {
+        "lo": 0.7,
+        "hi": 1.5
+      },
+      "actuator_gain_scale": {
+        "lo": 0.8,
+        "hi": 1.2
+      },
+      "obs_noise_std": {
+        "lo": 0.0,
+        "hi": 0.002
+      },
+      "action_latency_steps": {
+        "lo": 0,
+        "hi": 2
+      }
+    }
+  },
+  "success": {
+    "kind": "all_of",
+    "conditions": [
+      {
+        "kind": "object_in_region",
+        "object": "cyl_1",
+        "region": "spot_cyl_1"
+      },
+      {
+        "kind": "object_in_region",
+        "object": "cyl_2",
+        "region": "spot_cyl_2"
+      },
+      {
+        "kind": "object_in_region",
+        "object": "cyl_3",
+        "region": "spot_cyl_3"
+      },
+      {
+        "kind": "object_in_region",
+        "object": "cyl_4",
+        "region": "spot_cyl_4"
+      },
+      {
+        "kind": "object_in_region",
+        "object": "cyl_5",
+        "region": "spot_cyl_5"
+      },
+      {
+        "kind": "object_in_region",
+        "object": "cyl_6",
+        "region": "spot_cyl_6"
+      }
+    ]
+  },
+  "max_steps": 2400,
+  "control_hz": 20
+}
