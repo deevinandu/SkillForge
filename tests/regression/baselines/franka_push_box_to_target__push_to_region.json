@@ -1,6 +1,6 @@
 {
   "task_id": "franka_push_box_to_target",
-  "task_sha": "afa7822fcb81f68b",
+  "task_sha": "f47fac7f2c0c180e",
   "skill": "push_to_region",
   "skill_version": "0.2.0",
   "code_sha": "39babbde3b523fce",

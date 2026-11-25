@@ -21,7 +21,9 @@ from skillforge.contracts import EvalReport, RandomizationSpec, Range, SkillSour
 
 from .parallel import EvalPool, MakeEnv
 
-AXES: tuple[str, ...] = tuple(RandomizationSpec.model_fields)
+# The numeric randomization axes (Range fields). Other fields (e.g. a flag) are part of the task's
+# definition: sweeps and stress keep them as the task sets them.
+AXES: tuple[str, ...] = tuple(k for k, f in RandomizationSpec.model_fields.items() if f.annotation is Range)
 
 # Value of each axis that means "no perturbation".
 NOMINAL: dict[str, float] = {
@@ -124,7 +126,9 @@ def with_randomization(task: TaskSpec, rnd: RandomizationSpec) -> TaskSpec:
 def pin_axis(task: TaskSpec, axis: str, value: float, others: Others = "task") -> TaskSpec:
     if axis not in AXES:
         raise KeyError(f"unknown randomization axis '{axis}'; have {list(AXES)}")
-    base = task.scene.randomization if others == "task" else RandomizationSpec()
+    base = task.scene.randomization
+    if others == "nominal":  # every numeric axis at its default; non-axis fields stay the task's
+        base = base.model_copy(update={a: RandomizationSpec.model_fields[a].default for a in AXES})
     rnd = base.model_copy(update={axis: Range.fixed(float(value))})
     return with_randomization(task, RandomizationSpec.model_validate(rnd.model_dump()))
 
@@ -148,7 +152,7 @@ def stress_spec(rnd: RandomizationSpec, factor: float = 2.0) -> RandomizationSpe
         hi = nom + factor * (r.hi - nom) if r.hi > nom else r.hi
         lo = max(lo, FLOOR[axis])
         out[axis] = Range(lo=lo, hi=max(hi, lo))
-    return RandomizationSpec(**out)
+    return RandomizationSpec.model_validate(rnd.model_copy(update=out).model_dump())
 
 
 # ------------------------------------------------------------------ sweeps

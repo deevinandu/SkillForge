@@ -1,6 +1,6 @@
 {
   "task_id": "franka_pick_cube_to_far_bin",
-  "task_sha": "2e96977aece0d21a",
+  "task_sha": "ec6a7238faa468bc",
   "skill": "pick_place",
   "skill_version": "0.3.0",
   "code_sha": "0f57173becc51d96",

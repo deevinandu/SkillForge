@@ -1,6 +1,6 @@
 {
   "task_id": "franka_fill_tube_rack",
-  "task_sha": "85ef8825ef452d4c",
+  "task_sha": "99ad831d9def2e8e",
   "skill": "fill_rack",
   "skill_version": "0.1.0",
   "code_sha": "05aa82b2805e1d3e",

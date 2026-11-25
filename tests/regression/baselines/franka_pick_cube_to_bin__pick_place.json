@@ -1,6 +1,6 @@
 {
   "task_id": "franka_pick_cube_to_bin",
-  "task_sha": "1b37a0cda162edc0",
+  "task_sha": "cfb671a391167a5b",
   "skill": "pick_place",
   "skill_version": "0.3.0",
   "code_sha": "0f57173becc51d96",

@@ -1,6 +1,6 @@
 {
   "task_id": "franka_tube_into_rack",
-  "task_sha": "f090cc228c0718a1",
+  "task_sha": "80d13a08052091f8",
   "skill": "tube_into_rack",
   "skill_version": "0.2.0",
   "code_sha": "4188fd2841fcaa5f",
