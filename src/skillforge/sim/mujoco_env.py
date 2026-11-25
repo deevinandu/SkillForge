@@ -547,8 +547,7 @@ class MujocoEnv:
         m, d, rng = self.model, self.data, self._knock_rng
         specs = {o.name: o for o in self.task.scene.objects if not o.fixed}
         pos = self._true_obj_pos()
-        tcp = d.site_xpos[self._site]
-        cands = [n for n in specs if np.linalg.norm(pos[n] - tcp) > 0.06]  # near the fingertips = held
+        cands = [n for n in specs if n != self._held]  # the one gripped by both fingers stays in hand
         if count <= 0 or not cands:
             return []
         if names is not None:  # explicit choice (tests)
