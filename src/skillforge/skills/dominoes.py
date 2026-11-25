@@ -197,8 +197,12 @@ class ReplaceDomino:
             # (live, so a domino moved while the hand comes down is followed).
             p = c.obj_pos.copy()
             p[2] = 2 * hh - self.grasp_depth
-            dom = wrap_half_pi(heading_x(c.obj_quat))
-            c.quat = hand_quat(nearest_turn(dom, _hand_yaw(obs), math.pi))
+            # Wrist yaw: the first choice is the one closest to DOWN (keeps the last joint mid-range,
+            # where the IK is happy); after that follow it, so noise near +-pi/2 does not flip it.
+            dom = heading_x(c.obj_quat)
+            ref = c.bb.setdefault("grasp_yaw", wrap_half_pi(dom))
+            c.bb["grasp_yaw"] = nearest_turn(dom, ref, math.pi)
+            c.quat = hand_quat(c.bb["grasp_yaw"])
             return p
 
         def above_grasp(obs, c):
@@ -227,7 +231,7 @@ class ReplaceDomino:
             # constant during the carry, so take it fresh every step.
             hy = _hand_yaw(obs)
             off = wrap_half_pi(heading_x(obs.objects[c.obj].quat) - hy)
-            c.quat = hand_quat(nearest_turn(self.yaw - off, hy, math.pi))
+            c.quat = hand_quat(wrap_half_pi(self.yaw - off))  # closest to DOWN, as for the grasp
             return None
 
         def over_spot(obs, c):
