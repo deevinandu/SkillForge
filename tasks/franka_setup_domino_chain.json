@@ -1,0 +1,302 @@
+{
+  "id": "franka_setup_domino_chain",
+  "instruction": "Four dominoes stand at the side. Stand them in a row on the marked spots, put back any that get bumped, then knock the first one over so the whole row falls away from you.",
+  "scene": {
+    "robot": {
+      "name": "franka_panda",
+      "source": "menagerie:franka_emika_panda",
+      "ee_site": "tcp",
+      "gripper": "parallel",
+      "max_gripper_width": 0.08
+    },
+    "objects": [
+      {
+        "name": "domino_1",
+        "shape": "box",
+        "size": [
+          0.005,
+          0.02,
+          0.04
+        ],
+        "mass": 0.03,
+        "friction": 0.8,
+        "pose": {
+          "pos": [
+            0.36,
+            -0.18,
+            0.04
+          ],
+          "quat": [
+            0.707105,
+            0.0,
+            0.0,
+            0.707108
+          ]
+        },
+        "color": "red"
+      },
+      {
+        "name": "domino_2",
+        "shape": "box",
+        "size": [
+          0.005,
+          0.02,
+          0.04
+        ],
+        "mass": 0.03,
+        "friction": 0.8,
+        "pose": {
+          "pos": [
+            0.46,
+            -0.18,
+            0.04
+          ],
+          "quat": [
+            0.707105,
+            0.0,
+            0.0,
+            0.707108
+          ]
+        },
+        "color": "blue"
+      },
+      {
+        "name": "domino_3",
+        "shape": "box",
+        "size": [
+          0.005,
+          0.02,
+          0.04
+        ],
+        "mass": 0.03,
+        "friction": 0.8,
+        "pose": {
+          "pos": [
+            0.56,
+            -0.18,
+            0.04
+          ],
+          "quat": [
+            0.707105,
+            0.0,
+            0.0,
+            0.707108
+          ]
+        },
+        "color": "yellow"
+      },
+      {
+        "name": "domino_4",
+        "shape": "box",
+        "size": [
+          0.005,
+          0.02,
+          0.04
+        ],
+        "mass": 0.03,
+        "friction": 0.8,
+        "pose": {
+          "pos": [
+            0.66,
+            -0.18,
+            0.04
+          ],
+          "quat": [
+            0.707105,
+            0.0,
+            0.0,
+            0.707108
+          ]
+        },
+        "color": "orange"
+      }
+    ],
+    "regions": [
+      {
+        "name": "lane",
+        "center": [
+          0.545,
+          0.0,
+          0.03
+        ],
+        "half_extents": [
+          0.155,
+          0.07,
+          0.05
+        ]
+      },
+      {
+        "name": "spot_domino_1",
+        "center": [
+          0.44,
+          0.0,
+          0.04
+        ],
+        "half_extents": [
+          0.004,
+          0.004,
+          0.004
+        ]
+      },
+      {
+        "name": "spot_domino_2",
+        "center": [
+          0.49,
+          0.0,
+          0.04
+        ],
+        "half_extents": [
+          0.004,
+          0.004,
+          0.004
+        ]
+      },
+      {
+        "name": "spot_domino_3",
+        "center": [
+          0.54,
+          0.0,
+          0.04
+        ],
+        "half_extents": [
+          0.004,
+          0.004,
+          0.004
+        ]
+      },
+      {
+        "name": "spot_domino_4",
+        "center": [
+          0.59,
+          0.0,
+          0.04
+        ],
+        "half_extents": [
+          0.004,
+          0.004,
+          0.004
+        ]
+      }
+    ],
+    "randomization": {
+      "object_xy_jitter": {
+        "lo": 0.0,
+        "hi": 0.003
+      },
+      "object_yaw_jitter": {
+        "lo": 0.0,
+        "hi": 0.05
+      },
+      "friction_scale": {
+        "lo": 0.7,
+        "hi": 1.2
+      },
+      "mass_scale": {
+        "lo": 0.8,
+        "hi": 1.25
+      },
+      "actuator_gain_scale": {
+        "lo": 0.8,
+        "hi": 1.2
+      },
+      "obs_noise_std": {
+        "lo": 0.0,
+        "hi": 0.002
+      },
+      "action_latency_steps": {
+        "lo": 0,
+        "hi": 2
+      }
+    },
+    "disturbances": [
+      {
+        "kind": "pose",
+        "after_event": "release:",
+        "target": "event_object",
+        "prob": 0.6,
+        "at_step": {
+          "lo": 3,
+          "hi": 15
+        },
+        "xy": {
+          "lo": 0.01,
+          "hi": 0.025
+        },
+        "yaw": {
+          "lo": 0.1,
+          "hi": 0.4
+        },
+        "before_event": "toppled:"
+      },
+      {
+        "kind": "pose",
+        "objects": [],
+        "count": 1,
+        "at_step": {
+          "lo": 100,
+          "hi": 600
+        },
+        "xy": {
+          "lo": 0.012,
+          "hi": 0.03
+        },
+        "yaw": {
+          "lo": 0.15,
+          "hi": 0.5
+        },
+        "before_event": "toppled:"
+      }
+    ]
+  },
+  "success": {
+    "kind": "all_of",
+    "conditions": [
+      {
+        "kind": "object_toppled",
+        "object": "domino_1",
+        "min_tilt": 0.6,
+        "direction": [
+          1.0,
+          0.0
+        ],
+        "dir_tol": 0.8,
+        "region": "lane"
+      },
+      {
+        "kind": "object_toppled",
+        "object": "domino_2",
+        "min_tilt": 0.6,
+        "direction": [
+          1.0,
+          0.0
+        ],
+        "dir_tol": 0.8,
+        "region": "lane"
+      },
+      {
+        "kind": "object_toppled",
+        "object": "domino_3",
+        "min_tilt": 0.6,
+        "direction": [
+          1.0,
+          0.0
+        ],
+        "dir_tol": 0.8,
+        "region": "lane"
+      },
+      {
+        "kind": "object_toppled",
+        "object": "domino_4",
+        "min_tilt": 0.6,
+        "direction": [
+          1.0,
+          0.0
+        ],
+        "dir_tol": 0.8,
+        "region": "lane"
+      }
+    ]
+  },
+  "max_steps": 3600,
+  "control_hz": 20
+}
