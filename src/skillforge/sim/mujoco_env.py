@@ -10,8 +10,15 @@ with a speed-limited reference, joint-limit clamping and a null-space pull to ho
 result is a joint-position target for the arm's position servos. `mode="joint"` passes
 targets through. Arm bodies are gravity-compensated, as the real Panda's controller is.
 
-Randomness: all of it is drawn from `np.random.default_rng(seed)` at reset (scene draws)
-and `np.random.default_rng([seed, 1])` (observation noise stream), nothing else.
+Randomness: all of it is drawn from `np.random.default_rng(seed)` at reset (scene draws),
+`np.random.default_rng([seed, 1])` (observation noise stream) and `np.random.default_rng([seed, 2])`
+(mid-episode disturbances, `sim/disturbances.py`), nothing else.
+
+Disturbances (`SceneSpec.disturbances`) are applied after the physics step they are due on:
+'pose' teleports the object at rest (shrinking the offset if it would interpenetrate a neighbour,
+skipping it if even a quarter would), 'knock' sets an angular velocity about a horizontal axis.
+An object the fingers touch is not disturbed until it is let go. Objects named in an
+`object_toppled` leaf emit `toppled:<obj>` the first time they tilt past `TOPPLE_EVENT_TILT`.
 """
 
 from __future__ import annotations
@@ -32,10 +39,20 @@ default_mujoco_gl()  # must happen before mujoco is first imported; see sim/__in
 
 import mujoco  # noqa: E402
 
-from skillforge.contracts import Action, ColorName, ObjectState, Observation, StepInfo, TaskSpec  # noqa: E402
+from skillforge.contracts import (  # noqa: E402
+    Action,
+    ColorName,
+    ObjectState,
+    ObjectToppled,
+    Observation,
+    StepInfo,
+    TaskSpec,
+    success_conditions,
+)
 
 from .assets import resolve_robot_source  # noqa: E402
-from .success import is_success  # noqa: E402
+from .disturbances import DisturbanceSchedule, Planned, knock_axis, quat_mul, yaw_quat  # noqa: E402
+from .success import is_success, resting_half_height, tilt_of  # noqa: E402
 
 # Process-wide: once creating a GL context has failed, never try again. MuJoCo can abort the
 # whole process (not raise) on a second attempt without a working context.
@@ -60,6 +77,8 @@ MAX_TIMESTEP = 0.0035  # s; physics step is the largest dt / n <= this (20 Hz co
 # Gripper servo on the finger tendon (menagerie: kp 100, kv 10, i.e. ~1 N per finger on a 4 cm
 # cube, which let a 50-75 g cube slip out under transport accelerations). kp 1000 gives ~10 N
 # per finger on a 4 cm object, still well under the real Franka Hand's 70 N continuous force.
+TOPPLE_EVENT_TILT = 0.5  # radians: an object_toppled object past this tilt emits 'toppled:<obj>' once
+PENETRATION_TOL = 0.002  # metres: a teleported object may overlap a neighbour by at most this
 GRIP_KP = 1000.0
 GRIP_KV = 20.0
 OBJECT_COLORS = [(0.85, 0.15, 0.15, 1), (0.15, 0.35, 0.85, 1), (0.95, 0.75, 0.1, 1), (0.2, 0.7, 0.3, 1)]
@@ -254,6 +273,11 @@ class MujocoEnv:
             o.name: m.joint(f"{o.name}_free").dofadr[0] for o in self.task.scene.objects if not o.fixed
         }
         self._table_geom = m.geom("table").id
+        self._geom_obj = {int(g): o.name for g, o in zip(self._obj_geoms, self.task.scene.objects, strict=True)}
+        self._obj_body = {name: b for b, name in self._obj_bodies.items()}
+        self._topple_watch = sorted(
+            {c.object for c in success_conditions(self.task.success) if isinstance(c, ObjectToppled)}
+        )
         self._jacp = np.zeros((3, m.nv))
         self._jacr = np.zeros((3, m.nv))
 
@@ -299,6 +323,9 @@ class MujocoEnv:
         self._colors = {o.name: c for o, c in zip(coloured, names, strict=True)}
         for o, c in self._colors.items():
             s[f"{o}.color"] = float(COLOR_NAMES.index(c))
+        # mid-episode disturbances: their own stream, so no draw above changes
+        self._disturb = DisturbanceSchedule(self.task, seed)
+        s.update(self._disturb.sample)
         self._sample = s
 
         # physical parameters, re-applied from nominal every reset
@@ -351,6 +378,8 @@ class MujocoEnv:
         self._ik_failing = False
         self._unstable_seen = False
         self._ejected: set[str] = set()
+        self._step_i = 0
+        self._toppled_seen: set[str] = set()
         self._n_warn = self._warnings()
         self._rec = self._robot_env_contacts()
         self._start = self._true_obj_pos()
@@ -374,9 +403,15 @@ class MujocoEnv:
             events.append("sim_unstable")
         else:
             events += self._contact_events()
+        self._step_i += 1
+        if self._disturb and not self._unstable_seen:
+            events += self._apply_disturbances(events)
+        events += self._topple_events()
         pos = self._true_obj_pos()
+        quats = self._true_obj_quat()
         info = StepInfo(
-            success=not self._unstable_seen and is_success(self.task, pos, self._start, colors=self._colors),
+            success=not self._unstable_seen
+            and is_success(self.task, pos, self._start, colors=self._colors, quats=quats),
             terminated=self._unstable_seen or any(p[2] < DROP_Z for p in pos.values()),
             events=events,
         )
@@ -530,6 +565,85 @@ class MujocoEnv:
 
     def _true_obj_pos(self) -> dict[str, np.ndarray]:
         return {name: self.data.xpos[b].copy() for b, name in self._obj_bodies.items()}
+
+    def _true_obj_quat(self) -> dict[str, np.ndarray]:
+        return {name: self.data.xquat[b].copy() for b, name in self._obj_bodies.items()}
+
+    # ------------------------------------------------------------------ disturbances
+
+    def _fingers_touch(self, name: str) -> bool:
+        b = self._obj_body[name]
+        return name == self._held or any(rb in self._finger_bodies and ob == b for _, rb, ob, _, _ in self._rec)
+
+    def _penetration(self, name: str) -> float:
+        """Deepest overlap (metres, >= 0) between `name` and anything but the table."""
+        d = self.data
+        if d.ncon == 0:
+            return 0.0
+        g = d.contact.geom[: d.ncon]
+        dist = d.contact.dist[: d.ncon]
+        mine = self.model.geom(name).id
+        worst = 0.0
+        for (g1, g2), dd in zip(g, dist, strict=True):
+            other = g2 if g1 == mine else g1 if g2 == mine else None
+            if other is None or other == self._table_geom:
+                continue
+            worst = max(worst, -float(dd))
+        return worst
+
+    def _apply_disturbances(self, events: list[str]) -> list[str]:
+        out: list[str] = []
+        for p in self._disturb.update(self._step_i, events):
+            name = p.obj
+            if self._fingers_touch(name):
+                if e := self._disturb.blocked(p):
+                    out.append(e)
+                continue
+            if p.kind == "pose":
+                ok = self._teleport(name, p)
+            else:
+                self._knock(name, p)
+                ok = True
+            out.append(self._disturb.applied(p) if ok else self._disturb.skipped(p))
+        if out:
+            self._rec = self._robot_env_contacts()
+        return out
+
+    def _teleport(self, name: str, p: Planned) -> bool:
+        """Move `name` by (dx, dy, dyaw), at rest; shrink the move if it would overlap a neighbour."""
+        m, d = self.model, self.data
+        a, v = self._obj_free[name], self._obj_dof[name]
+        saved = d.qpos[a : a + 7].copy()
+        for scale in (1.0, 0.5, 0.25):
+            d.qpos[a : a + 2] = saved[:2] + scale * np.array([p.dx, p.dy])
+            q = quat_mul(yaw_quat(scale * p.dyaw), saved[3:7])
+            d.qpos[a + 3 : a + 7] = q / np.linalg.norm(q)
+            d.qvel[v : v + 6] = 0.0
+            mujoco.mj_forward(m, d)
+            if self._penetration(name) <= PENETRATION_TOL:
+                return True
+        d.qpos[a : a + 7] = saved
+        mujoco.mj_forward(m, d)
+        return False
+
+    def _knock(self, name: str, p: Planned) -> None:
+        """Spin `name` about a horizontal axis so its top moves toward `p.heading`."""
+        m, d = self.model, self.data
+        b, v = self._obj_body[name], self._obj_dof[name]
+        w = p.ang_vel * knock_axis(p.heading)  # world frame
+        R = d.xmat[b].reshape(3, 3)
+        hh = resting_half_height(self.task.scene.object(name))
+        d.qvel[v : v + 3] = np.cross(w, R[:, 2] * hh)  # centre turning about its bottom face centre
+        d.qvel[v + 3 : v + 6] = R.T @ w  # free-joint angular velocity is in the body frame
+        mujoco.mj_forward(m, d)
+
+    def _topple_events(self) -> list[str]:
+        out = []
+        for name in self._topple_watch:
+            if name not in self._toppled_seen and tilt_of(self.data.xquat[self._obj_body[name]]) > TOPPLE_EVENT_TILT:
+                self._toppled_seen.add(name)
+                out.append(f"toppled:{name}")
+        return out
 
     def _body_name(self, b: int) -> str:
         if b == 0:
