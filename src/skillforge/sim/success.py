@@ -5,6 +5,7 @@ from __future__ import annotations
 import numpy as np
 
 from skillforge.contracts import (
+    ColorInRegion,
     ObjectInRegion,
     ObjectLifted,
     ObjectOnObject,
@@ -35,7 +36,14 @@ def footprint_radius(o: ObjectSpec) -> float:
     return 0.0  # a sphere or mesh is not a support
 
 
-def _leaf(task: TaskSpec, s, pos: dict[str, np.ndarray], start: dict[str, np.ndarray]) -> bool:
+def _in_region(task: TaskSpec, region: str, p: np.ndarray) -> bool:
+    r = task.scene.region(region)
+    return bool(np.all(np.abs(p - np.asarray(r.center)) <= np.asarray(r.half_extents)))
+
+
+def _leaf(task: TaskSpec, s, pos: dict[str, np.ndarray], start: dict[str, np.ndarray], colors: dict[str, str]) -> bool:
+    if isinstance(s, ColorInRegion):
+        return all(_in_region(task, s.region, pos[n]) for n, c in colors.items() if c == s.color)
     p = pos[s.object]
     if isinstance(s, ObjectInRegion):
         r = task.scene.region(s.region)
@@ -52,6 +60,16 @@ def _leaf(task: TaskSpec, s, pos: dict[str, np.ndarray], start: dict[str, np.nda
     raise TypeError(f"unknown success spec {type(s).__name__}")
 
 
-def is_success(task: TaskSpec, true_obj_pos: dict[str, np.ndarray], start_obj_pos: dict[str, np.ndarray]) -> bool:
-    """Evaluate on TRUE object positions (not noisy observations). AllOf: every leaf at once."""
-    return all(_leaf(task, s, true_obj_pos, start_obj_pos) for s in success_conditions(task.success))
+def is_success(
+    task: TaskSpec,
+    true_obj_pos: dict[str, np.ndarray],
+    start_obj_pos: dict[str, np.ndarray],
+    colors: dict[str, str] | None = None,
+) -> bool:
+    """Evaluate on TRUE object positions (not noisy observations). AllOf: every leaf at once.
+
+    `colors`: each movable object's colour this episode (the env's draw when `shuffle_colors` is
+    on). None means the spec's colours."""
+    if colors is None:
+        colors = {o.name: o.color for o in task.scene.objects if o.color and not o.fixed}
+    return all(_leaf(task, s, true_obj_pos, start_obj_pos, colors) for s in success_conditions(task.success))
