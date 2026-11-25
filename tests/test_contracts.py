@@ -108,3 +108,46 @@ def test_bad_compound_success_rejected(stub_task, success):
     d["success"] = success
     with pytest.raises(ValidationError):
         TaskSpec.model_validate(d)
+
+
+def _coloured(stub_task, colors=("red", "blue")) -> dict:
+    d = json.loads(stub_task.model_dump_json())
+    cube = d["scene"]["objects"][0]
+    d["scene"]["objects"] = [{**cube, "name": f"cube{i}", "color": c} for i, c in enumerate(colors)]
+    d["success"] = {"kind": "color_in_region", "color": colors[0], "region": "bin"}
+    return d
+
+
+def test_color_sorting_fields_roundtrip(stub_task):
+    from skillforge.contracts import ColorInRegion, success_conditions, success_objects
+
+    d = _coloured(stub_task)
+    d["scene"]["randomization"]["shuffle_colors"] = True
+    d["scene"]["obs_cameras"] = ["wrist"]
+    t = TaskSpec.model_validate(d)
+    assert TaskSpec.model_validate_json(t.model_dump_json()) == t
+    assert [o.color for o in t.scene.objects] == ["red", "blue"]
+    assert t.scene.randomization.shuffle_colors and t.scene.obs_cameras == ("wrist",)
+    assert isinstance(t.success, ColorInRegion) and success_conditions(t.success) == (t.success,)
+    assert success_objects(t.success) == ()  # names no object: which ones depends on the episode
+
+
+def test_color_fields_default_off(stub_task):
+    assert stub_task.scene.objects[0].color is None
+    assert not stub_task.scene.randomization.shuffle_colors and stub_task.scene.obs_cameras == ()
+
+
+@pytest.mark.parametrize(
+    "change, match",
+    [
+        (lambda d: d["success"].update(region="nowhere"), "nowhere"),
+        (lambda d: d["success"].update(color="green"), "green"),  # no object is green
+        (lambda d: d["success"].update(color="mauve"), "color"),  # not a colour name
+        (lambda d: d["scene"]["objects"][0].update(color="teal"), "color"),
+    ],
+)
+def test_bad_color_sorting_rejected(stub_task, change, match):
+    d = _coloured(stub_task)
+    change(d)
+    with pytest.raises(ValidationError, match=match):
+        TaskSpec.model_validate(d)

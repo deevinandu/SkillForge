@@ -15,6 +15,8 @@ from .runtime import (
 )
 from .specs import (
     AllOf,
+    ColorInRegion,
+    ColorName,
     LeafSuccessSpec,
     ObjectInRegion,
     ObjectLifted,
@@ -35,6 +37,8 @@ from .specs import (
 __all__ = [
     "Action",
     "AllOf",
+    "ColorInRegion",
+    "ColorName",
     "Episode",
     "EvalReport",
     "FailureCase",
