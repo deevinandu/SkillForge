@@ -72,13 +72,13 @@ TABLE_TOP_Z = 0.0
 TABLE_THICKNESS = 0.04
 DROP_Z = TABLE_TOP_Z - 0.05  # an object below this has fallen off the table: episode terminated
 EJECT_SPEED = 3.0  # m/s; a tabletop object moving faster than this was flung by the solver
+TOPPLE_EVENT_TILT = 0.5  # radians: an object_toppled object past this tilt emits 'toppled:<obj>' once
+PENETRATION_TOL = 0.002  # metres: a teleported object may overlap a neighbour by at most this
 TCP_OFFSET = 0.1034  # metres from the hand frame to the fingertip pad centre, along hand z
 MAX_TIMESTEP = 0.0035  # s; physics step is the largest dt / n <= this (20 Hz control: 15 x 3.33 ms)
 # Gripper servo on the finger tendon (menagerie: kp 100, kv 10, i.e. ~1 N per finger on a 4 cm
 # cube, which let a 50-75 g cube slip out under transport accelerations). kp 1000 gives ~10 N
 # per finger on a 4 cm object, still well under the real Franka Hand's 70 N continuous force.
-TOPPLE_EVENT_TILT = 0.5  # radians: an object_toppled object past this tilt emits 'toppled:<obj>' once
-PENETRATION_TOL = 0.002  # metres: a teleported object may overlap a neighbour by at most this
 GRIP_KP = 1000.0
 GRIP_KV = 20.0
 OBJECT_COLORS = [(0.85, 0.15, 0.15, 1), (0.15, 0.35, 0.85, 1), (0.95, 0.75, 0.1, 1), (0.2, 0.7, 0.3, 1)]
@@ -273,7 +273,6 @@ class MujocoEnv:
             o.name: m.joint(f"{o.name}_free").dofadr[0] for o in self.task.scene.objects if not o.fixed
         }
         self._table_geom = m.geom("table").id
-        self._geom_obj = {int(g): o.name for g, o in zip(self._obj_geoms, self.task.scene.objects, strict=True)}
         self._obj_body = {name: b for b, name in self._obj_bodies.items()}
         self._topple_watch = sorted(
             {c.object for c in success_conditions(self.task.success) if isinstance(c, ObjectToppled)}
