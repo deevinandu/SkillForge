@@ -299,6 +299,15 @@ class MujocoEnv:
         self._colors = {o.name: c for o, c in zip(coloured, names, strict=True)}
         for o, c in self._colors.items():
             s[f"{o}.color"] = float(COLOR_NAMES.index(c))
+        # knockdown: when and how many, drawn after everything else (tasks without one are
+        # unchanged); which objects and where they land come from their own stream at knock time
+        self._knock = None
+        if rnd.knockdown is not None:
+            k = rnd.knockdown
+            s["knockdown_step"] = float(round(u(k.at_step)))
+            s["knockdown_count"] = float(round(u(k.count)))
+            self._knock = (int(s["knockdown_step"]), int(s["knockdown_count"]), float(k.radius))
+            self._knock_rng = np.random.default_rng([seed, 2])
         self._sample = s
 
         # physical parameters, re-applied from nominal every reset
@@ -344,6 +353,7 @@ class MujocoEnv:
         self._ref_pos = d.site_xpos[self._site].copy()
         self._ref_quat = self._site_quat(d)
         self._t = 0.0
+        self._step_i = 0
         self._queue: deque[Action] = deque()
         self._contacts: set[tuple[str, str]] = set()
         self._held: str | None = None
@@ -366,6 +376,9 @@ class MujocoEnv:
         self._apply_ctrl()
         mujoco.mj_step(self.model, self.data, nstep=self.n_substeps)
         self._t += self.dt
+        self._step_i += 1
+        if self._knock is not None and self._step_i == self._knock[0]:
+            events += self._knock_over(self._knock[1], self._knock[2])
         unstable = self._unstable()
         if unstable:
             # MuJoCo has reset the state behind our back: nothing after this is meaningful
@@ -527,6 +540,56 @@ class MujocoEnv:
         q = np.zeros(4)
         mujoco.mju_mat2Quat(q, d.site_xmat[self._site])
         return q
+
+    def _knock_over(self, count: int, radius: float) -> list[str]:
+        """Lay `count` movable objects (not the held one) on their side, at rest, on a free spot of
+        the table within `radius` of where they stood. What rested on them falls by itself."""
+        m, d, rng = self.model, self.data, self._knock_rng
+        specs = {o.name: o for o in self.task.scene.objects if not o.fixed}
+        pos = self._true_obj_pos()
+        tcp = d.site_xpos[self._site]
+        cands = [n for n in specs if np.linalg.norm(pos[n] - tcp) > 0.06]  # near the fingertips = held
+        if count <= 0 or not cands:
+            return []
+        chosen = [cands[i] for i in rng.choice(len(cands), size=min(count, len(cands)), replace=False)]
+
+        def footprint(o) -> float:  # radius of the object's footprint lying down (generous)
+            return float(np.linalg.norm(o.size[:2])) if o.shape == "box" else float(max(o.size[0], o.size[1]))
+
+        events, placed = [], {}
+        for name in chosen:
+            o = specs[name]
+            others = {n: p for n, p in pos.items() if n != name} | placed
+            best, best_gap = None, -np.inf
+            for _ in range(40):
+                ang, dist = rng.uniform(0, 2 * np.pi), rng.uniform(0.3 * radius, radius)
+                xy = pos[name][:2] + dist * np.array([np.cos(ang), np.sin(ang)])
+                r_base = float(np.linalg.norm(xy))
+                if not (0.32 <= r_base <= 0.68 and abs(xy[1]) <= 0.36 and xy[0] > 0.25):
+                    continue  # on the table and inside the arm's comfortable reach
+                gap = min((float(np.linalg.norm(xy - p[:2])) - footprint(o) - footprint(specs[n])
+                           for n, p in others.items()), default=np.inf)
+                if gap > best_gap:
+                    best, best_gap = xy, gap
+                if gap > 0.01:
+                    break
+            if best is None:
+                continue
+            yaw = rng.uniform(-np.pi, np.pi)
+            qz = np.array([np.cos(yaw / 2), 0.0, 0.0, np.sin(yaw / 2)])
+            qx = np.array([np.cos(np.pi / 4), np.sin(np.pi / 4), 0.0, 0.0])  # object z -> horizontal
+            q = np.zeros(4)
+            mujoco.mju_mulQuat(q, qz, qx)
+            half = float(o.size[1] if o.shape == "box" else o.size[0])  # resting half-height lying down
+            a, v = self._obj_free[name], self._obj_dof[name]
+            d.qpos[a : a + 3] = [best[0], best[1], TABLE_TOP_Z + half + 0.001]
+            d.qpos[a + 3 : a + 7] = q
+            d.qvel[v : v + 6] = 0.0
+            placed[name] = np.array([best[0], best[1], half])
+            self._sample[f"{name}.knocked"] = 1.0
+            events.append(f"knockdown:{name}")
+        mujoco.mj_forward(m, d)
+        return events
 
     def _true_obj_pos(self) -> dict[str, np.ndarray]:
         return {name: self.data.xpos[b].copy() for b, name in self._obj_bodies.items()}
