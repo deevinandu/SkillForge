@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 import numpy as np
 
 from skillforge.contracts import (
     ColorInRegion,
+    ObjectHung,
     ObjectInRegion,
     ObjectLifted,
     ObjectOnObject,
@@ -14,6 +17,8 @@ from skillforge.contracts import (
     TaskSpec,
     success_conditions,
 )
+
+from .mug import handle_threaded
 
 
 def resting_half_height(o: ObjectSpec) -> float:
@@ -24,6 +29,8 @@ def resting_half_height(o: ObjectSpec) -> float:
         return float(o.size[1])
     if o.shape == "sphere":
         return float(o.size[0])
+    if o.shape == "mug":
+        return float(o.size[1])
     return 0.0
 
 
@@ -69,6 +76,37 @@ def _in_region(task: TaskSpec, region: str, p: np.ndarray) -> bool:
     return bool(np.all(np.abs(p - np.asarray(r.center)) <= np.asarray(r.half_extents)))
 
 
+@dataclass
+class ContactState:
+    """What only a physics env knows, for success kinds that need more than positions.
+
+    quats: object name -> (w, x, y, z); touching: object name -> names of what it touches (other
+    object names, "robot", "table"); speeds: object name -> linear speed of its centre, m/s."""
+
+    quats: dict[str, np.ndarray]
+    touching: dict[str, set[str]]
+    speeds: dict[str, float]
+
+
+def _hung(task: TaskSpec, s: ObjectHung, pos: dict[str, np.ndarray], cs: ContactState | None) -> bool:
+    if cs is None:
+        raise ValueError("object_hung needs contact state (quats, contacts, speeds): only a physics env can judge it")
+    fixed = {o.name for o in task.scene.objects if o.fixed}
+    if not cs.touching.get(s.object) or not cs.touching[s.object] <= fixed:
+        return False  # resting on nothing (falling), or touching the robot, the table or a loose object
+    if cs.speeds[s.object] > s.max_speed:
+        return False
+    mug, peg = task.scene.object(s.object), task.scene.object(s.support)
+    return handle_threaded(mug, pos[s.object], cs.quats[s.object], peg, pos[s.support], cs.quats[s.support])
+
+
+def hold_steps(task: TaskSpec) -> int:
+    """Consecutive control steps the instantaneous condition must hold before it counts as success:
+    1 for most kinds, `hold_s` worth of steps for object_hung."""
+    n = [round(c.hold_s * task.control_hz) for c in success_conditions(task.success) if isinstance(c, ObjectHung)]
+    return max([1, *n])
+
+
 def _leaf(
     task: TaskSpec,
     s,
@@ -76,7 +114,10 @@ def _leaf(
     start: dict[str, np.ndarray],
     colors: dict[str, str],
     quats: dict[str, np.ndarray] | None,
+    cs: ContactState | None = None,
 ) -> bool:
+    if isinstance(s, ObjectHung):
+        return _hung(task, s, pos, cs)
     if isinstance(s, ColorInRegion):
         return all(_in_region(task, s.region, pos[n]) for n, c in colors.items() if c == s.color)
     p = pos[s.object]
@@ -105,14 +146,21 @@ def is_success(
     start_obj_pos: dict[str, np.ndarray],
     colors: dict[str, str] | None = None,
     quats: dict[str, np.ndarray] | None = None,
+    contacts: ContactState | None = None,
 ) -> bool:
     """Evaluate on TRUE object positions (not noisy observations). AllOf: every leaf at once.
 
     `colors`: each movable object's colour this episode (the env's draw when `shuffle_colors` is
     on). None means the spec's colours. `quats`: TRUE (w, x, y, z) per object; only
-    `object_toppled` reads them, and raises without them."""
+    `object_toppled` reads them, and raises without them (taken from `contacts` if not given).
+    `contacts`: orientations, contacts and speeds, needed by object_hung only. This is the
+    condition at one instant; for object_hung the env also requires it to hold for
+    `hold_steps(task)` steps in a row."""
     if colors is None:
         colors = {o.name: o.color for o in task.scene.objects if o.color and not o.fixed}
+    if quats is None and contacts is not None:
+        quats = contacts.quats
     return all(
-        _leaf(task, s, true_obj_pos, start_obj_pos, colors, quats) for s in success_conditions(task.success)
+        _leaf(task, s, true_obj_pos, start_obj_pos, colors, quats, contacts)
+        for s in success_conditions(task.success)
     )
