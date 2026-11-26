@@ -1,7 +1,7 @@
 """Where does picking a domino from the staging row fail? One domino, no disturbances.
 
-    python diag_pick.py                 # grid of staging positions x wrist yaw, 10 seeds each
-    python diag_pick.py --seeds 20
+    python scripts/diag_pick.py                 # grid of staging positions x wrist yaw, 10 seeds each
+    python scripts/diag_pick.py --seeds 20
 
 For each (x, y, yaw) it stages a single domino there, lets ToppleChain carry it to the lane spot
 and push it, and counts how often the carry fails ("repair failed: ...") and how often the
@@ -20,7 +20,7 @@ from skillforge.eval import run_episode
 from skillforge.sim import make_env
 from skillforge.skills import ToppleChain
 
-TASK = Path(__file__).resolve().parent / "tasks" / "franka_setup_domino_chain.json"
+TASK = Path(__file__).resolve().parents[1] / "tasks" / "franka_setup_domino_chain.json"
 
 
 def one_domino(x: float, y: float, yaw: float) -> TaskSpec:
@@ -42,7 +42,7 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--seeds", type=int, default=10)
     ap.add_argument("--xs", type=float, nargs="*", default=[0.36, 0.46, 0.56, 0.66])
-    ap.add_argument("--ys", type=float, nargs="*", default=[-0.18])
+    ap.add_argument("--ys", type=float, nargs="*", default=[-0.18, 0.18])
     ap.add_argument("--yaws", type=float, nargs="*", default=[0.0, math.pi / 2])
     a = ap.parse_args()
     print(f"{'x':>5} {'y':>6} {'yaw':>5} | carry_ok  success | first failure")

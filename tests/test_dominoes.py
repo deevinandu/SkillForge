@@ -49,9 +49,10 @@ def test_domino_task_geometry(name):
     assert all(c.direction == (1.0, 0.0) and c.region == "lane" for c in conds)
     assert t.scene.disturbances  # these tasks are about recovering from them
     if name == "franka_setup_domino_chain":
-        start = sorted(o.pose.pos for o in t.scene.objects)
-        assert all(abs(p[1] - lane.center[1]) > lane.half_extents[1] for p in start)  # staged outside the lane
-        assert np.all(np.diff([p[0] for p in start]) > h)  # too far apart to fall into each other
+        start = [np.asarray(o.pose.pos) for o in t.scene.objects]
+        assert all(abs(p[1] - lane.center[1]) > lane.half_extents[1] + h / 2 for p in start)  # a fall stays out of the lane
+        gaps = [np.linalg.norm(a[:2] - b[:2]) for i, a in enumerate(start) for b in start[i + 1 :]]
+        assert min(gaps) > h  # too far apart to fall into each other
 
 
 def test_library_skills_reject_domino_tasks():

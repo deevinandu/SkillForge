@@ -10,8 +10,7 @@ domino's resting centre), ToppleChain loops:
   ok (standing on its spot, yawed along the lane), misplaced (standing, off its spot or yaw),
   leaning (in between: wait and look again), down (fallen the right way, inside its region) or
   down_bad (fallen any other way or anywhere else: this version cannot stand one back up).
-- repair (`ReplaceDomino`): top-down grasp across the domino's width, closed only once the hand
-  has settled over the domino's centre (a 1 cm domino gripped a few mm off-centre pops out), rate-limited lift, carry
+- repair (`ReplaceDomino`): top-down grasp across the domino's width, rate-limited lift, carry
   over everything standing, turn the wrist so the domino arrives at the lane's yaw, lower to
   `drop` above the table, open, retreat. Misplaced dominoes are repaired farthest-first; each at
   most `max_repairs` times. Dominoes still in a staging area are "misplaced" too, so the same
@@ -157,33 +156,6 @@ class Turn(Node):
         return Action(ee_pos=self.at, ee_quat=ctx.quat, gripper=self.gripper), RUNNING
 
 
-class Settle(Node):
-    """Hold the EE at `target` (gripper open) until it is there: within `tol_xy` across the
-    domino's thin side and `tol` overall for `n` steps in a row. Closing on a 1 cm domino while
-    the hand still lags a few mm squeezes it out of the pads. Gives up waiting after `timeout`
-    steps and lets the grasp try anyway."""
-
-    def __init__(self, target, tol_xy: float = 0.0015, tol: float = 0.003, n: int = 3, timeout: int = 40):
-        self.target, self.tol_xy, self.tol, self.n, self.timeout = target, tol_xy, tol, n, timeout
-        self.name, self.k, self.ok = "settle", 0, 0
-
-    def reset(self) -> None:
-        self.k, self.ok = 0, 0
-
-    def tick(self, obs, ctx):
-        tgt = self.target(obs, ctx)
-        d = obs.ee_pos - tgt
-        thin = quat_to_mat(ctx.obj_quat)[:, 0] if ctx.obj_quat is not None else np.array([1.0, 0.0, 0.0])
-        thin_err = abs(float(d[:2] @ thin[:2]))
-        self.ok = self.ok + 1 if thin_err < self.tol_xy and float(np.linalg.norm(d)) < self.tol else 0
-        self.k += 1
-        if self.ok >= self.n or self.k > self.timeout:
-            if self.k > self.timeout:
-                ctx.bb["settle_timeout"] = True
-            return None, DONE
-        return Action(ee_pos=tgt, ee_quat=ctx.quat, gripper=0.0), RUNNING
-
-
 # ---------------------------------------------------------------- one repair
 
 
@@ -276,7 +248,6 @@ class ReplaceDomino:
                 Ramp(clear_z, self.carry_step, gripper=0.0, timeout=200, name="clear"),
                 MoveTo(above_grasp, gripper=0.0, tol=0.006, timeout=250, name="approach"),
                 Ramp(grasp_target, self.lower_step, eps=0.004, gripper=0.0, timeout=150, name="descend"),
-                Settle(grasp_target),
                 grip(settle=st),
                 Do(note, name="note"),
                 Ramp(risen, self.lift_step, gripper=1.0, check=held, timeout=200, name="lift"),

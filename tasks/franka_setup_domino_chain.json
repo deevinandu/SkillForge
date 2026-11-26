@@ -1,6 +1,6 @@
 {
   "id": "franka_setup_domino_chain",
-  "instruction": "Four dominoes stand in a row at the side, too far apart to knock each other over. Stand them on the marked spots, put back any that get bumped, then knock the first one over so the whole row falls away from you.",
+  "instruction": "Four dominoes stand at the sides, two on each side of the lane, too far apart to knock each other over. Stand them on the marked spots, put back any that get bumped, then knock the first one over so the whole row falls away from you.",
   "scene": {
     "robot": {
       "name": "franka_panda",
@@ -72,8 +72,8 @@
         "friction": 0.8,
         "pose": {
           "pos": [
-            0.56,
-            -0.18,
+            0.36,
+            0.18,
             0.04
           ],
           "quat": [
@@ -97,8 +97,8 @@
         "friction": 0.8,
         "pose": {
           "pos": [
-            0.66,
-            -0.18,
+            0.46,
+            0.18,
             0.04
           ],
           "quat": [

@@ -1,13 +1,13 @@
 """Run ToppleChain on a domino task in MuJoCo and show what happened.
 
-    python try_dominoes.py                                   # one episode, seed 0, printed log
-    python try_dominoes.py --view                            # watch it in the MuJoCo viewer
-    python try_dominoes.py --gif runs/dominoes.gif           # save a GIF
-    python try_dominoes.py --task franka_topple_domino_chain_knock --seed 3
-    python try_dominoes.py --no-disturb                      # same task, disturbances off
-    python try_dominoes.py --seeds 20                        # success rate over seeds 0..19
+    python scripts/try_dominoes.py                                   # one episode, seed 0, printed log
+    python scripts/try_dominoes.py --view                            # watch it in the MuJoCo viewer
+    python scripts/try_dominoes.py --gif runs/dominoes.gif           # save a GIF
+    python scripts/try_dominoes.py --task franka_topple_domino_chain_knock --seed 3
+    python scripts/try_dominoes.py --no-disturb                      # same task, disturbances off
+    python scripts/try_dominoes.py --seeds 20                        # success rate over seeds 0..19
 
-On macOS the viewer needs `mjpython try_dominoes.py --view` (comes with the mujoco package).
+On macOS the viewer needs `mjpython scripts/try_dominoes.py --view` (comes with the mujoco package).
 """
 
 from __future__ import annotations
@@ -21,7 +21,7 @@ from skillforge.eval import evaluate, run_episode
 from skillforge.sim import make_env
 from skillforge.skills import ToppleChain
 
-TASKS = Path(__file__).resolve().parent / "tasks"
+TASKS = Path(__file__).resolve().parents[1] / "tasks"
 SHOW = ("disturbance", "toppled:", "grasp:", "release:", "grasp_slip", "collision", "ik_failure", "sim_")
 
 
