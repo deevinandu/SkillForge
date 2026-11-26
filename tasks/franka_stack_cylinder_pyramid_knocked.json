@@ -1,0 +1,563 @@
+{
+  "id": "franka_stack_cylinder_pyramid_knocked",
+  "instruction": "Stand the six cylinders up into a pyramid. Someone knocks one or two over partway through: stand them back up and finish the pyramid.",
+  "scene": {
+    "robot": {
+      "name": "franka_panda",
+      "source": "menagerie:franka_emika_panda",
+      "ee_site": "tcp",
+      "gripper": "parallel",
+      "max_gripper_width": 0.08
+    },
+    "objects": [
+      {
+        "name": "cyl_1",
+        "shape": "cylinder",
+        "size": [
+          0.0254,
+          0.0419,
+          0.0
+        ],
+        "mass": 0.1,
+        "friction": 1.0,
+        "color": "blue",
+        "pose": {
+          "pos": [
+            0.4,
+            -0.32,
+            0.0419
+          ]
+        }
+      },
+      {
+        "name": "cyl_2",
+        "shape": "cylinder",
+        "size": [
+          0.0254,
+          0.0419,
+          0.0
+        ],
+        "mass": 0.1,
+        "friction": 1.0,
+        "color": "black",
+        "pose": {
+          "pos": [
+            0.4,
+            -0.21,
+            0.0419
+          ]
+        }
+      },
+      {
+        "name": "cyl_3",
+        "shape": "cylinder",
+        "size": [
+          0.0254,
+          0.0419,
+          0.0
+        ],
+        "mass": 0.1,
+        "friction": 1.0,
+        "color": "orange",
+        "pose": {
+          "pos": [
+            0.4,
+            -0.1,
+            0.0419
+          ]
+        }
+      },
+      {
+        "name": "cyl_4",
+        "shape": "cylinder",
+        "size": [
+          0.0254,
+          0.0419,
+          0.0
+        ],
+        "mass": 0.1,
+        "friction": 1.0,
+        "color": "white",
+        "pose": {
+          "pos": [
+            0.52,
+            -0.32,
+            0.0419
+          ]
+        }
+      },
+      {
+        "name": "cyl_5",
+        "shape": "cylinder",
+        "size": [
+          0.0254,
+          0.0419,
+          0.0
+        ],
+        "mass": 0.1,
+        "friction": 1.0,
+        "color": "yellow",
+        "pose": {
+          "pos": [
+            0.52,
+            -0.21,
+            0.0419
+          ]
+        }
+      },
+      {
+        "name": "cyl_6",
+        "shape": "cylinder",
+        "size": [
+          0.0254,
+          0.0419,
+          0.0
+        ],
+        "mass": 0.1,
+        "friction": 1.0,
+        "color": "red",
+        "pose": {
+          "pos": [
+            0.52,
+            -0.1,
+            0.0419
+          ]
+        }
+      },
+      {
+        "name": "ramp_right",
+        "shape": "box",
+        "size": [
+          0.05,
+          0.13692086978938345,
+          0.01
+        ],
+        "fixed": true,
+        "pose": {
+          "pos": [
+            0.4069,
+            -0.561,
+            0.0006
+          ],
+          "quat": [
+            0.70323,
+            -0.07391,
+            -0.07391,
+            -0.70323
+          ]
+        }
+      },
+      {
+        "name": "wall_right",
+        "shape": "box",
+        "size": [
+          0.005,
+          0.16692086978938345,
+          0.03
+        ],
+        "fixed": true,
+        "pose": {
+          "pos": [
+            0.4069,
+            -0.6128,
+            0.03
+          ],
+          "quat": [
+            0.70711,
+            0,
+            0,
+            -0.70711
+          ]
+        }
+      },
+      {
+        "name": "ramp_front_right",
+        "shape": "box",
+        "size": [
+          0.05,
+          0.21615826042123315,
+          0.01
+        ],
+        "fixed": true,
+        "pose": {
+          "pos": [
+            0.6511,
+            -0.3743,
+            0.0006
+          ],
+          "quat": [
+            0.96063,
+            -0.02705,
+            -0.10097,
+            -0.2574
+          ]
+        }
+      },
+      {
+        "name": "wall_front_right",
+        "shape": "box",
+        "size": [
+          0.005,
+          0.24615826042123315,
+          0.03
+        ],
+        "fixed": true,
+        "pose": {
+          "pos": [
+            0.696,
+            -0.4002,
+            0.03
+          ],
+          "quat": [
+            0.96593,
+            0,
+            0,
+            -0.25882
+          ]
+        }
+      },
+      {
+        "name": "ramp_front",
+        "shape": "box",
+        "size": [
+          0.05,
+          0.21756443470178577,
+          0.01
+        ],
+        "fixed": true,
+        "pose": {
+          "pos": [
+            0.751,
+            0.0,
+            0.0006
+          ],
+          "quat": [
+            0.99452,
+            0.0,
+            -0.10453,
+            0.0
+          ]
+        }
+      },
+      {
+        "name": "wall_front",
+        "shape": "box",
+        "size": [
+          0.005,
+          0.24756443470178577,
+          0.03
+        ],
+        "fixed": true,
+        "pose": {
+          "pos": [
+            0.8028,
+            0.0,
+            0.03
+          ],
+          "quat": [
+            1.0,
+            0,
+            0,
+            -0.0
+          ]
+        }
+      },
+      {
+        "name": "ramp_front_left",
+        "shape": "box",
+        "size": [
+          0.05,
+          0.21615826042123315,
+          0.01
+        ],
+        "fixed": true,
+        "pose": {
+          "pos": [
+            0.6511,
+            0.3743,
+            0.0006
+          ],
+          "quat": [
+            0.96063,
+            0.02705,
+            -0.10097,
+            0.2574
+          ]
+        }
+      },
+      {
+        "name": "wall_front_left",
+        "shape": "box",
+        "size": [
+          0.005,
+          0.24615826042123315,
+          0.03
+        ],
+        "fixed": true,
+        "pose": {
+          "pos": [
+            0.696,
+            0.4002,
+            0.03
+          ],
+          "quat": [
+            0.96593,
+            0,
+            0,
+            0.25882
+          ]
+        }
+      },
+      {
+        "name": "ramp_left",
+        "shape": "box",
+        "size": [
+          0.05,
+          0.13692086978938345,
+          0.01
+        ],
+        "fixed": true,
+        "pose": {
+          "pos": [
+            0.4069,
+            0.561,
+            0.0006
+          ],
+          "quat": [
+            0.70323,
+            0.07391,
+            -0.07391,
+            0.70323
+          ]
+        }
+      },
+      {
+        "name": "wall_left",
+        "shape": "box",
+        "size": [
+          0.005,
+          0.16692086978938345,
+          0.03
+        ],
+        "fixed": true,
+        "pose": {
+          "pos": [
+            0.4069,
+            0.6128,
+            0.03
+          ],
+          "quat": [
+            0.70711,
+            0,
+            0,
+            0.70711
+          ]
+        }
+      },
+      {
+        "name": "ramp_back",
+        "shape": "box",
+        "size": [
+          0.05,
+          0.54,
+          0.01
+        ],
+        "fixed": true,
+        "pose": {
+          "pos": [
+            0.249,
+            -0.0,
+            0.0006
+          ],
+          "quat": [
+            0.0,
+            -0.10453,
+            -0.0,
+            -0.99452
+          ]
+        }
+      },
+      {
+        "name": "wall_back",
+        "shape": "box",
+        "size": [
+          0.005,
+          0.5700000000000001,
+          0.03
+        ],
+        "fixed": true,
+        "pose": {
+          "pos": [
+            0.1972,
+            -0.0,
+            0.03
+          ],
+          "quat": [
+            0.0,
+            0,
+            0,
+            -1.0
+          ]
+        }
+      }
+    ],
+    "regions": [
+      {
+        "name": "spot_cyl_1",
+        "center": [
+          0.55,
+          0.0612,
+          0.0419
+        ],
+        "half_extents": [
+          0.008,
+          0.008,
+          0.006
+        ]
+      },
+      {
+        "name": "spot_cyl_2",
+        "center": [
+          0.55,
+          0.12,
+          0.0419
+        ],
+        "half_extents": [
+          0.008,
+          0.008,
+          0.006
+        ]
+      },
+      {
+        "name": "spot_cyl_3",
+        "center": [
+          0.55,
+          0.1788,
+          0.0419
+        ],
+        "half_extents": [
+          0.008,
+          0.008,
+          0.006
+        ]
+      },
+      {
+        "name": "spot_cyl_4",
+        "center": [
+          0.55,
+          0.0906,
+          0.1257
+        ],
+        "half_extents": [
+          0.008,
+          0.008,
+          0.006
+        ]
+      },
+      {
+        "name": "spot_cyl_5",
+        "center": [
+          0.55,
+          0.1494,
+          0.1257
+        ],
+        "half_extents": [
+          0.008,
+          0.008,
+          0.006
+        ]
+      },
+      {
+        "name": "spot_cyl_6",
+        "center": [
+          0.55,
+          0.12,
+          0.2095
+        ],
+        "half_extents": [
+          0.008,
+          0.008,
+          0.006
+        ]
+      }
+    ],
+    "randomization": {
+      "object_xy_jitter": {
+        "lo": 0.0,
+        "hi": 0.015
+      },
+      "object_yaw_jitter": {
+        "lo": 0.0,
+        "hi": 0.3
+      },
+      "friction_scale": {
+        "lo": 0.5,
+        "hi": 1.2
+      },
+      "mass_scale": {
+        "lo": 0.7,
+        "hi": 1.5
+      },
+      "actuator_gain_scale": {
+        "lo": 0.8,
+        "hi": 1.2
+      },
+      "obs_noise_std": {
+        "lo": 0.0,
+        "hi": 0.002
+      },
+      "action_latency_steps": {
+        "lo": 0,
+        "hi": 2
+      },
+      "knockdown": {
+        "at_step": {
+          "lo": 400,
+          "hi": 1400
+        },
+        "count": {
+          "lo": 1,
+          "hi": 2
+        },
+        "radius": 0.08
+      }
+    }
+  },
+  "success": {
+    "kind": "all_of",
+    "conditions": [
+      {
+        "kind": "object_in_region",
+        "object": "cyl_1",
+        "region": "spot_cyl_1"
+      },
+      {
+        "kind": "object_in_region",
+        "object": "cyl_2",
+        "region": "spot_cyl_2"
+      },
+      {
+        "kind": "object_in_region",
+        "object": "cyl_3",
+        "region": "spot_cyl_3"
+      },
+      {
+        "kind": "object_in_region",
+        "object": "cyl_4",
+        "region": "spot_cyl_4"
+      },
+      {
+        "kind": "object_in_region",
+        "object": "cyl_5",
+        "region": "spot_cyl_5"
+      },
+      {
+        "kind": "object_in_region",
+        "object": "cyl_6",
+        "region": "spot_cyl_6"
+      }
+    ]
+  },
+  "max_steps": 5000,
+  "control_hz": 20
+}
