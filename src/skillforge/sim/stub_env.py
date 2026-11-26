@@ -19,7 +19,8 @@ import numpy as np
 
 from skillforge.contracts import Action, ObjectState, Observation, StepInfo, TaskSpec
 
-from .disturbances import DisturbanceSchedule, knock_axis, quat_mul, yaw_quat
+from .disturbances import RELOCATE_CLEARANCE, DisturbanceSchedule, knock_axis, quat_mul, yaw_quat
+from .scatter import draw_scatter, free_spot, rest_height, rest_quat
 from .success import is_success
 
 TABLE_Z = 0.0
@@ -61,6 +62,11 @@ class StubEnv:
         self._quat = {k: np.array([1.0, 0.0, 0.0, 0.0]) for k in self._obj}
         self._disturb = DisturbanceSchedule(self.task, seed)
         self._sample.update(self._disturb.sample)
+        scattered, scat = draw_scatter(self.task, seed)
+        self._sample.update(scat)
+        for k, (pos, q) in scattered.items():
+            self._obj[k], self._quat[k] = pos.copy(), q.copy()
+        self._start = {k: v.copy() for k, v in self._obj.items()}
         self._step_i = 0
         self._ee = np.array(self.task.scene.robot.base_pose.pos, dtype=float) + np.array([0.4, 0.0, 0.3])
         self._grip = 0.0
@@ -136,6 +142,18 @@ class StubEnv:
             if p.kind == "pose":
                 self._obj[p.obj][:2] += [p.dx, p.dy]
                 self._quat[p.obj] = quat_mul(yaw_quat(p.dyaw), self._quat[p.obj])
+            elif p.kind == "relocate":
+                o = self.task.scene.object(p.obj)
+                if p.cands:
+                    others = [v[:2] for k, v in self._obj.items() if k != p.obj]
+                    spots = free_spot(p.cands, others, RELOCATE_CLEARANCE)
+                else:
+                    spots = [self._obj[p.obj][:2] + [p.dx, p.dy]]
+                if not spots:
+                    out.append(self._disturb.skipped(p))
+                    continue
+                self._obj[p.obj] = np.array([spots[0][0], spots[0][1], rest_height(o, p.face)])
+                self._quat[p.obj] = rest_quat(o, p.face, p.yaw_abs)
             else:  # knock: fall flat toward the heading
                 ax = knock_axis(p.heading)
                 fall = np.concatenate([[np.cos(np.pi / 4)], np.sin(np.pi / 4) * ax])

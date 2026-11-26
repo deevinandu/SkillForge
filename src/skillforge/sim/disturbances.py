@@ -15,13 +15,17 @@ due at step `max(1, at_step)`; with one, `at_step` steps after the step whose ev
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import numpy as np
 
 from skillforge.contracts import Disturbance, TaskSpec
 
+from .scatter import region_bounds
+
 MAX_WAIT = 40  # steps a due disturbance waits for its object to be let go before it is skipped
+RELOCATE_CANDIDATES = 12  # spots drawn per relocate; the env takes the first free one
+RELOCATE_CLEARANCE = 0.09  # metres from every other object for a relocate spot
 
 
 @dataclass
@@ -39,6 +43,9 @@ class Planned:
     dyaw: float
     ang_vel: float
     heading: float  # knock: world-xy direction (radians) the object's top is pushed toward
+    face: str = "flat"  # relocate: the face it is put down on
+    yaw_abs: float = 0.0  # relocate: its yaw once put down
+    cands: list[np.ndarray] = field(default_factory=list)  # relocate: candidate xy spots
     due: int | None = None  # absolute step at which it is due (None: trigger not seen yet)
     state: str = "waiting"  # waiting | applied | skipped | cancelled
     waited: int = 0
@@ -80,6 +87,12 @@ class DisturbanceSchedule:
                     dx=float(r * math.cos(th)), dy=float(r * math.sin(th)), dyaw=float(yaw),
                     ang_vel=float(w), heading=float(head),
                 )
+                if d.kind == "relocate":  # extra draws only for relocate, so other kinds keep theirs
+                    p.face = d.faces[int(rng.integers(len(d.faces)))]
+                    p.yaw_abs = float(rng.uniform(-math.pi, math.pi))
+                    for _ in range(RELOCATE_CANDIDATES if d.regions else 0):
+                        lo, hi = region_bounds(task, d.regions[int(rng.integers(len(d.regions)))])
+                        p.cands.append(rng.uniform(lo, hi))
                 if d.after_event is None:
                     p.due = max(1, delay)
                 self.plans.append(p)
@@ -90,6 +103,9 @@ class DisturbanceSchedule:
                 self.sample[f"{k}.dx"], self.sample[f"{k}.dy"] = p.dx, p.dy
                 self.sample[f"{k}.dyaw"], self.sample[f"{k}.ang_vel"] = p.dyaw, p.ang_vel
                 self.sample[f"{k}.heading"] = p.heading
+                if d.kind == "relocate":
+                    self.sample[f"{k}.face"] = float(("upright", "flat", "side").index(p.face))
+                    self.sample[f"{k}.yaw_abs"] = p.yaw_abs
 
     def __bool__(self) -> bool:
         return bool(self.plans)

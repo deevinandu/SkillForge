@@ -12,11 +12,13 @@ targets through. Arm bodies are gravity-compensated, as the real Panda's control
 
 Randomness: all of it is drawn from `np.random.default_rng(seed)` at reset (scene draws),
 `np.random.default_rng([seed, 1])` (observation noise stream) and `np.random.default_rng([seed, 2])`
-(mid-episode disturbances, `sim/disturbances.py`), nothing else.
+(mid-episode disturbances, `sim/disturbances.py`) and `np.random.default_rng([seed, 3])` (random
+initial resting poses, `SceneSpec.scatter`, `sim/scatter.py`), nothing else.
 
 Disturbances (`SceneSpec.disturbances`) are applied after the physics step they are due on:
 'pose' teleports the object at rest (shrinking the offset if it would interpenetrate a neighbour,
-skipping it if even a quarter would), 'knock' sets an angular velocity about a horizontal axis.
+skipping it if even a quarter would), 'knock' sets an angular velocity about a horizontal axis,
+'relocate' puts it down at rest on a drawn face and yaw at the first drawn free spot (or offset).
 An object the fingers touch is not disturbed until it is let go. Objects named in an
 `object_toppled` leaf emit `toppled:<obj>` the first time they tilt past `TOPPLE_EVENT_TILT`.
 """
@@ -51,7 +53,15 @@ from skillforge.contracts import (  # noqa: E402
 )
 
 from .assets import resolve_robot_source  # noqa: E402
-from .disturbances import DisturbanceSchedule, Planned, knock_axis, quat_mul, yaw_quat  # noqa: E402
+from .disturbances import (  # noqa: E402
+    RELOCATE_CLEARANCE,
+    DisturbanceSchedule,
+    Planned,
+    knock_axis,
+    quat_mul,
+    yaw_quat,
+)
+from .scatter import draw_scatter, free_spot, rest_height, rest_quat  # noqa: E402
 from .success import is_success, resting_half_height, tilt_of  # noqa: E402
 
 # Process-wide: once creating a GL context has failed, never try again. MuJoCo can abort the
@@ -325,6 +335,8 @@ class MujocoEnv:
         # mid-episode disturbances: their own stream, so no draw above changes
         self._disturb = DisturbanceSchedule(self.task, seed)
         s.update(self._disturb.sample)
+        self._scatter, scat = draw_scatter(self.task, seed)  # random initial resting poses
+        s.update(scat)
         self._sample = s
 
         # physical parameters, re-applied from nominal every reset
@@ -362,6 +374,8 @@ class MujocoEnv:
             q = np.zeros(4)
             mujoco.mju_mulQuat(q, qz, np.asarray(o.pose.quat, dtype=float))
             d.qpos[a + 3 : a + 7] = q
+            if o.name in self._scatter:
+                d.qpos[a : a + 3], d.qpos[a + 3 : a + 7] = self._scatter[o.name]
         self._q_des = self._home.copy()
         self._grip_cmd = 0.0
         self._apply_ctrl()
@@ -600,6 +614,8 @@ class MujocoEnv:
                 continue
             if p.kind == "pose":
                 ok = self._teleport(name, p)
+            elif p.kind == "relocate":
+                ok = self._relocate(name, p)
             else:
                 self._knock(name, p)
                 ok = True
@@ -617,6 +633,30 @@ class MujocoEnv:
             d.qpos[a : a + 2] = saved[:2] + scale * np.array([p.dx, p.dy])
             q = quat_mul(yaw_quat(scale * p.dyaw), saved[3:7])
             d.qpos[a + 3 : a + 7] = q / np.linalg.norm(q)
+            d.qvel[v : v + 6] = 0.0
+            mujoco.mj_forward(m, d)
+            if self._penetration(name) <= PENETRATION_TOL:
+                return True
+        d.qpos[a : a + 7] = saved
+        mujoco.mj_forward(m, d)
+        return False
+
+    def _relocate(self, name: str, p: Planned) -> bool:
+        """Put `name` down at rest on `p.face` at `p.yaw_abs`: at the first drawn spot that is free,
+        or (no regions) where it is plus (dx, dy)."""
+        m, d = self.model, self.data
+        o = self.task.scene.object(name)
+        a, v = self._obj_free[name], self._obj_dof[name]
+        saved = d.qpos[a : a + 7].copy()
+        if p.cands:
+            others = [self.data.xpos[b][:2].copy() for b, n in self._obj_bodies.items() if n != name]
+            spots = free_spot(p.cands, others, RELOCATE_CLEARANCE)
+        else:
+            spots = [saved[:2] + np.array([p.dx, p.dy])]
+        q = rest_quat(o, p.face, p.yaw_abs)
+        for xy in spots:
+            d.qpos[a : a + 3] = [xy[0], xy[1], rest_height(o, p.face) + 0.001]
+            d.qpos[a + 3 : a + 7] = q
             d.qvel[v : v + 6] = 0.0
             mujoco.mj_forward(m, d)
             if self._penetration(name) <= PENETRATION_TOL:
