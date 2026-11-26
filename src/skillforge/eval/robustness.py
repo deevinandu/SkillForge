@@ -2,7 +2,8 @@
 
 `sweep` varies one `RandomizationSpec` field at a time, pinning it to each value in turn
 (`Range.fixed(v)`), and evaluates the skill on the same seeds at every point, so the curve
-reflects the axis and not seed luck. `stress_spec` widens every range by a factor around
+reflects the axis and not seed luck. The extra axis `disturbance_scale` scales every
+`SceneSpec.disturbances` magnitude (xy, yaw, ang_vel) by its value; 0 removes them. `stress_spec` widens every range by a factor around
 its nominal value (the "stress" preset, 2x by default).
 
 The models here (`RobustnessReport`, `AxisCurve`, `CurvePoint`) are T4's, not contracts.
@@ -55,6 +56,10 @@ DEFAULT_GRID: dict[str, tuple[float, ...]] = {
     "obs_noise_std": tuple(np.linspace(0.0, 0.01, 6).round(6)),  # 0 -> 1 cm
     "action_latency_steps": (0.0, 1.0, 2.0, 3.0, 4.0, 6.0),
 }
+
+# Not a RandomizationSpec field: scales the task's mid-episode disturbances (0 = none, 1 = as the task has them).
+DISTURBANCE_AXIS = "disturbance_scale"
+DISTURBANCE_GRID: tuple[float, ...] = (0.0, 0.5, 1.0, 1.5, 2.0, 3.0)
 
 Others = Literal["task", "nominal"]
 
@@ -133,6 +138,21 @@ def pin_axis(task: TaskSpec, axis: str, value: float, others: Others = "task") -
     return with_randomization(task, RandomizationSpec.model_validate(rnd.model_dump()))
 
 
+def scale_disturbances(task: TaskSpec, factor: float) -> TaskSpec:
+    """A copy of `task` with every disturbance magnitude (xy, yaw, ang_vel) times `factor`; when,
+    which objects and how likely stay the task's. `factor == 0` removes the disturbances."""
+    if factor < 0:
+        raise ValueError("disturbance scale must be >= 0")
+    d = task.model_dump(mode="json")
+    if factor == 0:
+        d["scene"]["disturbances"] = []
+    else:
+        for dist in d["scene"]["disturbances"]:
+            for k in ("xy", "yaw", "ang_vel"):
+                dist[k] = {"lo": dist[k]["lo"] * factor, "hi": dist[k]["hi"] * factor}
+    return TaskSpec.model_validate(d)
+
+
 def stress_spec(rnd: RandomizationSpec, factor: float = 2.0) -> RandomizationSpec:
     """Widen every range `factor`x away from its nominal value, clamped to physical limits.
 
@@ -181,7 +201,11 @@ def sweep_axis(
 ) -> AxisCurve:
     pts = []
     for v in values:
-        report, _ = pool.evaluate(make_env, src, pin_axis(task, axis, v, others), seeds)
+        if axis == DISTURBANCE_AXIS:  # `others` does not apply: randomization stays the task's
+            t = scale_disturbances(task, v)
+        else:
+            t = pin_axis(task, axis, v, others)
+        report, _ = pool.evaluate(make_env, src, t, seeds)
         pts.append(_point(report, v))
     return AxisCurve(axis=axis, others=others, points=pts)
 
@@ -202,12 +226,13 @@ def sweep(
     `stress_factor=None` skips the stress eval. Pass `pool` to reuse an open EvalPool.
     """
     seeds = [int(s) for s in seeds]
-    if axes is None:
-        grid = dict(DEFAULT_GRID)
+    named = {**DEFAULT_GRID, DISTURBANCE_AXIS: DISTURBANCE_GRID}
+    if axes is None:  # every randomization axis, plus the disturbance axis if the task has disturbances
+        grid = {a: v for a, v in named.items() if a != DISTURBANCE_AXIS or task.scene.disturbances}
     elif isinstance(axes, dict):
         grid = {a: tuple(v) for a, v in axes.items()}
     else:
-        grid = {a: DEFAULT_GRID[a] for a in axes}
+        grid = {a: named[a] for a in axes}
     own = pool is None
     pool = pool or EvalPool(workers)
     if own:

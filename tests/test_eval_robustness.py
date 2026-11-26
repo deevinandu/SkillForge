@@ -84,3 +84,42 @@ def test_axes_are_the_numeric_range_fields():
     from skillforge.eval.robustness import AXES
 
     assert AXES and all(RandomizationSpec.model_fields[a].annotation is Range for a in AXES)
+
+
+# ---------------------------------------------------------------- disturbance axis
+
+
+def _domino_task():
+    from pathlib import Path
+
+    from skillforge.contracts import TaskSpec
+
+    return TaskSpec.model_validate_json(
+        (Path(__file__).resolve().parents[1] / "tasks" / "franka_topple_domino_chain_knock.json").read_text()
+    )
+
+
+def test_scale_disturbances():
+    from skillforge.eval.robustness import scale_disturbances
+
+    t = _domino_task()
+    assert scale_disturbances(t, 1.0) == t
+    zero = scale_disturbances(t, 0.0)
+    assert zero.scene.disturbances == () and zero.scene.randomization == t.scene.randomization
+    two = scale_disturbances(t, 2.0)
+    for a, b in zip(t.scene.disturbances, two.scene.disturbances, strict=True):
+        assert (b.xy.lo, b.xy.hi, b.yaw.hi, b.ang_vel.hi) == (2 * a.xy.lo, 2 * a.xy.hi, 2 * a.yaw.hi, 2 * a.ang_vel.hi)
+        assert (b.at_step, b.prob, b.objects, b.after_event) == (a.at_step, a.prob, a.objects, a.after_event)
+    with pytest.raises(ValueError):
+        scale_disturbances(t, -1.0)
+
+
+def test_sweep_includes_disturbance_axis_only_when_the_task_has_them(stub_task):
+    from skillforge.eval.parallel import EvalPool
+    from skillforge.eval.robustness import DISTURBANCE_AXIS, DISTURBANCE_GRID, sweep_axis
+    from skillforge.sim import StubEnv
+
+    with EvalPool(1) as pool:
+        c = sweep_axis(pool, StubEnv, pick_place_source(), stub_task, DISTURBANCE_AXIS, [0.0], range(3))
+    assert c.axis == DISTURBANCE_AXIS and c.points[0].n == 3  # a task without disturbances: scale is a no-op
+    assert DISTURBANCE_GRID[0] == 0.0 and 1.0 in DISTURBANCE_GRID
