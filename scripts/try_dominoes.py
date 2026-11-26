@@ -82,8 +82,7 @@ def main() -> None:
             return
         finally:
             if viewer is not None:
-                time.sleep(1.0)
-                viewer.close()
+                time.sleep(1.0)  # not closed from here: that segfaults on some GL drivers
 
     print(f"\n{task.id} seed {a.seed}: success={ep.success} steps={ep.n_steps} failure={ep.failure} {ep.failure_detail}")
     print("events:", [e for e in ep.events if e.startswith(SHOW)])

@@ -148,6 +148,48 @@ class Ramp(MoveTo):
         return self.arrived and float(np.linalg.norm(obs.ee_pos - self.g)) < self.eps
 
 
+class TouchDown(Ramp):
+    """Ramp down toward `goal` (and up to `extra` metres past it) and stop as soon as the fingers
+    touch something: contact force above `force`, or the EE lagging its reference by `lag` (it is
+    resting on the table). For picking a domino that lies flat, where the pads must get as low as
+    the fingertips allow and a fixed target height is either above the domino or in the table."""
+
+    def __init__(self, goal, step: float, extra: float = 0.012, force: float = 3.0, lag: float = 0.003, **kw):
+        self.extra, self.force, self.lag = extra, force, lag
+        self.last_z: float | None = None
+        super().__init__(goal, step, **kw)
+
+    def reset(self) -> None:
+        super().reset()
+        self.last_z = None
+
+    def _target(self, obs, ctx):
+        g = np.asarray(self.goal(obs, ctx) if callable(self.goal) else self.goal, dtype=float).copy()
+        g[2] -= self.extra
+        self.g = g
+        if self.ref is None:
+            self.ref = obs.ee_pos.copy()
+        d = g - self.ref
+        n = float(np.linalg.norm(d))
+        self.arrived = n <= self.step
+        self.ref = g.copy() if self.arrived else self.ref + d * (self.step / n)
+        return self.ref
+
+    def _near(self, obs, ctx):
+        f = obs.contact_force
+        if f is not None and float(np.linalg.norm(f)) > self.force:
+            ctx.bb["touch"] = f"force {float(np.linalg.norm(f)):.1f}N at z={obs.ee_pos[2]:.4f}"
+            return True
+        # blocked: the reference is already down near the goal, the EE is above it and has stopped
+        z, last = float(obs.ee_pos[2]), self.last_z
+        self.last_z = z
+        near_goal = self.ref is not None and self.ref[2] <= self.g[2] + self.extra + 0.002
+        if near_goal and last is not None and z - self.ref[2] > self.lag and abs(z - last) < 0.0005:
+            ctx.bb["touch"] = f"blocked at z={z:.4f}"
+            return True
+        return self.arrived and float(np.linalg.norm(obs.ee_pos - self.g)) < self.eps
+
+
 class HandHoldMonitor(HoldMonitor):
     """HoldMonitor whose object-to-EE offset is kept in the hand frame, so turning the wrist with
     the object in it (a stand-up turns it ~90 deg) is not mistaken for the object drifting."""
@@ -348,7 +390,7 @@ class StandUp:
     the hand goes down."""
 
     end_offset = 0.026  # grasp this far from the centre toward one end (8.5 mm pad half-height inside)
-    min_grasp_z = 0.012  # fingertip-pad centre above the table for a domino lying flat (1 cm tall)
+    min_grasp_z = 0.008  # aim for the pad centre here (a flat domino is 1 cm tall); TouchDown stops on contact
     lift_z = 0.24
     hover = 0.10
     lift_step = 0.006
@@ -364,7 +406,8 @@ class StandUp:
     palm = (0.032, 0.105, -0.13, -0.037)
     wrist = (-0.21, 0.065)
     min_clear = 0.008
-    tilts = (0.0, 0.35, 0.6, 0.85, 1.1)  # radians of grasp tilt about the closing axis, tried in order
+    tilts = (0.0, 0.35, 0.5, 0.65, 0.8, 1.0)  # radians of grasp tilt about the closing axis, tried in order
+    max_up = -0.26  # the standing pose's hand axis must point down at least ~15 deg (reachable, wrist high)
 
     def __init__(self, task: TaskSpec, obj: str, spot: np.ndarray, lane_dir: np.ndarray):
         o = task.scene.object(obj)
@@ -422,8 +465,8 @@ class StandUp:
                 if tcp_rel[2] < 0.012:
                     continue  # the gripped end must be the top one
                 a = R_hs[:, 2]
-                if a[2] > 0.25:
-                    continue  # hand pointing up
+                if a[2] > self.max_up:
+                    continue  # hand level or pointing up: hard for the arm, wrist low
                 if not self._clear(R_hs, self.h + self.drop + tcp_rel[2]):
                     continue  # palm or wrist in the table
                 face = R_ds[:2, 0]  # the standing domino's face normal
@@ -500,8 +543,8 @@ class StandUp:
             [
                 Ramp(up_here, self.carry_step, gripper=0.0, timeout=200, name="clear"),
                 MoveTo(above_grasp, gripper=0.0, tol=0.006, timeout=250, check=check_grasp, name="approach"),
-                Ramp(grasp_target, self.lower_step, eps=0.004, gripper=0.0, timeout=150, check=check_grasp,
-                     name="descend"),
+                TouchDown(grasp_target, self.lower_step, eps=0.003, gripper=0.0, timeout=150, check=check_grasp,
+                          name="descend"),
                 grip(settle=st),
                 Do(note, name="note"),
                 Ramp(risen, self.lift_step, gripper=1.0, check=held, timeout=250, name="lift"),

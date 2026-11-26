@@ -4,6 +4,8 @@
     python scripts/diag_standup.py --seeds 5 --yaws 0 90
     python scripts/diag_standup.py --view --face flat --yaws 45 --sides -1   # watch one
 
+For a lying domino it also prints where the fingers touched down ("touch") on the first failure.
+
 A run counts as stood up when StandUp finishes and the domino ends standing (tilt < 0.15 rad)
 within 3 cm of its target spot. Prints, per cell, the count and the first failure: the reason
 StandUp gave (the node that failed is in it, e.g. 'grasp_slip:...' while carrying, 'timeout:stand'
@@ -66,7 +68,8 @@ def run_one(env, task: TaskSpec, spot: np.ndarray, seed: int, viewer=None) -> tu
     if job.status.running:
         why = "out of steps"
     tilt_s = "none" if plan is None else f"{plan:+.2f}"
-    return up, f"{why} [grasp tilt {tilt_s}]"
+    touch = job.ctx.bb.get("touch", "no touch-down")
+    return up, f"{why} [grasp tilt {tilt_s}; {touch}]"
 
 
 def main() -> None:
@@ -96,8 +99,7 @@ def main() -> None:
                     ok += up
                     if not up and not first:
                         first = f"seed {s}: {why}"
-                if viewer is not None:
-                    viewer.close()
+                # (the viewer is left open: closing it from the script segfaults on some GL drivers)
                 print(f"{face:>5} {yd:4.0f} {side:+4.0f} | {ok:2d}/{a.seeds:<2d} | {first}")
 
 
