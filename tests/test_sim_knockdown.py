@@ -101,3 +101,52 @@ def test_knocking_a_support_brings_down_what_stands_on_it(MujocoEnv):
             assert env.data.xpos[env.model.body(n).id][2] < 0.03  # on the table
     finally:
         env.close()
+
+
+def test_knockdown_keeps_clear_of_fixed_objects(MujocoEnv):
+    # Fixed objects (walls here) are obstacles, never candidates: knocked objects land clear of them.
+    d = json.loads((TASKS / "franka_stack_block_pyramid.json").read_text())
+    d["scene"]["randomization"]["knockdown"] = {"at_step": {"lo": 5, "hi": 5}, "count": {"lo": 2, "hi": 2}, "radius": 0.12}
+    walls = [("wall_a", (0.50, -0.20)), ("wall_b", (0.62, -0.10)), ("wall_c", (0.40, -0.05))]
+    for name, (x, y) in walls:
+        d["scene"]["objects"].append({"name": name, "shape": "box", "size": [0.005, 0.05, 0.03], "fixed": True,
+                                      "pose": {"pos": [x, y, 0.03]}})
+    env = MujocoEnv(TaskSpec.model_validate(d))
+    try:
+        for seed in range(6):
+            events = _run(env, seed, 15)
+            knocked = [e.split(":", 1)[1] for e in events if e.startswith("knockdown:")]
+            assert knocked and not any(n.startswith("wall") for n in knocked)
+            for n in knocked:
+                xy = env.data.xpos[env.model.body(n).id][:2]
+                for _, (x, y) in walls:  # footprint of a lying block: its half diagonal, 2.9 cm
+                    gap = np.hypot(max(abs(xy[0] - x) - 0.005, 0.0), max(abs(xy[1] - y) - 0.05, 0.0))
+                    assert gap > 0.028, (seed, n, gap)
+    finally:
+        env.close()
+
+
+def test_cylinders_have_rolling_friction(MujocoEnv):
+    # condim 6 for cylinders: a lying cylinder that is set rolling slows down and stops.
+    import mujoco
+
+    d = json.loads((TASKS / "franka_pick_cylinder_to_bin.json").read_text())  # a 2 cm radius can
+    env = MujocoEnv(TaskSpec.model_validate(d))
+    try:
+        obs = env.reset(0)
+        m, dt = env.model, env.data
+        assert m.geom_condim[m.geom("can").id] == 6
+        a, v = m.joint("can_free").qposadr[0], m.joint("can_free").dofadr[0]
+        dt.qpos[a : a + 3] = [0.45, 0.10, 0.0205]
+        dt.qpos[a + 3 : a + 7] = [np.cos(np.pi / 4), np.sin(np.pi / 4), 0, 0]  # axis along world y
+        dt.qvel[v : v + 6] = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+        dt.qvel[v] = 0.10  # rolling along +x: spin about the axis to match
+        dt.qvel[v + 3 : v + 6] = np.array([0.0, 0.0, -0.10 / 0.02])  # body z (the axis) is world -y
+        mujoco.mj_forward(m, dt)
+        hold = Action(ee_pos=obs.ee_pos, ee_quat=obs.ee_quat)
+        for _ in range(150):  # 7.5 s
+            env.step(hold)
+        assert dt.qpos[a] > 0.50  # it rolled (at condim 4 it would roll on to the table's edge) ...
+        assert np.linalg.norm(dt.qvel[v : v + 3]) < 0.01  # ... and stopped
+    finally:
+        env.close()

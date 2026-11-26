@@ -203,7 +203,10 @@ class MujocoEnv:
             if o.shape == "box":
                 body.add_geom(type=mujoco.mjtGeom.mjGEOM_BOX, size=list(o.size), **g)
             elif o.shape == "cylinder":
-                body.add_geom(type=mujoco.mjtGeom.mjGEOM_CYLINDER, size=[o.size[0], o.size[1], 0], **g)
+                # condim 6 adds rolling friction (the 0.0001 m above: a rolling resistance of 0.4% for
+                # a 2.5 cm radius). At condim 4 nothing slowed a lying cylinder: once nudged it rolled
+                # on until it hit something or left the table.
+                body.add_geom(type=mujoco.mjtGeom.mjGEOM_CYLINDER, size=[o.size[0], o.size[1], 0], **(g | {"condim": 6}))
             elif o.shape == "sphere":
                 body.add_geom(type=mujoco.mjtGeom.mjGEOM_SPHERE, size=[o.size[0], 0, 0], **g)
             else:  # mesh
@@ -558,6 +561,16 @@ class MujocoEnv:
         def footprint(o) -> float:  # radius of the object's footprint lying down (generous)
             return float(np.linalg.norm(o.size[:2])) if o.shape == "box" else float(max(o.size[0], o.size[1]))
 
+        fixed = [o for o in self.task.scene.objects if o.fixed]
+
+        def fixed_gap(xy, o) -> float:  # horizontal distance from xy to a fixed object's footprint
+            yaw = 2.0 * np.arctan2(o.pose.quat[3], o.pose.quat[0])  # fixed objects turn about z
+            dl = np.asarray(xy) - np.asarray(o.pose.pos[:2])
+            c, s_ = np.cos(yaw), np.sin(yaw)
+            local = np.abs([c * dl[0] + s_ * dl[1], -s_ * dl[0] + c * dl[1]])
+            half = np.asarray(o.size[:2]) if o.shape == "box" else np.array([o.size[0], o.size[0]])
+            return float(np.linalg.norm(np.maximum(local - half, 0.0)))
+
         def width(o) -> float:  # horizontal half-size standing up
             return float(np.linalg.norm(o.size[:2])) if o.shape == "box" else float(o.size[0])
 
@@ -576,7 +589,7 @@ class MujocoEnv:
         events, placed = [], {}
         for name in chosen:
             o = specs[name]
-            others = {n: p for n, p in pos.items() if n != name} | placed
+            others = {n: p for n, p in pos.items() if n != name and n in specs} | placed
             best, best_gap = None, -np.inf
             for _ in range(40):
                 ang, dist = rng.uniform(0, 2 * np.pi), rng.uniform(0.3 * radius, radius)
@@ -586,6 +599,7 @@ class MujocoEnv:
                     continue  # on the table and inside the arm's comfortable reach
                 gap = min((float(np.linalg.norm(xy - p[:2])) - footprint(o) - footprint(specs[n])
                            for n, p in others.items()), default=np.inf)
+                gap = min([gap] + [fixed_gap(xy, f) - footprint(o) for f in fixed])  # walls, racks
                 if gap > best_gap:
                     best, best_gap = xy, gap
                 if gap > 0.01:
