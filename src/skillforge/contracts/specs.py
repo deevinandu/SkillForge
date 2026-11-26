@@ -97,6 +97,24 @@ class RandomizationSpec(Spec):
     shuffle_colors: bool = False
 
 
+# How a box rests on the table: "upright" on its own z axis (its spawn convention), "flat" on its
+# largest face (thinnest axis vertical, a domino lying face down), "side" on the remaining face
+# (middle axis vertical, a domino lying on its long edge).
+RestFace = Literal["upright", "flat", "side"]
+
+
+class Scatter(Spec):
+    """Random initial poses, drawn from the seed at reset: each of `objects` (empty = every movable
+    one) rests on one of `faces` (uniform), at a uniform yaw, at a uniform xy in one of `regions`
+    (uniform), at least `min_dist` (centre to centre) from every other object. Faces other than
+    "upright" need box objects. Overrides the spec pose and the xy/yaw jitter of those objects."""
+
+    objects: tuple[str, ...] = ()
+    regions: tuple[str, ...] = Field(min_length=1)
+    faces: tuple[RestFace, ...] = Field(("upright",), min_length=1)
+    min_dist: float = Field(0.10, ge=0.0)
+
+
 class Disturbance(Spec):
     """A perturbation the env applies to objects DURING an episode (someone bumps the table, a
     domino gets nudged after it was placed). Everything about it is drawn from the env seed at
@@ -112,10 +130,13 @@ class Disturbance(Spec):
     - kind "pose": teleport the object, at rest, by an xy offset of magnitude ~ U(xy) in a uniform
       direction, and a yaw about world z of magnitude ~ U(yaw) with a random sign;
     - kind "knock": give it an angular velocity of magnitude ~ U(ang_vel) about a horizontal axis,
-      so its top moves toward `knock_dir` (world xy) or, if None, a uniform random direction.
+      so its top moves toward `knock_dir` (world xy) or, if None, a uniform random direction;
+    - kind "relocate": someone picks it up and puts it down, at rest, on one of `faces` at a
+      uniform yaw: in one of `regions` (a free spot at least 0.09 m from everything), or, with
+      no regions, where it is moved by an xy offset of magnitude ~ U(xy).
     The env never disturbs an object the gripper is touching; it waits for it to be let go."""
 
-    kind: Literal["pose", "knock"] = "pose"
+    kind: Literal["pose", "knock", "relocate"] = "pose"
     objects: tuple[str, ...] = ()
     count: int = Field(1, ge=1)
     prob: float = Field(1.0, ge=0.0, le=1.0)
@@ -127,6 +148,8 @@ class Disturbance(Spec):
     yaw: Range = Range.fixed(0.0)  # radians (pose)
     ang_vel: Range = Range.fixed(0.0)  # rad/s (knock)
     knock_dir: tuple[float, float] | None = None
+    regions: tuple[str, ...] = ()  # relocate
+    faces: tuple[RestFace, ...] = ("flat",)  # relocate
 
     @model_validator(mode="after")
     def _consistent(self) -> Disturbance:
@@ -138,6 +161,8 @@ class Disturbance(Spec):
             raise ValueError("a 'pose' disturbance needs a non-zero xy or yaw range")
         if self.kind == "knock" and self.ang_vel.hi == 0:
             raise ValueError("a 'knock' disturbance needs a non-zero ang_vel range")
+        if not self.faces:
+            raise ValueError("disturbance faces must not be empty")
         if self.target == "event_object" and not self.after_event:
             raise ValueError("target 'event_object' needs after_event")
         if self.knock_dir is not None and self.knock_dir[0] ** 2 + self.knock_dir[1] ** 2 < 1e-12:
@@ -154,6 +179,8 @@ class SceneSpec(Spec):
     obs_cameras: tuple[str, ...] = ()
     # Mid-episode perturbations (see Disturbance). Empty = none, and every existing task is unchanged.
     disturbances: tuple[Disturbance, ...] = ()
+    # Random initial poses (see Scatter). None = objects start where the spec puts them.
+    scatter: Scatter | None = None
 
     @model_validator(mode="after")
     def _unique_names(self) -> SceneSpec:
@@ -162,10 +189,26 @@ class SceneSpec(Spec):
         if dupes:
             raise ValueError(f"duplicate object/region names: {sorted(dupes)}")
         movable = {o.name for o in self.objects if not o.fixed}
+        regions = {r.name for r in self.regions}
+        boxes = {o.name for o in self.objects if o.shape == "box"}
         for i, d in enumerate(self.disturbances):
             bad = [n for n in d.objects if n not in movable]
             if bad:
                 raise ValueError(f"disturbance {i} names objects that are missing or fixed: {bad}")
+            if d.kind == "relocate":
+                if [r for r in d.regions if r not in regions]:
+                    raise ValueError(f"disturbance {i} names unknown regions: {list(d.regions)}")
+                if any(f != "upright" for f in d.faces) and [n for n in (d.objects or movable) if n not in boxes]:
+                    raise ValueError(f"disturbance {i}: faces other than upright need box objects")
+        if self.scatter is not None:
+            sc = self.scatter
+            bad = [n for n in sc.objects if n not in movable]
+            if bad:
+                raise ValueError(f"scatter names objects that are missing or fixed: {bad}")
+            if [r for r in sc.regions if r not in regions]:
+                raise ValueError(f"scatter names unknown regions: {list(sc.regions)}")
+            if any(f != "upright" for f in sc.faces) and [n for n in (sc.objects or movable) if n not in boxes]:
+                raise ValueError("scatter faces other than upright need box objects")
         return self
 
     def object(self, name: str) -> ObjectSpec:

@@ -214,3 +214,34 @@ def test_bad_dominoes_rejected(stub_task, change, match):
     change(d)
     with pytest.raises(ValidationError, match=match):
         TaskSpec.model_validate(d)
+
+
+def test_scatter_and_relocate_roundtrip(stub_task):
+    from skillforge.contracts import Scatter
+
+    d = _dominoes(stub_task)
+    d["scene"]["regions"].append({"name": "side", "center": [0.4, -0.2, 0.03], "half_extents": [0.07, 0.06, 0.04]})
+    d["scene"]["scatter"] = {"regions": ["side"], "faces": ["upright", "flat", "side"]}
+    d["scene"]["disturbances"] = [{"kind": "relocate", "regions": ["side"], "faces": ["flat", "side"]}]
+    t = TaskSpec.model_validate(d)
+    assert TaskSpec.model_validate_json(t.model_dump_json()) == t
+    assert isinstance(t.scene.scatter, Scatter) and t.scene.scatter.min_dist == pytest.approx(0.10)
+    assert stub_task.scene.scatter is None
+
+
+@pytest.mark.parametrize(
+    "change, match",
+    [
+        (lambda d: d["scene"].update(scatter={"regions": ["nowhere"]}), "unknown regions"),
+        (lambda d: d["scene"].update(scatter={"regions": []}), "at least 1"),
+        (lambda d: d["scene"].update(scatter={"regions": ["lane"], "objects": ["ghost"]}), "ghost"),
+        (lambda d: d["scene"].update(scatter={"regions": ["lane"], "faces": []}), "at least 1"),
+        (lambda d: d["scene"].update(disturbances=[{"kind": "relocate", "regions": ["nowhere"]}]), "unknown regions"),
+        (lambda d: d["scene"].update(disturbances=[{"kind": "relocate", "faces": ["upside"]}]), "upright"),
+    ],
+)
+def test_bad_scatter_rejected(stub_task, change, match):
+    d = _dominoes(stub_task)
+    change(d)
+    with pytest.raises(ValidationError, match=match):
+        TaskSpec.model_validate(d)
