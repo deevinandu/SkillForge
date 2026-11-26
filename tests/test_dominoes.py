@@ -19,7 +19,8 @@ from skillforge.skills.dominoes import hand_quat, heading_x, nearest_turn, tilt,
 from skillforge.skills.grasp import DOWN, quat_angle
 
 TASKS = Path(__file__).resolve().parents[1] / "tasks"
-DOMINO_TASKS = ("franka_topple_domino_chain", "franka_topple_domino_chain_knock", "franka_setup_domino_chain")
+DOMINO_TASKS = ("franka_topple_domino_chain", "franka_topple_domino_chain_knock", "franka_setup_domino_chain",
+                "franka_build_domino_chain_scattered", "franka_rebuild_domino_chain")
 
 
 def load(name: str) -> TaskSpec:
@@ -191,3 +192,48 @@ def test_mujoco_undisturbed_chain(mj):
 def test_mujoco_domino_tasks_seed0(mj, name):
     _, (ep,) = mj(load(name), [0])
     assert ep.success, (ep.failure, ep.failure_detail)
+
+
+# ---------------------------------------------------------------- standing fallen dominoes up
+
+
+@pytest.mark.parametrize("face", ["flat", "side"])
+def test_standup_finds_a_clear_grasp_at_any_yaw(face):
+    from skillforge.sim.scatter import rest_height, rest_quat
+    from skillforge.skills.dominoes import StandUp
+
+    t = load("franka_build_domino_chain_scattered")
+    o = t.scene.object("domino_1")
+    su = StandUp(t, "domino_1", np.array([0.44, 0.0, 0.0]), np.array([1.0, 0.0, 0.0]))
+    for side in (-1, 1):
+        for deg in range(0, 360, 20):
+            q = rest_quat(o, face, math.radians(deg))
+            g = su.plan_grasp(np.array([0.40, 0.21 * side, rest_height(o, face)]), q)
+            assert g is not None, (face, side, deg)
+            pt, R_h, t_ = g
+            assert su._clear(R_h, float(pt[2])) and abs(t_) <= max(su.tilts)
+
+
+@pytest.mark.parametrize("seed", range(4))
+def test_builds_the_chain_from_scattered_dominoes(seed):
+    ep, sk = run(load("franka_build_domino_chain_scattered"), seed)
+    assert ep.success, (ep.failure_detail, sk.log)
+
+
+def test_scattered_starts_need_standups():
+    """Across a few seeds, some dominoes start lying down and get stood up."""
+    stood = 0
+    for seed in range(4):
+        _, sk = run(load("franka_build_domino_chain_scattered"), seed)
+        stood += sum(":standup:" in e for e in sk.log)
+    assert stood > 0
+
+
+@pytest.mark.parametrize("seed", range(4))
+def test_rebuilds_after_a_domino_is_laid_down_elsewhere(seed):
+    ep, sk = run(load("franka_rebuild_domino_chain"), seed)
+    assert ep.success, (ep.failure_detail, sk.log)
+    moved = {e.rsplit(":", 1)[1] for e in ep.events if e.startswith("disturbance:relocate:")}
+    assert moved  # the first one always fires
+    stood = {e.split(":")[2].split("#")[0] for e in sk.log if ":standup:" in e}
+    assert moved <= stood

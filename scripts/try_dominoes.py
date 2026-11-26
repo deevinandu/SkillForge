@@ -6,6 +6,8 @@
     python scripts/try_dominoes.py --task franka_topple_domino_chain_knock --seed 3
     python scripts/try_dominoes.py --no-disturb                      # same task, disturbances off
     python scripts/try_dominoes.py --seeds 20                        # success rate over seeds 0..19
+    python scripts/try_dominoes.py --view --task franka_build_domino_chain_scattered   # random starts
+    python scripts/try_dominoes.py --view --task franka_rebuild_domino_chain           # laid-down dominoes
 
 On macOS the viewer needs `mjpython scripts/try_dominoes.py --view` (comes with the mujoco package).
 """
