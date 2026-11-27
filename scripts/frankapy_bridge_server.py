@@ -22,7 +22,8 @@ the arm holds where it is until the next `home`.
 Safety here, independent of the client (the client's RealEnv has its own limits too):
 - joint targets are clamped to the joint limits (with a margin) and to `--max-joint-speed`
   relative to the last target sent;
-- a watchdog stops the skill if no target arrives for `--watchdog` seconds while streaming;
+- if no target arrives for `--watchdog` seconds the arm HOLDS its last target (the skill keeps
+  running), and the next target is speed-limited from the measured joints;
 - if the robot ends the skill by itself (virtual wall, reflex, e-stop), streaming stops and
   every later `targets` is refused with an error until `home`, so the client fails loudly;
 - the socket listens on 127.0.0.1 only, and serves one client at a time.
@@ -251,6 +252,7 @@ class Bridge:
         self.streaming = False
         self.last_q = None
         self.last_t = 0.0
+        self.holding = False  # the watchdog fired: the arm holds its last target until the next one
         self.grip_closed = False
         self.events = []
         self.t0 = time.time()
@@ -268,14 +270,20 @@ class Bridge:
                 print("stopped:", event, flush=True)
 
     def _watch(self):
-        """Watchdog at 50 Hz; whether the robot ended the skill at 10 Hz (a ROS service call)."""
+        """Watchdog at 50 Hz; whether the robot ended the skill at 10 Hz (a ROS service call).
+
+        A gap in targets means HOLD, not stop: the dynamic skill keeps its last target, which is
+        the safe behaviour and what RealEnv's own watchdog expects. Ending the skill instead
+        would turn any pause (a prompt, a slow perception step) into a failure. The next target
+        after a gap is speed-limited from the arm's measured joints, so it cannot jump."""
         n = 0
         while self._alive:
             time.sleep(0.02)
             n += 1
             with self.lock:
-                if self.streaming and time.time() - self.last_t > self.watchdog_s:
-                    self._halt("bridge:watchdog")
+                if self.streaming and not self.holding and time.time() - self.last_t > self.watchdog_s:
+                    self.holding = True
+                    self.events.append("bridge:watchdog_hold")
                 elif self.streaming and n % 5 == 0 and self.arm.skill_done():
                     self._halt("bridge:robot_ended_skill")
 
@@ -297,6 +305,10 @@ class Bridge:
                 if len(q) != 7 or not all(math.isfinite(x) for x in q):
                     return {"ok": False, "error": "q must be 7 finite numbers"}
                 now = time.time()
+                if self.holding:  # resume from where the arm is, as if the last target were sent just now
+                    self.last_q = [float(x) for x in self.arm.state()[0]]
+                    self.last_t = now - 0.05
+                    self.holding = False
                 dt = min(now - self.last_t, 0.1)
                 q, clipped = clamp_targets(q, self.last_q, dt, self.max_speed, self.margin)
                 self.arm.publish(q, dt)
@@ -341,7 +353,8 @@ class Bridge:
                     self.arm.start_stream()
                 except Exception as e:  # report, don't die: the client decides what to do
                     return {"ok": False, "error": f"home failed: {e}"}
-                self.last_q, self.last_t = self.arm.state()[0], time.time()
+                self.last_q, self.last_t = [float(x) for x in self.arm.state()[0]], time.time()
+                self.holding = False
                 self.streaming = True
                 return {"ok": True}
             if cmd == "fault" and self.fake:
@@ -389,7 +402,7 @@ def main():
     ap.add_argument("--port", type=int, default=8765, help="0 picks a free port (printed)")
     ap.add_argument("--fake", action="store_true", help="no robot: joints follow targets exactly")
     ap.add_argument("--max-joint-speed", type=float, default=0.5, help="rad/s on any joint, relative to the last target")
-    ap.add_argument("--watchdog", type=float, default=0.5, help="stop if no target arrives for this long (s)")
+    ap.add_argument("--watchdog", type=float, default=0.5, help="hold (and report it) if no target arrives for this long (s)")
     ap.add_argument("--margin", type=float, default=0.05, help="rad kept clear of each joint limit")
     a = ap.parse_args()
     arm = FakeArm() if a.fake else FrankapyArm()

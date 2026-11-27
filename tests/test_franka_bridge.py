@@ -89,16 +89,28 @@ def test_home_outside_the_joint_limits_is_refused(server):
         robot.home()
 
 
-def test_the_watchdog_stops_streaming_and_later_targets_fail(server):
+def test_a_pause_after_home_holds_and_streaming_resumes(server):
+    """2026-11-27 on the arm: a prompt between home and the first target let the watchdog end
+    the skill, and every later target was refused. A pause must hold, not stop."""
+    with connect(server) as robot:
+        robot.home()
+        time.sleep(WATCHDOG + 0.3)  # nobody sends anything (an operator prompt)
+        s = robot.read_state()
+        assert "bridge:watchdog_hold" in s.events
+        np.testing.assert_allclose(s.q, SIM_HOME, atol=1e-9)  # held
+        stream_to(robot, SIM_HOME, n=3)  # accepted again
+        assert robot._call({"cmd": "state"})["streaming"] is True
+
+
+def test_the_first_target_after_a_hold_cannot_jump(server):
     with connect(server) as robot:
         robot.home()
         stream_to(robot, SIM_HOME, n=2)
         time.sleep(WATCHDOG + 0.3)
-        assert "bridge:watchdog" in robot.read_state().events
-        with pytest.raises(BridgeError, match="not streaming"):
-            robot.send_joint_targets(np.array(SIM_HOME), 0.0)
-        robot.home()  # home is the way back
-        stream_to(robot, SIM_HOME)
+        far = np.array(SIM_HOME) + [0.5, 0, 0, 0, 0, 0, 0]
+        stream_to(robot, far, n=1, dt=0.0)
+        moved = robot.read_state().q[0] - SIM_HOME[0]
+        assert 0 < moved <= SPEED * 0.05 + 1e-9  # one control period's worth from the measured joints
 
 
 def test_the_robot_ending_the_skill_stops_streaming(server):
