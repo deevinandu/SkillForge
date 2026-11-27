@@ -239,10 +239,11 @@ class MujocoEnv:
                 mesh_name = f"{o.name}_mesh"
                 spec.add_mesh(name=mesh_name, file=str(os.path.abspath(o.mesh)), scale=list(o.size))
                 body.add_geom(type=mujoco.mjtGeom.mjGEOM_MESH, meshname=mesh_name, **g)
-        for r in sc.regions:
+        for r in sc.regions:  # invisible ones keep their site (code finds regions by name), not drawn
             wb.add_site(
                 name=r.name, type=mujoco.mjtGeom.mjGEOM_BOX, pos=list(r.center),
-                size=list(r.half_extents), rgba=[0.1, 0.8, 0.2, 0.25], group=0,
+                size=list(r.half_extents), rgba=[0.1, 0.8, 0.2, 0.25 if r.visible else 0.0],
+                group=0 if r.visible else 5,
             )
         return spec.compile()
 

@@ -79,6 +79,10 @@ class Region(Spec):
     name: str
     center: Vec3
     half_extents: Vec3
+    # Drawn in the sim (a translucent green box) when True. Set False for regions that only exist
+    # in the task logic (spots, lanes): nothing marks them on a real table, and a camera should
+    # not see them either.
+    visible: bool = True
 
 
 class RandomizationSpec(Spec):

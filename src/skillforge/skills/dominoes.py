@@ -417,6 +417,7 @@ class StandUp:
         self.h = float(self.size[np.argmax(self.size)])  # half-length: centre height when upright
         self.max_width = float(task.scene.robot.max_gripper_width)
         self.base = np.asarray(task.scene.robot.base_pose.pos[:2], dtype=float)
+        self.end_offset = min(self.end_offset, self.h - 0.009)  # pads (8.5 mm half-height) stay on the domino
         self.ctx = Context(obj=obj, monitor=HandHoldMonitor(dev_tol=0.03, dev_hard=0.05))
         self.runner = Runner(self._build(), self.ctx)
 
@@ -587,7 +588,7 @@ class ToppleChain:
     push_gripper = 0.9  # ~8 mm between the fingers: no grasp (only the front finger touches), no grasp_miss
     push_back = 0.03  # metres behind the domino's back face where the TCP comes down
     push_speed = 0.004  # metres per step (8 cm/s at 20 Hz)
-    push_travel = 0.06
+    push_travel = 0.045  # less than the spacing plus a thickness, so the fingers never reach the next domino
     tipped = 0.35  # radians: the pushed domino is going, stop pushing
     watch_steps = 80
     quiet_steps = 10
