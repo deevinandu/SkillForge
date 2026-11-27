@@ -445,6 +445,7 @@ class MujocoEnv:
         self._step_i += 1
         if self._knockdown is not None and self._step_i == self._knockdown[0] and not self._unstable_seen:
             events += self._knock_over(self._knockdown[1], self._knockdown[2])
+            self._rec = self._robot_env_contacts()  # objects moved: the cached contacts are stale
         if self._disturb and not self._unstable_seen:
             events += self._apply_disturbances(events)
         events += self._topple_events()
