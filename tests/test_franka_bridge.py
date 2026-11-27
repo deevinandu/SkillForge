@@ -151,6 +151,78 @@ def test_bad_messages_get_errors_not_a_dead_server(server):
         stream_to(robot, SIM_HOME)  # still serving
 
 
+def test_frankapy_args_are_plain_floats():
+    """frankapy asserts `type(run_time) is float`: a numpy.float64 duration failed on the arm
+    ("Incorrect time type") on 2026-11-27. The server converts everything before calling it."""
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("bridge_server", SERVER)
+    srv = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(srv)
+    now = np.array([0.418, 0.529, -0.476, -1.786, 0.388, 2.212, -0.433])  # the pose of the failed run
+    duration = max(4.0, np.abs(np.array(SIM_HOME) - now).max() / 0.3)
+    assert type(duration) is not float  # the bug's input: numpy.float64
+    joints, d = srv.frankapy_joints_args(np.array(SIM_HOME), duration)
+    assert type(d) is float and type(joints) is list and all(type(x) is float for x in joints)
+
+
+def _server_module():
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("bridge_server", SERVER)
+    srv = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(srv)
+    return srv
+
+
+PARKED = [0.418, 0.529, -0.476, -1.786, 0.388, 2.212, -0.433]  # 2026-11-27: flange 9.99 cm from the front wall
+
+
+def test_wall_check_matches_the_robot_and_clears_sim_home():
+    srv = _server_module()
+    problem = srv.wall_problem(PARKED)
+    assert "flange" in problem and "front wall" in problem and "9.9 cm" in problem  # the robot logged 0.0999721 m
+    assert srv.wall_problem(list(SIM_HOME)) is None
+
+
+def test_server_kinematics_match_mujoco():
+    mujoco = pytest.importorskip("mujoco")
+    from skillforge.contracts import TaskSpec
+    from skillforge.sim import make_env
+
+    srv = _server_module()
+    task = TaskSpec.model_validate(json.loads((Path(__file__).parent.parent / "tasks" / "franka_lift_cube.json").read_text()))
+    env = make_env(task)
+    env.reset(0)
+    m, d = env.model, env.data
+    rng = np.random.default_rng(0)
+    try:
+        for _ in range(20):
+            q = np.array(srv.Q_MIN) + rng.random(7) * (np.array(srv.Q_MAX) - np.array(srv.Q_MIN))
+            d.qpos[:7] = q
+            mujoco.mj_kinematics(m, d)
+            base = d.xpos[m.body("link0").id]
+            got = np.array(srv.frame_positions(list(q)))
+            want = np.array([d.xpos[m.body(n).id] - base for n in [f"link{i}" for i in range(1, 8)] + ["hand"]])
+            np.testing.assert_allclose(got, want, atol=1e-6)
+    finally:
+        env.close()
+
+
+def test_home_from_inside_a_wall_margin_is_refused_before_moving(server):
+    with connect(server) as robot:
+        robot.home()
+        stream_to(robot, PARKED, n=1, dt=0.0)  # clamped: walk there at the speed cap
+        for _ in range(120):
+            stream_to(robot, PARKED, dt=0.03)
+        before = robot.read_state().q
+        assert np.abs(before - PARKED).max() < 1e-6
+        robot.stop()
+        with pytest.raises(BridgeError, match="flange is 9.9 cm from the front wall"):
+            robot.home()
+        np.testing.assert_allclose(robot.read_state().q, before)  # nothing moved
+
+
 def test_no_server_is_a_clear_error():
     with pytest.raises(BridgeError, match="is frankapy_bridge_server.py running"):
         FrankaBridgeRobotIO(port=1)

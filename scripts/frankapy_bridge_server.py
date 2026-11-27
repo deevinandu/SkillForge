@@ -51,6 +51,66 @@ Q_MAX = [2.8973, 1.7628, 2.8973, -0.0698, 2.8973, 3.7525, 2.8973]
 MAX_WIDTH = 0.08
 
 
+# franka-interface's virtual walls (control PC, termination_handler.h): plane normal, point on
+# plane, name; and the clearance each checked frame needs (Joint2..Joint7, then the flange).
+# A skill stops as soon as any of these frames is closer than its threshold, including at its
+# first control step, so a pose inside the margin cannot start any skill.
+WALLS = [((1, 0, 0), (0.75, 0, 0), "front wall (x = 0.75 m)"),
+         ((0, 1, 0), (0, 0.47, 0), "left wall (y = +0.47 m)"),
+         ((0, 1, 0), (0, -0.47, 0), "right wall (y = -0.47 m)"),
+         ((0, 0, 1), (0, 0, -0.015), "table (z = -0.015 m)"),
+         ((0, 0, 1), (0, 0, 1.25), "ceiling (z = 1.25 m)"),
+         ((1, 0, 0), (-0.46, 0, 0), "back wall (x = -0.46 m)")]
+WALL_FRAMES = ["joint2", "joint3", "joint4", "joint5", "joint6", "joint7 (wrist)", "flange"]
+WALL_CLEARANCE = [0.11, 0.11, 0.08, 0.08, 0.07, 0.07, 0.10]
+
+# Panda kinematics, modified DH (Craig), as in Franka's documentation: a, d, alpha per joint.
+_DH = [(0.0, 0.333, 0.0), (0.0, 0.0, -math.pi / 2), (0.0, 0.316, math.pi / 2), (0.0825, 0.0, math.pi / 2),
+       (-0.0825, 0.384, -math.pi / 2), (0.0, 0.0, math.pi / 2), (0.088, 0.0, math.pi / 2)]
+_FLANGE_D = 0.107
+
+
+def _matmul(A, B):
+    return [[sum(A[i][k] * B[k][j] for k in range(4)) for j in range(4)] for i in range(4)]
+
+
+def frame_positions(q):
+    """Origins of joint frames 1..7 and the flange in the base frame, pure Python."""
+    T = [[1.0 if i == j else 0.0 for j in range(4)] for i in range(4)]
+    out = []
+    for (a, d, alpha), th in zip(_DH, q):
+        ca, sa, ct, st = math.cos(alpha), math.sin(alpha), math.cos(th), math.sin(th)
+        T = _matmul(T, [[ct, -st, 0, a], [st * ca, ct * ca, -sa, -d * sa], [st * sa, ct * sa, ca, d * ca], [0, 0, 0, 1]])
+        out.append((T[0][3], T[1][3], T[2][3]))
+    T = _matmul(T, [[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, _FLANGE_D], [0, 0, 0, 1]])
+    out.append((T[0][3], T[1][3], T[2][3]))
+    return out  # joint1..joint7, flange
+
+
+def wall_problem(q):
+    """None if every checked frame clears every wall as franka-interface requires, else a sentence."""
+    pos = frame_positions(q)[1:]  # franka-interface checks Joint2..Flange
+    for name, p, need in zip(WALL_FRAMES, pos, WALL_CLEARANCE):
+        for n, p0, wall in WALLS:
+            dist = abs(sum(ni * (pi - p0i) for ni, pi, p0i in zip(n, p, p0)))
+            if dist < need:
+                return f"the {name} is {dist * 100:.1f} cm from the {wall}; it must stay {need * 100:.0f} cm away"
+    return None
+
+
+def frankapy_joints_args(joints, duration):
+    """`joints` and `duration` as frankapy's skill_list accepts them, checked the same way.
+
+    frankapy asserts `type(run_time) is float or int` and `type(joints) is list`, so a
+    numpy.float64 duration (e.g. from arithmetic on `get_joints()`) is rejected with
+    "Incorrect time type". The fake arm calls this too, so the tests catch such a value."""
+    joints = [float(x) for x in joints]
+    duration = float(duration)
+    assert type(duration) is float and type(joints) is list and len(joints) == 7
+    assert all(type(x) is float and math.isfinite(x) for x in joints)
+    return joints, duration
+
+
 def clamp_targets(q, last, dt, max_speed, margin):
     """`q` clamped to the joint limits (shrunk by `margin`) and to `max_speed` rad/s from `last`."""
     out, clipped = [], False
@@ -74,8 +134,19 @@ class FakeArm:
         self.skill_running = False
         self.fault = None
 
+    def _get_joints(self):
+        """Like frankapy's get_joints(): a numpy array when numpy is installed, so arithmetic on
+        it gives numpy.float64, which frankapy's type checks reject."""
+        try:
+            import numpy as np
+        except ImportError:  # pragma: no cover
+            return list(self.q)
+        return np.array(self.q)
+
     def goto_joints_blocking(self, q):
-        self.q = list(q)
+        now = self._get_joints()
+        q, _ = frankapy_joints_args(q, max(4.0, max(abs(a - b) for a, b in zip(q, now)) / 0.3))
+        self.q = q
         self.qvel = [0.0] * 7
 
     def open_gripper(self):
@@ -85,6 +156,7 @@ class FakeArm:
         self.width = 0.0
 
     def start_stream(self):
+        frankapy_joints_args(self._get_joints(), 3600.0)
         self.skill_running, self.fault = True, None
 
     def publish(self, q, dt):
@@ -125,8 +197,8 @@ class FrankapyArm:
     def goto_joints_blocking(self, q):
         now = self.fa.get_joints()
         dist = max(abs(a - b) for a, b in zip(q, now))
-        duration = max(4.0, dist / 0.3)  # at most 0.3 rad/s on any joint
-        self.fa.goto_joints(list(q), duration=duration, ignore_virtual_walls=False)
+        q, duration = frankapy_joints_args(q, max(4.0, dist / 0.3))  # at most 0.3 rad/s on any joint
+        self.fa.goto_joints(q, duration=duration, ignore_virtual_walls=False)
         err = max(abs(a - b) for a, b in zip(q, self.fa.get_joints()))
         if err > 0.02:
             raise RuntimeError(f"home not reached: max joint error {err:.3f} rad (wall, reflex or e-stop?)")
@@ -141,9 +213,9 @@ class FrankapyArm:
         self.fa.goto_gripper(MAX_WIDTH, block=False)
 
     def start_stream(self):
-        q = self.fa.get_joints()
-        kw = {"k_gains": self.k_gains} if self.k_gains else {}
-        self.fa.goto_joints(list(q), duration=self.session_s, dynamic=True, buffer_time=10,
+        q, duration = frankapy_joints_args(self.fa.get_joints(), self.session_s)
+        kw = {"k_gains": [float(k) for k in self.k_gains]} if self.k_gains else {}
+        self.fa.goto_joints(q, duration=duration, dynamic=True, buffer_time=10,
                             ignore_virtual_walls=False, **kw)
         self._id, self._t0 = 0, time.time()
 
@@ -250,6 +322,18 @@ class Bridge:
                     return {"ok": False, "error": "home joints missing or outside the joint limits"}
                 self._halt("bridge:home")
                 self.events = [e for e in self.events if e != "bridge:home"]
+                now = [float(x) for x in self.arm.state()[0]]
+                problem = wall_problem(now)
+                if problem:
+                    return {"ok": False, "error": "the arm starts inside franka-interface's virtual-wall margin, so no "
+                            f"skill can start: {problem}. Move it back by hand first (e-stop down for white mode, "
+                            "squeeze the grey wrist buttons), then release the e-stop."}
+                for k in range(1, 21):  # frankapy interpolates in joint space: check the path, not just the ends
+                    s = k / 20
+                    problem = wall_problem([a + s * (b - a) for a, b in zip(now, q)])
+                    if problem:
+                        return {"ok": False, "error": f"the move home would pass inside a virtual-wall margin at {s:.0%} "
+                                f"of the way: {problem}. Move the arm nearer home by hand first."}
                 try:
                     self.arm.goto_joints_blocking(q)
                     self.arm.open_gripper()
