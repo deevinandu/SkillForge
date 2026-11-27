@@ -25,6 +25,7 @@ from .fakes import (
     make_sim_speed_twin_env,
     make_twin_env,
 )
+from .franka_bridge import SIM_HOME, BridgeError, FrankaBridgeRobotIO
 from .realsense import (
     RealSenseCamera,
     RealSenseFrameSource,
@@ -36,8 +37,11 @@ from .realsense import (
 from .safety import GuardedSkill, Safety, SafetyLimits, Watchdog, Workspace
 
 __all__ = [
+    "SIM_HOME",
     "AutoOperator",
+    "BridgeError",
     "Controller",
+    "FrankaBridgeRobotIO",
     "FakeCell",
     "FakeRobotIO",
     "GuardedSkill",
