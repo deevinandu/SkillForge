@@ -1,0 +1,353 @@
+{
+  "id": "franka_topple_domino_chain_knock",
+  "instruction": "Five dominoes stand in a row. One in the middle may get knocked over early and take the rest with it, and one may be bumped out of line: fix what is standing, then knock over whatever has not fallen, so every domino ends up fallen away from you.",
+  "scene": {
+    "robot": {
+      "name": "franka_panda",
+      "source": "menagerie:franka_emika_panda",
+      "ee_site": "tcp",
+      "gripper": "parallel",
+      "max_gripper_width": 0.08
+    },
+    "objects": [
+      {
+        "name": "domino_1",
+        "shape": "box",
+        "size": [
+          0.005,
+          0.02,
+          0.04
+        ],
+        "mass": 0.03,
+        "friction": 0.8,
+        "pose": {
+          "pos": [
+            0.42,
+            0.0,
+            0.04
+          ],
+          "quat": [
+            1.0,
+            0.0,
+            0.0,
+            0.0
+          ]
+        },
+        "color": "red"
+      },
+      {
+        "name": "domino_2",
+        "shape": "box",
+        "size": [
+          0.005,
+          0.02,
+          0.04
+        ],
+        "mass": 0.03,
+        "friction": 0.8,
+        "pose": {
+          "pos": [
+            0.47,
+            0.0,
+            0.04
+          ],
+          "quat": [
+            1.0,
+            0.0,
+            0.0,
+            0.0
+          ]
+        },
+        "color": "blue"
+      },
+      {
+        "name": "domino_3",
+        "shape": "box",
+        "size": [
+          0.005,
+          0.02,
+          0.04
+        ],
+        "mass": 0.03,
+        "friction": 0.8,
+        "pose": {
+          "pos": [
+            0.52,
+            0.0,
+            0.04
+          ],
+          "quat": [
+            1.0,
+            0.0,
+            0.0,
+            0.0
+          ]
+        },
+        "color": "yellow"
+      },
+      {
+        "name": "domino_4",
+        "shape": "box",
+        "size": [
+          0.005,
+          0.02,
+          0.04
+        ],
+        "mass": 0.03,
+        "friction": 0.8,
+        "pose": {
+          "pos": [
+            0.57,
+            0.0,
+            0.04
+          ],
+          "quat": [
+            1.0,
+            0.0,
+            0.0,
+            0.0
+          ]
+        },
+        "color": "orange"
+      },
+      {
+        "name": "domino_5",
+        "shape": "box",
+        "size": [
+          0.005,
+          0.02,
+          0.04
+        ],
+        "mass": 0.03,
+        "friction": 0.8,
+        "pose": {
+          "pos": [
+            0.62,
+            0.0,
+            0.04
+          ],
+          "quat": [
+            1.0,
+            0.0,
+            0.0,
+            0.0
+          ]
+        },
+        "color": "purple"
+      }
+    ],
+    "regions": [
+      {
+        "name": "lane",
+        "center": [
+          0.55,
+          0.0,
+          0.03
+        ],
+        "half_extents": [
+          0.18,
+          0.07,
+          0.05
+        ]
+      },
+      {
+        "name": "spot_domino_1",
+        "center": [
+          0.42,
+          0.0,
+          0.04
+        ],
+        "half_extents": [
+          0.004,
+          0.004,
+          0.004
+        ]
+      },
+      {
+        "name": "spot_domino_2",
+        "center": [
+          0.47,
+          0.0,
+          0.04
+        ],
+        "half_extents": [
+          0.004,
+          0.004,
+          0.004
+        ]
+      },
+      {
+        "name": "spot_domino_3",
+        "center": [
+          0.52,
+          0.0,
+          0.04
+        ],
+        "half_extents": [
+          0.004,
+          0.004,
+          0.004
+        ]
+      },
+      {
+        "name": "spot_domino_4",
+        "center": [
+          0.57,
+          0.0,
+          0.04
+        ],
+        "half_extents": [
+          0.004,
+          0.004,
+          0.004
+        ]
+      },
+      {
+        "name": "spot_domino_5",
+        "center": [
+          0.62,
+          0.0,
+          0.04
+        ],
+        "half_extents": [
+          0.004,
+          0.004,
+          0.004
+        ]
+      }
+    ],
+    "randomization": {
+      "object_xy_jitter": {
+        "lo": 0.0,
+        "hi": 0.003
+      },
+      "object_yaw_jitter": {
+        "lo": 0.0,
+        "hi": 0.05
+      },
+      "friction_scale": {
+        "lo": 0.7,
+        "hi": 1.2
+      },
+      "mass_scale": {
+        "lo": 0.8,
+        "hi": 1.25
+      },
+      "actuator_gain_scale": {
+        "lo": 0.8,
+        "hi": 1.2
+      },
+      "obs_noise_std": {
+        "lo": 0.0,
+        "hi": 0.002
+      },
+      "action_latency_steps": {
+        "lo": 0,
+        "hi": 2
+      }
+    },
+    "disturbances": [
+      {
+        "kind": "pose",
+        "objects": [],
+        "count": 1,
+        "at_step": {
+          "lo": 1,
+          "hi": 40
+        },
+        "xy": {
+          "lo": 0.012,
+          "hi": 0.03
+        },
+        "yaw": {
+          "lo": 0.15,
+          "hi": 0.5
+        },
+        "before_event": "toppled:"
+      },
+      {
+        "kind": "knock",
+        "objects": [
+          "domino_3",
+          "domino_4"
+        ],
+        "count": 1,
+        "at_step": {
+          "lo": 20,
+          "hi": 120
+        },
+        "ang_vel": {
+          "lo": 3.0,
+          "hi": 5.0
+        },
+        "knock_dir": [
+          1.0,
+          0.0
+        ],
+        "before_event": "toppled:"
+      }
+    ]
+  },
+  "success": {
+    "kind": "all_of",
+    "conditions": [
+      {
+        "kind": "object_toppled",
+        "object": "domino_1",
+        "min_tilt": 0.6,
+        "direction": [
+          1.0,
+          0.0
+        ],
+        "dir_tol": 0.8,
+        "region": "lane"
+      },
+      {
+        "kind": "object_toppled",
+        "object": "domino_2",
+        "min_tilt": 0.6,
+        "direction": [
+          1.0,
+          0.0
+        ],
+        "dir_tol": 0.8,
+        "region": "lane"
+      },
+      {
+        "kind": "object_toppled",
+        "object": "domino_3",
+        "min_tilt": 0.6,
+        "direction": [
+          1.0,
+          0.0
+        ],
+        "dir_tol": 0.8,
+        "region": "lane"
+      },
+      {
+        "kind": "object_toppled",
+        "object": "domino_4",
+        "min_tilt": 0.6,
+        "direction": [
+          1.0,
+          0.0
+        ],
+        "dir_tol": 0.8,
+        "region": "lane"
+      },
+      {
+        "kind": "object_toppled",
+        "object": "domino_5",
+        "min_tilt": 0.6,
+        "direction": [
+          1.0,
+          0.0
+        ],
+        "dir_tol": 0.8,
+        "region": "lane"
+      }
+    ]
+  },
+  "max_steps": 2000,
+  "control_hz": 20
+}
