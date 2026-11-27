@@ -119,6 +119,26 @@ class Region(Spec):
     half_extents: Vec3
 
 
+class Knockdown(Spec):
+    """Someone knocks objects over mid-episode (a disturbance to recover from).
+
+    At the control step drawn from `at_step`, `count` movable objects (drawn from the seed, never
+    the one in the gripper) are knocked over, and so is everything resting on them (in a stack,
+    knocking a lower object brings down what stands on it). Each knocked object is laid on its
+    side on the table, at rest, at a free spot within `radius` of where it stood. Both ranges are
+    rounded to integers."""
+
+    at_step: Range
+    count: Range = Range.fixed(1.0)
+    radius: float = Field(0.08, gt=0, description="metres")
+
+    @model_validator(mode="after")
+    def _non_negative(self) -> Knockdown:
+        if self.at_step.lo < 0 or self.count.lo < 0:
+            raise ValueError("knockdown at_step and count must be >= 0")
+        return self
+
+
 class RandomizationSpec(Spec):
     """Domain randomization. Every field is sampled per episode from its Range."""
 
@@ -133,6 +153,7 @@ class RandomizationSpec(Spec):
     # Permute the colours among the movable objects that have one, per episode (from the env seed):
     # which object is which colour is then only knowable by looking.
     shuffle_colors: bool = False
+    knockdown: Knockdown | None = None  # None: nobody knocks anything over
 
 
 class Disturbance(Spec):
