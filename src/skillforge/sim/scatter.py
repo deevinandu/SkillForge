@@ -83,7 +83,7 @@ def draw_scatter(task: TaskSpec, seed: int) -> tuple[dict[str, tuple[np.ndarray,
         o = task.scene.object(name)
         fi = int(rng.integers(len(sc.faces)))
         face = sc.faces[fi]
-        yaw = float(rng.uniform(-math.pi, math.pi))
+        yaw = float(rng.uniform(-sc.max_yaw, sc.max_yaw))
         xy, ok = None, False
         for _ in range(200):
             lo, hi = region_bounds(task, sc.regions[int(rng.integers(len(sc.regions)))])

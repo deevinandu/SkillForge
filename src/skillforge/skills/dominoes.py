@@ -10,8 +10,9 @@ domino's resting centre), ToppleChain loops:
   ok (standing on its spot, yawed along the lane), misplaced (standing, off its spot or yaw),
   leaning (in between: wait and look again; still leaning after a while = fallen), down (fallen
   the right way, inside its region) or down_bad (lying or fallen any other way, or anywhere else).
-- stand up (`StandUp`), before the robot's own push, for every down_bad domino, top of a pile
-  first: grasp near its +z end, tilted about the closing axis just enough that palm and wrist
+- stand up (`StandUp`, OFF by default: `stand_up = False`, see that attribute for the MuJoCo
+  numbers; when off, a down_bad domino is reported and left), before the robot's own push, for
+  every down_bad domino, top of a pile first: grasp near its +z end, tilted about the closing axis just enough that palm and wrist
   stay clear of the table both now and once it stands; lift; turn the hand so the domino hangs
   upright (+z end up, chosen from how it actually sits in the fingers); set it down standing on
   its own spot if that is clear, else on the nearest clear point of a grid beside the lane; open,
@@ -593,6 +594,11 @@ class ToppleChain:
     quiet_tol = 0.01  # radians of tilt change per step that counts as still
     max_nudges = 4
     max_standups = 3  # per domino
+    # Standing a fallen domino back up (StandUp) is OFF: in MuJoCo it stood 3/24 face-down and
+    # 6/24 on-their-side dominoes up (2026-11-27, scripts/diag_standup.py): the fingertips touch the
+    # table with the pad centre still ~9 mm up (scripts/probe_fingers.py), so the pads barely reach
+    # a 10 mm-tall domino. With it off, such a domino is reported (`cannot stand ... up`) and left.
+    stand_up = False
     # where a fallen domino is stood up before it is carried to its spot: a grid on both sides of
     # the lane, close to the robot (picks from far out slipped in MuJoCo)
     standup_xs = (0.34, 0.40, 0.46)
@@ -718,6 +724,12 @@ class ToppleChain:
         # way is rebuilt: stood up in a clear spot (then repaired onto its spot like any other).
         # Top of a pile first, so nothing is resting on the one being picked.
         bad = [k for k in self.order if st[k] == "down_bad" and self.standups[k] < self.max_standups]
+        if bad and not self.pushed and not self.stand_up:
+            new = [k for k in bad if self.standups[k] == 0]
+            for k in new:
+                self.standups[k] = self.max_standups  # report once
+                self.log.append(f"{self.steps}:cannot stand {k} up (stand_up is off) [{summary}]")
+            bad = []
         if bad and not self.pushed:
             pos = {k: np.mean([s.objects[k].pos for s in self.samples], axis=0) for k in self.order}
             for k in sorted(bad, key=lambda j: -float(pos[j][2])):

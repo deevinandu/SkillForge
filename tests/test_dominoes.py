@@ -218,22 +218,49 @@ def test_standup_finds_a_clear_grasp_at_any_yaw(face):
 def test_builds_the_chain_from_scattered_dominoes(seed):
     ep, sk = run(load("franka_build_domino_chain_scattered"), seed)
     assert ep.success, (ep.failure_detail, sk.log)
-
-
-def test_scattered_starts_need_standups():
-    """Across a few seeds, some dominoes start lying down and get stood up."""
-    stood = 0
-    for seed in range(4):
-        _, sk = run(load("franka_build_domino_chain_scattered"), seed)
-        stood += sum(":standup:" in e for e in sk.log)
-    assert stood > 0
+    repaired = {e.split(":")[2].split("#")[0] for e in sk.log if ":repair:" in e}
+    assert repaired == set(sk.order)  # every domino started off its spot
+    assert not any(":standup:" in e for e in sk.log)
 
 
 @pytest.mark.parametrize("seed", range(4))
-def test_rebuilds_after_a_domino_is_laid_down_elsewhere(seed):
+def test_rebuilds_after_a_domino_is_moved_elsewhere(seed):
     ep, sk = run(load("franka_rebuild_domino_chain"), seed)
     assert ep.success, (ep.failure_detail, sk.log)
     moved = {e.rsplit(":", 1)[1] for e in ep.events if e.startswith("disturbance:relocate:")}
     assert moved  # the first one always fires
-    stood = {e.split(":")[2].split("#")[0] for e in sk.log if ":standup:" in e}
-    assert moved <= stood
+    repaired = {e.split(":")[2].split("#")[0] for e in sk.log if ":repair:" in e}
+    assert moved <= repaired
+
+
+def lying_variant(name: str) -> TaskSpec:
+    """The task with lying starts / lay-down relocations (what StandUp is for)."""
+    t = load(name)
+    sc = t.scene
+    upd = {"disturbances": tuple(d.model_copy(update={"faces": ("flat", "side")}) if d.kind == "relocate" else d
+                                 for d in sc.disturbances)}
+    if sc.scatter is not None:
+        upd["scatter"] = sc.scatter.model_copy(update={"faces": ("upright", "flat", "side"), "max_yaw": 3.1416})
+    return t.model_copy(update={"scene": sc.model_copy(update=upd)})
+
+
+def test_lying_domino_is_reported_when_stand_up_is_off():
+    t = lying_variant("franka_rebuild_domino_chain")
+    ep, sk = run(t, 0)
+    assert not ep.success
+    assert any("cannot stand" in e and "stand_up is off" in e for e in sk.log)
+    assert ep.failure == "unrecovered_disturbance"
+
+
+@pytest.mark.parametrize("name", ["franka_build_domino_chain_scattered", "franka_rebuild_domino_chain"])
+def test_stand_up_path_when_switched_on(name):
+    """StandUp is off by default (it fails in MuJoCo); its decision path still works when on."""
+    t = lying_variant(name)
+    stood = 0
+    for seed in range(4):
+        env, sk = DominoKinematicEnv(t), ToppleChain()
+        sk.stand_up = True
+        ep = run_episode(env, sk, t, seed)
+        assert ep.success, (seed, ep.failure_detail, sk.log)
+        stood += sum(":standup:" in e for e in sk.log)
+    assert stood > 0

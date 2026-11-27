@@ -1,6 +1,6 @@
 {
   "id": "franka_rebuild_domino_chain",
-  "instruction": "Five dominoes stand in a row. Someone takes one out and lays it down at the side of the table, and may do it again to one you just put back: stand them up, rebuild the row, then knock the first one over so the whole row falls away from you.",
+  "instruction": "Five dominoes stand in a row. Someone takes one out and stands it somewhere at the side of the table, and may do it again to one you just put back: rebuild the row, then knock the first one over so the whole row falls away from you.",
   "scene": {
     "robot": {
       "name": "franka_panda",
@@ -286,10 +286,10 @@
           "side_l"
         ],
         "faces": [
-          "flat",
-          "side"
+          "upright"
         ],
-        "before_event": "toppled:"
+        "before_event": "toppled:",
+        "max_yaw": 0.6
       },
       {
         "kind": "relocate",
@@ -305,10 +305,10 @@
           "side_l"
         ],
         "faces": [
-          "flat",
-          "side"
+          "upright"
         ],
-        "before_event": "toppled:"
+        "before_event": "toppled:",
+        "max_yaw": 0.6
       }
     ]
   },

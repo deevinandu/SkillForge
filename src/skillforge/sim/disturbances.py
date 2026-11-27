@@ -89,7 +89,7 @@ class DisturbanceSchedule:
                 )
                 if d.kind == "relocate":  # extra draws only for relocate, so other kinds keep theirs
                     p.face = d.faces[int(rng.integers(len(d.faces)))]
-                    p.yaw_abs = float(rng.uniform(-math.pi, math.pi))
+                    p.yaw_abs = float(rng.uniform(-d.max_yaw, d.max_yaw))
                     for _ in range(RELOCATE_CANDIDATES if d.regions else 0):
                         lo, hi = region_bounds(task, d.regions[int(rng.integers(len(d.regions)))])
                         p.cands.append(rng.uniform(lo, hi))

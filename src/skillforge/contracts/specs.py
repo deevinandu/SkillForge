@@ -105,7 +105,7 @@ RestFace = Literal["upright", "flat", "side"]
 
 class Scatter(Spec):
     """Random initial poses, drawn from the seed at reset: each of `objects` (empty = every movable
-    one) rests on one of `faces` (uniform), at a uniform yaw, at a uniform xy in one of `regions`
+    one) rests on one of `faces` (uniform), at a yaw ~ U(-max_yaw, max_yaw), at a uniform xy in one of `regions`
     (uniform), at least `min_dist` (centre to centre) from every other object. Faces other than
     "upright" need box objects. Overrides the spec pose and the xy/yaw jitter of those objects."""
 
@@ -113,6 +113,7 @@ class Scatter(Spec):
     regions: tuple[str, ...] = Field(min_length=1)
     faces: tuple[RestFace, ...] = Field(("upright",), min_length=1)
     min_dist: float = Field(0.10, ge=0.0)
+    max_yaw: float = Field(3.1416, gt=0.0, le=3.1416, description="radians")
 
 
 class Disturbance(Spec):
@@ -132,7 +133,7 @@ class Disturbance(Spec):
     - kind "knock": give it an angular velocity of magnitude ~ U(ang_vel) about a horizontal axis,
       so its top moves toward `knock_dir` (world xy) or, if None, a uniform random direction;
     - kind "relocate": someone picks it up and puts it down, at rest, on one of `faces` at a
-      uniform yaw: in one of `regions` (a free spot at least 0.09 m from everything), or, with
+      yaw ~ U(-max_yaw, max_yaw): in one of `regions` (a free spot at least 0.09 m from everything), or, with
       no regions, where it is moved by an xy offset of magnitude ~ U(xy).
     The env never disturbs an object the gripper is touching; it waits for it to be let go."""
 
@@ -150,6 +151,7 @@ class Disturbance(Spec):
     knock_dir: tuple[float, float] | None = None
     regions: tuple[str, ...] = ()  # relocate
     faces: tuple[RestFace, ...] = ("flat",)  # relocate
+    max_yaw: float = Field(3.1416, gt=0.0, le=3.1416)  # relocate: radians
 
     @model_validator(mode="after")
     def _consistent(self) -> Disturbance:

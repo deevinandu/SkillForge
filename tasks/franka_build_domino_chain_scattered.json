@@ -1,6 +1,6 @@
 {
   "id": "franka_build_domino_chain_scattered",
-  "instruction": "Four dominoes lie around the sides of the table: some standing, some face down, some on their side, at any angle. Stand each one up, line them up on the marked spots, put back any that someone moves or lays down, then knock the first one over so the whole row falls away from you.",
+  "instruction": "Four dominoes stand around the sides of the table, at random spots and angles. Line them up on the marked spots, put back any that someone moves, then knock the first one over so the whole row falls away from you.",
   "scene": {
     "robot": {
       "name": "franka_panda",
@@ -249,10 +249,10 @@
           "side_l"
         ],
         "faces": [
-          "flat",
-          "side"
+          "upright"
         ],
-        "before_event": "toppled:"
+        "before_event": "toppled:",
+        "max_yaw": 0.6
       },
       {
         "kind": "pose",
@@ -279,11 +279,10 @@
         "side_l"
       ],
       "faces": [
-        "upright",
-        "flat",
-        "side"
+        "upright"
       ],
-      "min_dist": 0.1
+      "min_dist": 0.1,
+      "max_yaw": 0.6
     }
   },
   "success": {
