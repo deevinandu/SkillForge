@@ -151,3 +151,66 @@ def test_bad_color_sorting_rejected(stub_task, change, match):
     change(d)
     with pytest.raises(ValidationError, match=match):
         TaskSpec.model_validate(d)
+
+
+# ---------------------------------------------------------------- dominoes: toppled + disturbances
+
+
+def _dominoes(stub_task, n=3) -> dict:
+    d = json.loads(stub_task.model_dump_json())
+    dom = {"name": "d", "shape": "box", "size": [0.005, 0.02, 0.04], "mass": 0.03}
+    d["scene"]["objects"] = [{**dom, "name": f"d{i}", "pose": {"pos": [0.4 + 0.05 * i, 0.0, 0.04]}} for i in range(n)]
+    d["scene"]["regions"] = [{"name": "lane", "center": [0.45, 0, 0.03], "half_extents": [0.15, 0.05, 0.04]}]
+    d["success"] = {
+        "kind": "all_of",
+        "conditions": [
+            {"kind": "object_toppled", "object": f"d{i}", "direction": [1.0, 0.0], "region": "lane"} for i in range(n)
+        ],
+    }
+    return d
+
+
+def test_toppled_and_disturbances_roundtrip(stub_task):
+    from skillforge.contracts import Disturbance, ObjectToppled, success_conditions, success_objects
+
+    d = _dominoes(stub_task)
+    d["scene"]["disturbances"] = [
+        {"kind": "pose", "objects": ["d1"], "at_step": {"lo": 10, "hi": 40}, "xy": {"lo": 0.01, "hi": 0.03},
+         "yaw": {"lo": 0.1, "hi": 0.5}, "before_event": "toppled:"},
+        {"kind": "knock", "after_event": "release:", "target": "event_object", "prob": 0.5,
+         "ang_vel": {"lo": 2, "hi": 4}, "knock_dir": [1, 0]},
+    ]
+    t = TaskSpec.model_validate(d)
+    assert TaskSpec.model_validate_json(t.model_dump_json()) == t
+    leaves = success_conditions(t.success)
+    assert all(isinstance(c, ObjectToppled) for c in leaves) and leaves[0].min_tilt == pytest.approx(0.6)
+    assert success_objects(t.success) == ("d0", "d1", "d2")
+    a, b = t.scene.disturbances
+    assert isinstance(a, Disturbance) and a.count == 1 and a.prob == 1.0 and a.target == "random"
+    assert b.kind == "knock" and b.knock_dir == (1.0, 0.0)
+
+
+def test_disturbances_default_off(stub_task):
+    assert stub_task.scene.disturbances == ()
+
+
+@pytest.mark.parametrize(
+    "change, match",
+    [
+        (lambda d: d["success"]["conditions"][0].update(region="nowhere"), "nowhere"),
+        (lambda d: d["success"]["conditions"][0].update(object="ghost"), "ghost"),
+        (lambda d: d["success"]["conditions"][0].update(direction=[0, 0]), "direction"),
+        (lambda d: d["success"]["conditions"][0].update(min_tilt=0), "min_tilt"),
+        (lambda d: d["scene"].update(disturbances=[{"kind": "pose", "objects": ["ghost"], "xy": {"lo": 0, "hi": 0.01}}]), "ghost"),
+        (lambda d: d["scene"].update(disturbances=[{"kind": "pose"}]), "non-zero xy or yaw"),
+        (lambda d: d["scene"].update(disturbances=[{"kind": "knock"}]), "ang_vel"),
+        (lambda d: d["scene"].update(disturbances=[{"kind": "pose", "yaw": {"lo": 0, "hi": 1}, "target": "event_object"}]), "after_event"),
+        (lambda d: d["scene"].update(disturbances=[{"kind": "pose", "yaw": {"lo": -1, "hi": 1}}]), ">= 0"),
+        (lambda d: d["scene"].update(disturbances=[{"kind": "pose", "yaw": {"lo": 0, "hi": 1}, "prob": 1.5}]), "prob"),
+    ],
+)
+def test_bad_dominoes_rejected(stub_task, change, match):
+    d = _dominoes(stub_task)
+    change(d)
+    with pytest.raises(ValidationError, match=match):
+        TaskSpec.model_validate(d)
