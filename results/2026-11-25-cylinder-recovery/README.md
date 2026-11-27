@@ -45,7 +45,7 @@ UprightCylinder stands a lying cylinder up with gravity:
 
 | Seeds | Rebuilt |
 | --- | --- |
-| 0-49 (all knocked) | **50/50** |
+| 0-49 (all knocked) | **49/50** (seed 47: grip slipped; 50/50 before main's domino sim changes moved the knock-over later in the step) |
 | 100-149 (held out, all knocked) | **49/50** (seed 107: out of time) |
 | UprightCylinder alone: 4 x 6 positions x 4 lying directions | 96/96 |
 
@@ -65,6 +65,9 @@ UprightCylinder stands a lying cylinder up with gravity:
 
 ## Sim changes (T1)
 - Knock-over treats fixed objects (the border) as obstacles: it used to crash on them.
+- After a knock-over the env refreshes its cached robot contacts. Without that, a knock-over while
+  the hand touched something crashed the next observation (stale contact index); main had this
+  after merging knockdown with the domino disturbances.
 - Cylinders use contact dimension 6, so the rolling friction they already specified (0.0001 m)
   applies. At dimension 4 nothing slowed a rolling cylinder: once nudged, it rolled on until it
   hit something or left the table. The regression baselines (tubes, rack, cylinder to bin,

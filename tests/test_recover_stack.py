@@ -136,9 +136,13 @@ def mj():
     return evaluate, make_env
 
 
-def test_rebuilds_the_knocked_pyramid(mj):
+@pytest.mark.parametrize("seed", [0, 9])
+def test_rebuilds_the_knocked_pyramid(mj, seed):
+    # two cylinders knocked over each (seed 0 at step 784, with the hand touching a cylinder:
+    # the env must refresh its contacts after the knock-over; seed 9 at step 1313)
     evaluate, make_env = mj
     t = load(KNOCKED)
-    _, (ep,) = evaluate(make_env, StackWithRecovery(), t, [9])  # two cylinders knocked over at step 1313
+    _, (ep,) = evaluate(make_env, StackWithRecovery(), t, [seed])
+    assert ep.failure != "exception", ep.failure_detail
     assert ep.success, (ep.failure, ep.failure_detail)
     assert sum(e.startswith("knockdown:") for e in ep.events) == 2

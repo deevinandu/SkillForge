@@ -64,7 +64,9 @@ class Action:
 class StepInfo:
     success: bool
     terminated: bool  # task can no longer succeed (e.g. object fell off the table)
-    events: list[str] = field(default_factory=list)  # e.g. 'collision:arm-table', 'grasp_slip'
+    # e.g. 'collision:arm-table', 'grasp_slip'. A SceneSpec.disturbances perturbation is reported as
+    # 'disturbance:<kind>:<obj>' on the step it was applied ('disturbance_skipped:<obj>' if it could not be)
+    events: list[str] = field(default_factory=list)
 
 
 # ---------------------------------------------------------------- interfaces
@@ -124,6 +126,9 @@ FailureTag = Literal[
     "exception",
     "terminated",
     "sim_artifact",  # the simulator failed (NaN reset, object flung by the solver), not the skill
+    # the env disturbed the scene (SceneSpec.disturbances) and the skill did not recover from it;
+    # only when no more specific cause (sim artifact, ik failure, collision, slip, drop) explains it
+    "unrecovered_disturbance",
     "other",
 ]
 

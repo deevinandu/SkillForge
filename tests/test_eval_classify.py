@@ -25,6 +25,12 @@ from skillforge.eval.harness import _classify
         (["grasp:cube", "grasp_slip", "object_ejected:cube"], True, False, "sim_artifact"),
         (["ik_failure", "collision:hand-table", "object_ejected"], False, True, "sim_artifact"),
         (["grasp:cube", "sim_unstable"], True, False, "sim_artifact"),
+        (["disturbance:pose:domino_2"], False, True, "unrecovered_disturbance"),
+        (["grasp:d", "release:d", "disturbance:pose:d"], False, True, "unrecovered_disturbance"),  # not the placement
+        (["disturbance:knock:d", "collision:hand-d"], False, True, "collision"),  # a physical cause first
+        (["disturbance:pose:d", "grasp:d", "grasp_slip:d"], False, True, "grasp_slip"),
+        (["disturbance:pose:d"], True, False, "object_dropped"),
+        (["disturbance_skipped:d"], False, True, "timeout"),  # nothing was disturbed
         (["object_ejected_check"], False, True, "timeout"),  # name match, not prefix of a longer name  # prefix match is on the event name, not a substring
     ],
 )
@@ -33,5 +39,7 @@ def test_classify(events, terminated, timed_out, tag):
     assert got == tag
     if tag in ("ik_failure", "collision", "grasp_slip"):
         assert why.startswith(tag)
+    if tag == "unrecovered_disturbance":
+        assert why.startswith("disturbance:")
     if tag == "sim_artifact":
         assert why.startswith(("sim_unstable", "object_ejected"))
