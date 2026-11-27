@@ -5,6 +5,7 @@
   sysid    fit latency, tracking gain and gripper timing from a session -> calibration.json
   scoreboard  sim prediction against session results -> scoreboard.json and .html
   close-loop  turn a session's failed trials into pinned sim tasks and regression baselines
+  camera   capture one RealSense frame -> rgb/depth png, frame.npz; --extrinsics adds a calibration check
 """
 
 from __future__ import annotations
@@ -116,6 +117,52 @@ def cmd_close_loop(a: argparse.Namespace) -> None:
         print("no failed trials in this session")
 
 
+def cmd_camera(a: argparse.Namespace) -> None:
+    import numpy as np
+
+    from .realsense import (
+        RealSenseCamera,
+        RealSenseFrameSource,
+        calibration_overlay,
+        list_devices,
+        load_extrinsics,
+    )
+
+    devices = list_devices()
+    for name, serial in devices:
+        print(f"found {name} serial {serial}")
+    if not devices:
+        raise SystemExit("no RealSense camera found: check the USB 3 cable and `rs-enumerate-devices`")
+    T = load_extrinsics(a.extrinsics) if a.extrinsics else np.eye(4)
+    cam = RealSenseCamera(a.name, T, serial=a.serial, width=a.width, height=a.height)
+    out = Path(a.out) if a.out else RUNS / "real" / "camera" / f"{datetime.now():%Y%m%d-%H%M%S}"
+    out.mkdir(parents=True, exist_ok=True)
+    with RealSenseFrameSource([cam]) as src:
+        frame = src.capture(a.name)
+        if frame is None:
+            raise SystemExit("camera started but no frame arrived")
+        info = src.info(a.name)
+    valid = frame.depth > 0
+    info.update(valid_depth_fraction=float(valid.mean()),
+                median_depth=float(np.median(frame.depth[valid])) if valid.any() else None,
+                extrinsics=str(a.extrinsics) if a.extrinsics else None)
+    (out / "camera.json").write_text(json.dumps(info, indent=2))
+    np.savez_compressed(out / "frame.npz", rgb=frame.rgb, depth=frame.depth, K=frame.K, T_world_cam=frame.T_world_cam)
+    try:
+        import imageio.v3 as iio
+    except ImportError:
+        iio = None
+    if iio is not None:
+        iio.imwrite(out / "rgb.png", frame.rgb)
+        d = np.clip(frame.depth / max(float(np.percentile(frame.depth[valid], 99)), 1e-3), 0, 1) if valid.any() else frame.depth
+        iio.imwrite(out / "depth.png", (d * 255).astype(np.uint8))
+        if a.extrinsics:
+            iio.imwrite(out / "calibration_check.png", calibration_overlay(frame))
+    print(f"K fx={info['K'][0][0]:.1f} fy={info['K'][1][1]:.1f} cx={info['K'][0][2]:.1f} cy={info['K'][1][2]:.1f}, "
+          f"depth valid {info['valid_depth_fraction']:.0%}, median {info['median_depth'] or 0:.3f} m")
+    print(f"wrote {out}")
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="python -m skillforge.real", description=__doc__.splitlines()[0])
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -154,6 +201,14 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--baselines-dir", default=str(REPO / "tests" / "regression" / "baselines"))
     p.add_argument("--n-seeds", type=int, default=20)
     p.set_defaults(fn=cmd_close_loop)
+    p = sub.add_parser("camera", help="capture one RealSense frame; with --extrinsics, draw the calibration check")
+    p.add_argument("--name", default="overview")
+    p.add_argument("--serial", help="camera serial; default: the only one connected")
+    p.add_argument("--extrinsics", help="world<-camera 4x4 as .npy or .json")
+    p.add_argument("--width", type=int, default=640)
+    p.add_argument("--height", type=int, default=480)
+    p.add_argument("--out")
+    p.set_defaults(fn=cmd_camera)
     a = ap.parse_args(argv)
     a.fn(a)
     return 0
