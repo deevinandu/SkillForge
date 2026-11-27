@@ -3,6 +3,12 @@
 It exists so T2/T3/T4 can build and test against the SimEnv contract before T1's MuJoCo
 env lands. It honours the randomization fields that make sense without physics
 (xy/yaw jitter, observation noise, latency) and records the rest as sampled values.
+
+Disturbances (`SceneSpec.disturbances`, drawn by `sim/disturbances.py` exactly as MujocoEnv draws
+them): 'pose' shifts and yaws the object, 'knock' lays it down 90 degrees toward the knock
+direction at once (a toy: no physics). A held object is not disturbed until it is let go.
+Object orientations start at identity (the stub ignores spec orientations and yaw jitter) and
+change only through disturbances.
 """
 
 from __future__ import annotations
@@ -13,6 +19,7 @@ import numpy as np
 
 from skillforge.contracts import Action, ObjectState, Observation, StepInfo, TaskSpec
 
+from .disturbances import DisturbanceSchedule, knock_axis, quat_mul, yaw_quat
 from .success import is_success
 
 TABLE_Z = 0.0
@@ -51,6 +58,10 @@ class StubEnv:
                 p[:2] += self._rng.uniform(-j, j, size=2)
             self._obj[o.name] = p
         self._start = {k: v.copy() for k, v in self._obj.items()}
+        self._quat = {k: np.array([1.0, 0.0, 0.0, 0.0]) for k in self._obj}
+        self._disturb = DisturbanceSchedule(self.task, seed)
+        self._sample.update(self._disturb.sample)
+        self._step_i = 0
         self._ee = np.array(self.task.scene.robot.base_pose.pos, dtype=float) + np.array([0.4, 0.0, 0.3])
         self._grip = 0.0
         self._held: str | None = None
@@ -66,8 +77,11 @@ class StubEnv:
         if act is not None:
             events += self._apply(act)
         self._t += self.dt
+        self._step_i += 1
+        if self._disturb:
+            events += self._apply_disturbances(events)
         info = StepInfo(
-            success=is_success(self.task, self._obj, self._start),
+            success=is_success(self.task, self._obj, self._start, quats=self._quat),
             terminated=any(p[2] < TABLE_Z - 0.05 for p in self._obj.values()),
             events=events,
         )
@@ -112,10 +126,27 @@ class StubEnv:
                 p[2] = self._start[k][2]
         return events
 
+    def _apply_disturbances(self, events: list[str]) -> list[str]:
+        out = []
+        for p in self._disturb.update(self._step_i, events):
+            if p.obj == self._held:
+                if e := self._disturb.blocked(p):
+                    out.append(e)
+                continue
+            if p.kind == "pose":
+                self._obj[p.obj][:2] += [p.dx, p.dy]
+                self._quat[p.obj] = quat_mul(yaw_quat(p.dyaw), self._quat[p.obj])
+            else:  # knock: fall flat toward the heading
+                ax = knock_axis(p.heading)
+                fall = np.concatenate([[np.cos(np.pi / 4)], np.sin(np.pi / 4) * ax])
+                self._quat[p.obj] = quat_mul(fall, self._quat[p.obj])
+            out.append(self._disturb.applied(p))
+        return out
+
     def _observe(self) -> Observation:
         sd = self._sample["obs_noise_std"]
         objs = {
-            k: ObjectState(pos=p + self._rng.normal(0, sd, 3) if sd > 0 else p.copy(), quat=np.array([1.0, 0, 0, 0]))
+            k: ObjectState(pos=p + self._rng.normal(0, sd, 3) if sd > 0 else p.copy(), quat=self._quat[k].copy())
             for k, p in self._obj.items()
         }
         return Observation(
