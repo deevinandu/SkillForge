@@ -15,6 +15,8 @@ On macOS the viewer needs `mjpython scripts/try_dominoes.py --view` (comes with 
 from __future__ import annotations
 
 import argparse
+import os
+import sys
 import time
 from pathlib import Path
 
@@ -89,6 +91,9 @@ def main() -> None:
     print("skill log:")
     for line in skill.log:
         print("  ", line)
+    if a.view:  # skip interpreter teardown: the viewer's GL context segfaults there on some drivers
+        sys.stdout.flush()
+        os._exit(0)
 
 
 if __name__ == "__main__":

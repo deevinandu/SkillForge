@@ -17,6 +17,8 @@ from __future__ import annotations
 import argparse
 import json
 import math
+import os
+import sys
 import time
 from pathlib import Path
 
@@ -105,3 +107,5 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+    sys.stdout.flush()
+    os._exit(0)  # skip interpreter teardown: a viewer's GL context segfaults there on some drivers
