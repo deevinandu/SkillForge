@@ -1,0 +1,308 @@
+{
+  "id": "franka_rebuild_fallen_dominoes",
+  "instruction": "Four dominoes lie fallen around the sides of the table, face down or on their side, at any angle. Stand each one up, line them up on the marked spots, then knock the first one over so the whole row falls away from you.",
+  "scene": {
+    "robot": {
+      "name": "franka_panda",
+      "source": "menagerie:franka_emika_panda",
+      "ee_site": "tcp",
+      "gripper": "parallel",
+      "max_gripper_width": 0.08
+    },
+    "objects": [
+      {
+        "name": "domino_1",
+        "shape": "box",
+        "size": [
+          0.003931,
+          0.012554,
+          0.025368
+        ],
+        "mass": 0.012,
+        "friction": 0.8,
+        "pose": {
+          "pos": [
+            0.36,
+            -0.18,
+            0.025368
+          ],
+          "quat": [
+            1.0,
+            0.0,
+            0.0,
+            0.0
+          ]
+        },
+        "color": "red"
+      },
+      {
+        "name": "domino_2",
+        "shape": "box",
+        "size": [
+          0.003931,
+          0.012554,
+          0.025368
+        ],
+        "mass": 0.012,
+        "friction": 0.8,
+        "pose": {
+          "pos": [
+            0.46,
+            -0.18,
+            0.025368
+          ],
+          "quat": [
+            1.0,
+            0.0,
+            0.0,
+            0.0
+          ]
+        },
+        "color": "blue"
+      },
+      {
+        "name": "domino_3",
+        "shape": "box",
+        "size": [
+          0.003931,
+          0.012554,
+          0.025368
+        ],
+        "mass": 0.012,
+        "friction": 0.8,
+        "pose": {
+          "pos": [
+            0.36,
+            0.18,
+            0.025368
+          ],
+          "quat": [
+            1.0,
+            0.0,
+            0.0,
+            0.0
+          ]
+        },
+        "color": "yellow"
+      },
+      {
+        "name": "domino_4",
+        "shape": "box",
+        "size": [
+          0.003931,
+          0.012554,
+          0.025368
+        ],
+        "mass": 0.012,
+        "friction": 0.8,
+        "pose": {
+          "pos": [
+            0.46,
+            0.18,
+            0.025368
+          ],
+          "quat": [
+            1.0,
+            0.0,
+            0.0,
+            0.0
+          ]
+        },
+        "color": "orange"
+      }
+    ],
+    "regions": [
+      {
+        "name": "lane",
+        "center": [
+          0.5014,
+          0.0,
+          0.02
+        ],
+        "half_extents": [
+          0.1114,
+          0.07,
+          0.04
+        ],
+        "visible": false
+      },
+      {
+        "name": "spot_domino_1",
+        "center": [
+          0.44,
+          0.0,
+          0.025368
+        ],
+        "half_extents": [
+          0.004,
+          0.004,
+          0.004
+        ],
+        "visible": false
+      },
+      {
+        "name": "spot_domino_2",
+        "center": [
+          0.474,
+          0.0,
+          0.025368
+        ],
+        "half_extents": [
+          0.004,
+          0.004,
+          0.004
+        ],
+        "visible": false
+      },
+      {
+        "name": "spot_domino_3",
+        "center": [
+          0.508,
+          0.0,
+          0.025368
+        ],
+        "half_extents": [
+          0.004,
+          0.004,
+          0.004
+        ],
+        "visible": false
+      },
+      {
+        "name": "spot_domino_4",
+        "center": [
+          0.542,
+          0.0,
+          0.025368
+        ],
+        "half_extents": [
+          0.004,
+          0.004,
+          0.004
+        ],
+        "visible": false
+      },
+      {
+        "name": "fallen_r",
+        "center": [
+          0.41,
+          -0.2,
+          0.03
+        ],
+        "half_extents": [
+          0.09,
+          0.06,
+          0.04
+        ],
+        "visible": false
+      },
+      {
+        "name": "fallen_l",
+        "center": [
+          0.41,
+          0.2,
+          0.03
+        ],
+        "half_extents": [
+          0.09,
+          0.06,
+          0.04
+        ],
+        "visible": false
+      }
+    ],
+    "randomization": {
+      "object_xy_jitter": {
+        "lo": 0.0,
+        "hi": 0.003
+      },
+      "object_yaw_jitter": {
+        "lo": 0.0,
+        "hi": 0.05
+      },
+      "friction_scale": {
+        "lo": 0.7,
+        "hi": 1.2
+      },
+      "mass_scale": {
+        "lo": 0.8,
+        "hi": 1.25
+      },
+      "actuator_gain_scale": {
+        "lo": 0.8,
+        "hi": 1.2
+      },
+      "obs_noise_std": {
+        "lo": 0.0,
+        "hi": 0.002
+      },
+      "action_latency_steps": {
+        "lo": 0,
+        "hi": 2
+      }
+    },
+    "disturbances": [],
+    "scatter": {
+      "regions": [
+        "fallen_r",
+        "fallen_l"
+      ],
+      "faces": [
+        "flat",
+        "side"
+      ],
+      "min_dist": 0.08
+    }
+  },
+  "success": {
+    "kind": "all_of",
+    "conditions": [
+      {
+        "kind": "object_toppled",
+        "object": "domino_1",
+        "min_tilt": 0.6,
+        "direction": [
+          1.0,
+          0.0
+        ],
+        "dir_tol": 0.8,
+        "region": "lane"
+      },
+      {
+        "kind": "object_toppled",
+        "object": "domino_2",
+        "min_tilt": 0.6,
+        "direction": [
+          1.0,
+          0.0
+        ],
+        "dir_tol": 0.8,
+        "region": "lane"
+      },
+      {
+        "kind": "object_toppled",
+        "object": "domino_3",
+        "min_tilt": 0.6,
+        "direction": [
+          1.0,
+          0.0
+        ],
+        "dir_tol": 0.8,
+        "region": "lane"
+      },
+      {
+        "kind": "object_toppled",
+        "object": "domino_4",
+        "min_tilt": 0.6,
+        "direction": [
+          1.0,
+          0.0
+        ],
+        "dir_tol": 0.8,
+        "region": "lane"
+      }
+    ]
+  },
+  "max_steps": 8000,
+  "control_hz": 20
+}

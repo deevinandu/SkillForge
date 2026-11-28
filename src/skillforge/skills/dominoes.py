@@ -10,9 +10,8 @@ domino's resting centre), ToppleChain loops:
   ok (standing on its spot, yawed along the lane), misplaced (standing, off its spot or yaw),
   leaning (in between: wait and look again; still leaning after a while = fallen), down (fallen
   the right way, inside its region) or down_bad (lying or fallen any other way, or anywhere else).
-- stand up (`StandUp`, OFF by default: `stand_up = False`, see that attribute for the MuJoCo
-  numbers; when off, a down_bad domino is reported and left), before the robot's own push, for
-  every down_bad domino, top of a pile first: grasp near its +z end, tilted about the closing axis just enough that palm and wrist
+- stand up (`StandUp`; `stand_up = False` turns it off and only reports lying dominoes), before
+  the robot's own push, for every down_bad domino, top of a pile first: grasp near its +z end, tilted about the closing axis just enough that palm and wrist
   stay clear of the table both now and once it stands; lift; turn the hand so the domino hangs
   upright (+z end up, chosen from how it actually sits in the fingers); set it down standing on
   its own spot if that is clear, else on the nearest clear point of a grid beside the lane; open,
@@ -155,8 +154,10 @@ class TouchDown(Ramp):
     resting on the table). For picking a domino that lies flat, where the pads must get as low as
     the fingertips allow and a fixed target height is either above the domino or in the table."""
 
-    def __init__(self, goal, step: float, extra: float = 0.012, force: float = 3.0, lag: float = 0.003, **kw):
+    def __init__(self, goal, step: float, extra: float = 0.012, force: float = 2.0, lag: float = 0.002,
+                 slow: float = 0.001, slow_from: float = 0.02, **kw):
         self.extra, self.force, self.lag = extra, force, lag
+        self.slow, self.slow_from = slow, slow_from  # step per tick within `slow_from` of the goal
         self.last_z: float | None = None
         super().__init__(goal, step, **kw)
 
@@ -172,8 +173,9 @@ class TouchDown(Ramp):
             self.ref = obs.ee_pos.copy()
         d = g - self.ref
         n = float(np.linalg.norm(d))
-        self.arrived = n <= self.step
-        self.ref = g.copy() if self.arrived else self.ref + d * (self.step / n)
+        step = self.slow if self.ref[2] - (g[2] + self.extra) < self.slow_from else self.step
+        self.arrived = n <= step
+        self.ref = g.copy() if self.arrived else self.ref + d * (step / n)
         return self.ref
 
     def _near(self, obs, ctx):
@@ -208,12 +210,23 @@ class HandHoldMonitor(HoldMonitor):
 class Turn(Node):
     """Hold the EE still (gripper fixed) until its orientation is within `tol` of `ctx.quat`."""
 
-    def __init__(self, gripper: float, tol: float = 0.04, timeout: int = 60, check=None, name: str = "turn"):
+    def __init__(self, gripper: float, tol: float = 0.04, timeout: int = 60, check=None, name: str = "turn",
+                 rate: float | None = None):
         self.gripper, self.tol, self.timeout, self.check, self.name = gripper, tol, timeout, check, name
-        self.n, self.at = 0, None
+        self.rate = rate  # radians per step the commanded orientation may turn (None: command the goal)
+        self.n, self.at, self.ref = 0, None, None
 
     def reset(self) -> None:
-        self.n, self.at = 0, None
+        self.n, self.at, self.ref = 0, None, None
+
+    def _command(self, obs, goal: np.ndarray) -> np.ndarray:
+        if self.rate is None:
+            return goal
+        if self.ref is None:
+            self.ref = np.asarray(obs.ee_quat, dtype=float)
+        ang = quat_angle(self.ref, goal)
+        self.ref = goal.copy() if ang <= self.rate else _slerp(self.ref, goal, self.rate / ang)
+        return self.ref
 
     def tick(self, obs, ctx):
         if self.at is None:
@@ -225,7 +238,19 @@ class Turn(Node):
         self.n += 1
         if self.n > self.timeout:
             return None, fail(f"timeout:{self.name}")
-        return Action(ee_pos=self.at, ee_quat=ctx.quat, gripper=self.gripper), RUNNING
+        return Action(ee_pos=self.at, ee_quat=self._command(obs, ctx.quat), gripper=self.gripper), RUNNING
+
+
+def _slerp(a: np.ndarray, b: np.ndarray, t: float) -> np.ndarray:
+    a, b = np.asarray(a, dtype=float), np.asarray(b, dtype=float)
+    d = float(a @ b)
+    if d < 0:
+        b, d = -b, -d
+    if d > 0.9995:
+        q = a + t * (b - a)
+        return q / np.linalg.norm(q)
+    th = math.acos(d)
+    return (math.sin((1 - t) * th) * a + math.sin(t * th) * b) / math.sin(th)
 
 
 # ---------------------------------------------------------------- one repair
@@ -391,7 +416,8 @@ class StandUp:
     the hand goes down."""
 
     end_offset = 0.026  # grasp this far from the centre toward one end (8.5 mm pad half-height inside)
-    min_grasp_z = 0.008  # aim for the pad centre here (a flat domino is 1 cm tall); TouchDown stops on contact
+    min_grasp_z = 0.006  # aim for the pad centre here; TouchDown stops on contact (fingertips touch at ~9 mm)
+    ease_up = 0.001  # after touching down, back off this much before closing
     lift_z = 0.24
     hover = 0.10
     lift_step = 0.006
@@ -407,8 +433,9 @@ class StandUp:
     palm = (0.032, 0.105, -0.13, -0.037)
     wrist = (-0.21, 0.065)
     min_clear = 0.008
-    tilts = (0.0, 0.35, 0.5, 0.65, 0.8, 1.0)  # radians of grasp tilt about the closing axis, tried in order
-    max_up = -0.26  # the standing pose's hand axis must point down at least ~15 deg (reachable, wrist high)
+    tilts = (0.5, 0.65, 0.8, 1.0)  # radians of grasp tilt about the closing axis, tried in order
+    max_up = -0.45  # the standing pose's hand axis must point down at least ~27 deg (reachable, wrist high)
+    turn_rate = 0.04  # radians per step (0.8 rad/s) while turning the domino upright
 
     def __init__(self, task: TaskSpec, obj: str, spot: np.ndarray, lane_dir: np.ndarray):
         o = task.scene.object(obj)
@@ -510,6 +537,13 @@ class StandUp:
             c.bb["rise_xy"] = obs.ee_pos[:2].copy()
             return None
 
+        def note_touch(obs, c):
+            c.bb["eased"] = obs.ee_pos + [0.0, 0.0, self.ease_up]
+            return None
+
+        def eased(obs, c):
+            return c.bb["eased"]
+
         def risen(obs, c):
             return np.array([*c.bb["rise_xy"], self.lift_z])
 
@@ -545,13 +579,15 @@ class StandUp:
             [
                 Ramp(up_here, self.carry_step, gripper=0.0, timeout=200, name="clear"),
                 MoveTo(above_grasp, gripper=0.0, tol=0.006, timeout=250, check=check_grasp, name="approach"),
-                TouchDown(grasp_target, self.lower_step, eps=0.003, gripper=0.0, timeout=150, check=check_grasp,
+                TouchDown(grasp_target, self.lower_step, eps=0.003, gripper=0.0, timeout=200, check=check_grasp,
                           name="descend"),
+                Do(note_touch, name="note_touch"),
+                Ramp(eased, 0.001, eps=0.0015, gripper=0.0, timeout=20, name="ease"),
                 grip(settle=st),
                 Do(note, name="note"),
                 Ramp(risen, self.lift_step, gripper=1.0, check=held, timeout=250, name="lift"),
                 Do(plan, name="plan"),
-                Turn(1.0, check=held, timeout=120, name="stand"),
+                Turn(1.0, check=held, timeout=160, name="stand", rate=self.turn_rate),
                 Ramp(over_spot, self.carry_step, gripper=1.0, check=held, timeout=300, name="carry"),
                 Ramp(on_spot, self.lower_step, eps=0.003, gripper=1.0, check=held, timeout=200, name="lower"),
                 release(settle=st),
@@ -595,11 +631,10 @@ class ToppleChain:
     quiet_tol = 0.01  # radians of tilt change per step that counts as still
     max_nudges = 4
     max_standups = 3  # per domino
-    # Standing a fallen domino back up (StandUp) is OFF: in MuJoCo it stood 3/24 face-down and
-    # 6/24 on-their-side dominoes up (2026-11-27, scripts/diag_standup.py): the fingertips touch the
-    # table with the pad centre still ~9 mm up (scripts/probe_fingers.py), so the pads barely reach
-    # a 10 mm-tall domino. With it off, such a domino is reported (`cannot stand ... up`) and left.
-    stand_up = False
+    # Stand a fallen domino back up (StandUp). Round 2 in MuJoCo (8 cm test domino) stood 3/24
+    # face-down and 6/24 on-their-side dominoes up; round 3 (real 5 cm domino, gentle touch-down,
+    # grasp tilted >= 0.5 rad, slow turn) is untested. Set False to only report lying dominoes.
+    stand_up = True
     # where a fallen domino is stood up before it is carried to its spot: a grid on both sides of
     # the lane, close to the robot (picks from far out slipped in MuJoCo)
     standup_xs = (0.34, 0.40, 0.46)
