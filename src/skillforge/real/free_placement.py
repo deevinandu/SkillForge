@@ -124,12 +124,19 @@ class FreePlacementOperator:
     Enter: measure the table and check the layout. When it is fine, the sim predicts it, and
     Enter runs the trial; 'r' re-measures (after moving something); 'a' aborts the trial.
     `predict(task_with_layout)` and `show()` are injected (the CLI passes the sim and a picture).
+    `fresh()` is called before every measurement: it must make the estimator forget which object
+    was where (objects jump between measurements while a person arranges them; an estimator that
+    tracks names by nearest previous position then loses most of them; seen on the arm
+    2026-11-27, "sees 2 of 6" with all six in plain view).
+    `preview` (a `Preview`) runs while the person arranges objects, until Enter.
     """
 
     task: TaskSpec
     area: StartArea = LAB_START_AREA
     predict: Callable[[TaskSpec], Prediction] | None = None
     show: Callable[[], None] | None = None
+    fresh: Callable[[], None] | None = None
+    preview: object | None = None  # has start() and stop()
     min_prediction: float = 0.8  # warn below this predicted success rate
     out: Path | None = None  # saves layout_<seed>.json (pinned task + prediction) here
     ask: Callable[[str], str] = input
@@ -142,10 +149,19 @@ class FreePlacementOperator:
                  f"(x {self.area.x[0]:.2f}..{self.area.x[1]:.2f} m out from the base, "
                  f"y {self.area.y[0]:.2f}..{self.area.y[1]:.2f} m), standing up, spread apart.")
         while True:
-            if self.ask("Enter when placed (a = abort): ").strip().lower() == "a":
+            if self.preview is not None:
+                self.preview.start()
+            try:
+                ans = self.ask("Enter when placed (a = abort): ").strip().lower()
+            finally:
+                if self.preview is not None:
+                    self.preview.stop()  # before measuring: one user of the camera at a time
+            if ans == "a":
                 raise PlacementAborted(f"operator aborted trial {seed}")
             if self.show is not None:
                 self.show()
+            if self.fresh is not None:
+                self.fresh()
             est = measure()
             problems = check_layout(self.task, est, self.area)
             if problems:

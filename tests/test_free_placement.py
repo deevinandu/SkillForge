@@ -154,3 +154,89 @@ def test_lab_env_with_free_placement(tmp_path):
         scene.close()
         srv.terminate()
         srv.wait(5)
+
+
+def test_every_measurement_starts_fresh():
+    """2026-11-27 on the arm: the estimator kept names from earlier measurements while the person
+    moved cans around, and reported 'sees 2 of 6' with all six in view. `fresh` runs first."""
+    calls = []
+    op = FreePlacementOperator(task(), fresh=lambda: calls.append("fresh"), ask=scripted(["", "a"]),
+                               say=lambda s: None)
+    with pytest.raises(PlacementAborted):
+        op.place(0, {}, measure=lambda: calls.append("measure") or est(GOOD))
+    assert calls == ["fresh", "measure"]
+
+
+def test_tracking_loses_cans_that_jump_and_a_fresh_estimator_finds_them():
+    pytest.importorskip("mujoco")
+    sys.path.insert(0, str(Path(__file__).parent))
+    from test_cans import set_pose
+    from test_lab_env import SimCamera
+
+    from skillforge.real.cans import IdenticalCylinderEstimator
+    from skillforge.sim import make_env
+
+    t = task()
+    scene = make_env(t)
+    scene.reset(0)
+    if scene.render() is None:
+        scene.close()
+        pytest.skip("no GL context")
+    cam = SimCamera(scene)
+    try:
+        far = {n: (x + 0.0, y - 0.0) for n, (x, y) in GOOD.items()}
+        for n, (x, y) in far.items():
+            set_pose(scene, n, [x, y + 0.13 if y < -0.1 else y - 0.13, 0.0419])  # a first arrangement
+        e = IdenticalCylinderEstimator()
+        e.reset(t)
+        e.estimate([cam.capture("fixed")])
+        for n, (x, y) in GOOD.items():  # the person rearranges everything
+            set_pose(scene, n, [x, y, 0.0419])
+        tracked = e.estimate([cam.capture("fixed")])
+        e.reset(t)
+        fresh = e.estimate([cam.capture("fixed")])
+        assert sum(s.found for s in fresh.values()) == 6
+        assert sum(s.found for s in tracked.values()) <= sum(s.found for s in fresh.values())
+    finally:
+        cam.src.close()
+        scene.close()
+
+
+def test_preview_draws_and_stops(tmp_path):
+    pytest.importorskip("mujoco")
+    sys.path.insert(0, str(Path(__file__).parent))
+    from test_cans import set_pose
+    from test_lab_env import SimCamera
+
+    from skillforge.real.lab import Preview
+    from skillforge.sim import make_env
+
+    t = task()
+    scene = make_env(t)
+    scene.reset(0)
+    if scene.render() is None:
+        scene.close()
+        pytest.skip("no GL context")
+    cam = SimCamera(scene)
+    try:
+        for n, (x, y) in GOOD.items():
+            set_pose(scene, n, [x, y, 0.0419])
+        frame = cam.capture("fixed")  # MuJoCo's GL renders only in its own thread; the RealSense has no such limit
+
+        class Still:
+            def capture(self, name):
+                return frame
+
+        p = Preview(t, Still(), tmp_path / "placement.png", hz=10)
+        p.start()
+        import time
+
+        time.sleep(1.0)
+        p.stop()
+        assert p.frames_written >= 2 and (tmp_path / "placement.png").exists()
+        n = p.frames_written
+        time.sleep(0.4)
+        assert p.frames_written == n  # really stopped: the camera is free for the measurement
+    finally:
+        cam.src.close()
+        scene.close()
