@@ -322,9 +322,9 @@ def test_mujoco_scattered_dominoes_rest(mj):
 def test_mujoco_relocate(mj):
     reloc = {"kind": "relocate", "objects": ["d1"], "at_step": {"lo": 5, "hi": 5}, "regions": ["side_r", "side_l"],
              "faces": ["flat"]}
-    t = domino_task(source="menagerie:franka_emika_panda", disturbances=[reloc])
-    d = json.loads(t.model_dump_json())
-    d["scene"]["regions"] += SIDES
+    d = json.loads(domino_task(source="menagerie:franka_emika_panda").model_dump_json())
+    d["scene"]["regions"] += SIDES  # the regions first: the relocate names them
+    d["scene"]["disturbances"] = [reloc]
     env = mj(TaskSpec.model_validate(d))
     env.reset(0)
     a = _park(env)

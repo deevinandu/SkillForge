@@ -631,10 +631,12 @@ class ToppleChain:
     quiet_tol = 0.01  # radians of tilt change per step that counts as still
     max_nudges = 4
     max_standups = 3  # per domino
-    # Stand a fallen domino back up (StandUp). Round 2 in MuJoCo (8 cm test domino) stood 3/24
-    # face-down and 6/24 on-their-side dominoes up; round 3 (real 5 cm domino, gentle touch-down,
-    # grasp tilted >= 0.5 rad, slow turn) is untested. Set False to only report lying dominoes.
-    stand_up = True
+    # Stand a fallen domino back up (StandUp): OFF. MuJoCo, diag_standup.py, 3 seeds per cell:
+    # round 2 (8 cm domino) 3/24 face-down, 6/24 on its side; round 3 (real 5 cm domino, touch-down
+    # at 10-40 N, grasp tilted 0.5 rad, slow turn) 0/24 face-down, 4/24 on its side, and 0/10 on
+    # franka_rebuild_fallen_dominoes. The fingers close fully (`width_collapsed`): the domino is
+    # squeezed out of the pinch. Off, a lying domino is reported and left. True to try it.
+    stand_up = False
     # where a fallen domino is stood up before it is carried to its spot: a grid on both sides of
     # the lane, close to the robot (picks from far out slipped in MuJoCo)
     standup_xs = (0.34, 0.40, 0.46)

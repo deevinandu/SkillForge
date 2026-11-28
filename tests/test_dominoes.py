@@ -200,9 +200,16 @@ def test_mujoco_domino_tasks_mostly_succeed(mj, name):
     assert ok >= 3, [(e.seed, e.failure, e.failure_detail) for e in eps if not e.success]
 
 
-@pytest.mark.xfail(reason="StandUp round 3 not yet measured in MuJoCo", strict=False)
+@pytest.mark.xfail(reason="StandUp fails in MuJoCo (0/10, round 3): see ToppleChain.stand_up", strict=False)
 def test_mujoco_rebuild_fallen_dominoes(mj):
-    _, eps = mj(load("franka_rebuild_fallen_dominoes"), range(3))
+    from skillforge.eval import evaluate
+    from skillforge.sim import make_env
+
+    class On(ToppleChain):
+        stand_up = True
+
+    pytest.importorskip("mujoco")
+    _, eps = evaluate(make_env, On(), load("franka_rebuild_fallen_dominoes"), range(3))
     assert sum(e.success for e in eps) >= 2, [(e.seed, e.failure, e.failure_detail) for e in eps if not e.success]
 
 
@@ -237,7 +244,10 @@ def test_builds_the_chain_from_scattered_dominoes(seed):
 
 @pytest.mark.parametrize("seed", range(4))
 def test_rebuilds_fallen_dominoes(seed):
-    ep, sk = run(load("franka_rebuild_fallen_dominoes"), seed)
+    t = load("franka_rebuild_fallen_dominoes")
+    env, sk = DominoKinematicEnv(t), ToppleChain()
+    sk.stand_up = True
+    ep = run_episode(env, sk, t, seed)
     assert ep.success, (ep.failure_detail, sk.log)
     stood = {e.split(":")[2].split("#")[0] for e in sk.log if ":standup:" in e}
     assert stood == set(sk.order)  # every domino started lying
@@ -266,9 +276,7 @@ def lying_variant(name: str) -> TaskSpec:
 
 def test_lying_domino_is_reported_when_stand_up_is_off():
     t = lying_variant("franka_rebuild_domino_chain")
-    env, sk = DominoKinematicEnv(t), ToppleChain()
-    sk.stand_up = False
-    ep = run_episode(env, sk, t, 0)
+    ep, sk = run(t, 0)  # off by default
     assert not ep.success
     assert any("cannot stand" in e and "stand_up is off" in e for e in sk.log)
     assert ep.failure == "unrecovered_disturbance"
@@ -276,7 +284,8 @@ def test_lying_domino_is_reported_when_stand_up_is_off():
 
 @pytest.mark.parametrize("name", ["franka_build_domino_chain_scattered", "franka_rebuild_domino_chain"])
 def test_stand_up_path_when_switched_on(name):
-    """With stand_up on (the default), lying starts and lay-downs are stood up and rebuilt."""
+    """With stand_up on, lying starts and lay-downs are stood up and rebuilt (the decisions; the
+    MuJoCo pinch is what fails)."""
     t = lying_variant(name)
     stood = 0
     for seed in range(4):
