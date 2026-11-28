@@ -518,6 +518,8 @@ class StandUp:
     min_clear = 0.008
     tilts = (0.5, 0.65, 0.8, 1.0)  # radians of grasp tilt about the closing axis, tried in order
     max_up = -0.45  # the standing pose's hand axis must point down at least ~27 deg (reachable, wrist high)
+    max_up_relaxed = -0.20  # second try, once in the air (~12 deg down)
+    min_clear_relaxed = 0.004
     turn_rate = 0.04  # radians per step (0.8 rad/s) while turning the domino upright
     turn_z = 0.30  # height of the point in front of the robot where the domino is turned upright
 
@@ -651,7 +653,17 @@ class StandUp:
 
         def plan(obs, c):
             o = obs.objects[c.obj]
-            cands = self.upright_hands(quat_to_mat(obs.ee_quat), quat_to_mat(o.quat), obs.ee_pos, o.pos)
+            args = (quat_to_mat(obs.ee_quat), quat_to_mat(o.quat), obs.ee_pos, o.pos)
+            cands = self.upright_hands(*args)
+            if not cands:
+                # The domino turned in the fingers while lifting (MuJoCo: the most common stand-up
+                # failure): accept a flatter hand and a closer table before giving up.
+                strict = (self.max_up, self.min_clear)
+                self.max_up, self.min_clear = self.max_up_relaxed, self.min_clear_relaxed
+                try:
+                    cands = self.upright_hands(*args)
+                finally:
+                    self.max_up, self.min_clear = strict
             if not cands:
                 return "no_upright_pose"  # none keeps the palm and wrist clear of the table
             c.bb["stand_cands"] = [mat_to_quat(R) for R in cands]
@@ -770,9 +782,10 @@ class Relay:
     settle_steps = 10
     low_shift = 0.010  # metres toward the lower end of a tilted domino (scaled by how tilted)
 
-    def __init__(self, task: TaskSpec, obj: str, spot: np.ndarray, turn: float):
+    def __init__(self, task: TaskSpec, obj: str, spot: np.ndarray, turn: float, holding: bool = False):
         o = task.scene.object(obj)
         self.obj, self.spot, self.turn = obj, np.asarray(spot, dtype=float), float(turn)
+        self.holding = holding  # already in the hand (a failed StandUp): just set it down
         self.size = np.asarray(o.size, dtype=float)
         self.max_width = float(task.scene.robot.max_gripper_width)
         self.ctx = Context(obj=obj, monitor=HandHoldMonitor(dev_tol=0.03, dev_hard=0.05))
@@ -832,8 +845,14 @@ class Relay:
             c.bb["yaw_end"] = c.bb["g"][1] + self.turn
             return None
 
+        def keep(obs, c):  # holding: keep the hand's orientation, only move
+            c.quat = obs.ee_quat.copy()
+            c.bb["yaw_end"] = None
+            return None
+
         def over(obs, c):
-            c.quat = hand_quat(c.bb["yaw_end"])
+            if c.bb["yaw_end"] is not None:
+                c.quat = hand_quat(c.bb["yaw_end"])
             o = obs.objects[c.obj].pos - obs.ee_pos
             return np.array([self.spot[0] - o[0], self.spot[1] - o[1], self.lift_z])
 
@@ -844,6 +863,17 @@ class Relay:
             return np.array([self.spot[0] - o[0], self.spot[1] - o[1], max(z, 0.010)])
 
         held = hold_check("grasp_slip")
+        if self.holding:
+            return Sequence(
+                [
+                    Do(keep, name="keep"),
+                    CarryRamp(over, self.carry_step, gripper=1.0, timeout=300, name="carry"),
+                    CarryRamp(down, self.lower_step, eps=0.003, ok=0.006, gripper=1.0, timeout=200, name="lower"),
+                    release(settle=st),
+                    Ramp(up, self.lift_step, gripper=0.0, timeout=200, name="retreat"),
+                ],
+                name=f"set_down_{self.obj}",
+            )
         return Sequence(
             [
                 Ramp(up, self.carry_step, gripper=0.0, timeout=200, name="clear"),
@@ -923,8 +953,9 @@ class ToppleChain:
     clean_dist = 0.06  # metres between centres for a lying domino to count as by itself
     reach = (0.28, 0.66)  # metres from the robot base where the hand works well, looking down
     shelf_margin = 0.012  # metres the palm keeps from a shelf
+    shelf_clear = 0.20  # metres from a shelf to the farthest work point (stand-up, bench)
     bench_xs = (0.34, 0.40, 0.46, 0.52)
-    bench_ys = (0.15, 0.20, 0.25)
+    bench_ys = (0.12, 0.15, 0.175)
     pose_failures = ("no_upright_pose", "no_clear_grasp", "timeout:descend", "stalled", "timeout:carry",
                      "timeout:to_turn", "timeout:approach", "ik")
     # time: a job is started only if it, the repairs still to do and a push fit in the steps left
@@ -975,6 +1006,10 @@ class ToppleChain:
         self.base_xy = base
         # the hand's centre stays this far from the robot's y: palm inside the shelves (or table)
         self.y_max = tb.width / 2 - 0.105 - self.shelf_margin
+        if tb.shelves:
+            # MuJoCo, 75 cm: links 5-7 and the hand hit the shelf while turning dominoes stood up
+            # at y = 0.13-0.21 (the wrist swings out sideways): keep work points nearer the middle
+            self.y_max = min(self.y_max, tb.width / 2 - self.shelf_clear)
         self.job_kind, self.job_obj = "", ""
         self.variant = {k: 0 for k in self.order}
         self.pushed = False  # once the robot has pushed, fallen dominoes are left to the chain
@@ -1328,8 +1363,30 @@ class ToppleChain:
         a = self.job.act(obs)
         st = self.job.status
         if not st.running:
+            k = self.job_obj
             self._job_finished(not st.failed, st.reason or "")
+            if st.failed and k and self._holding(obs, k):
+                # still in the fingers (no upright pose, a stalled carry): set it down low instead
+                # of opening the hand in the air, so it is not thrown across the table
+                self.job = Relay(self.task, k, self.job.spot, 0.0, holding=True)
+                self.job_kind, self.job_obj = "setdown", k
+                self._go("setdown", f"standup failed: {st.reason}; setting {k} down at "
+                                    f"({self.job.spot[0]:.2f},{self.job.spot[1]:.2f})")
+                return a
             self._after_job(obs, f"standup {'failed: ' + st.reason if st.failed else 'done'}", st.failed)
+        return a
+
+    def _holding(self, obs: Observation, k: str) -> bool:
+        w = getattr(obs, "gripper_width", None)
+        near = float(np.linalg.norm(np.asarray(obs.objects[k].pos) - obs.ee_pos)) < 0.06
+        return near and (w is None or w > 0.004) and obs.objects[k].pos[2] > 0.04
+
+    def _setdown(self, obs: Observation) -> Action:
+        a = self.job.act(obs)
+        st = self.job.status
+        if not st.running:
+            self.job_kind, self.job_obj = "", ""
+            self._after_job(obs, f"setdown {'failed: ' + st.reason if st.failed else 'done'}", True)
         return a
 
     def _relay(self, obs: Observation) -> Action:

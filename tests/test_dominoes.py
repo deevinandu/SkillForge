@@ -394,3 +394,21 @@ def test_stops_rebuilding_when_out_of_time():
     ep, sk = run(t, 0)
     assert any("out of time" in e for e in sk.log), sk.log
     assert sum(":standup:" in e for e in sk.log) <= 2
+
+
+def test_a_failed_stand_up_sets_the_domino_down_instead_of_dropping_it(monkeypatch):
+    from skillforge.skills.dominoes import StandUp
+
+    # No upright pose once in the air: every stand-up fails there, holding the domino.
+    t = load("franka_rebuild_fallen_dominoes").model_copy(update={"max_steps": 3000})
+    env, sk = DominoKinematicEnv(t), ToppleChain()
+    sk.reset(t)
+    orig = StandUp.upright_hands
+
+    def none_in_the_air(self, R_h, R_d, p_e, p_d, k=6, min_sep=0.35):
+        return [] if p_e[2] > 0.1 else orig(self, R_h, R_d, p_e, p_d, k, min_sep)
+
+    monkeypatch.setattr(StandUp, "upright_hands", none_in_the_air)
+    run_episode(env, sk, t, 0)
+    assert any(":setdown:standup failed: no_upright_pose" in e for e in sk.log), sk.log
+    assert any(":park:setdown done" in e or ":rehome:setdown done" in e for e in sk.log), sk.log
