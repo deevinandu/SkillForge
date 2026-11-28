@@ -22,7 +22,7 @@ import time
 from pathlib import Path
 
 from skillforge.contracts import TaskSpec
-from skillforge.eval import evaluate, run_episode
+from skillforge.eval import run_episode
 from skillforge.sim import make_env
 from skillforge.skills import ToppleChain
 
@@ -46,19 +46,38 @@ def main() -> None:
     ap.add_argument("--speed", type=float, default=1.0, help="viewer playback speed")
     ap.add_argument("--gif", default=None)
     ap.add_argument("--no-disturb", action="store_true")
+    ap.add_argument("--no-shelves", action="store_true", help="the old open 1.2 m table, to compare")
     ap.add_argument("--progress", type=int, default=100,
                     help="print step, sim speed and the skill's phase every N steps (0: off)")
     ap.add_argument("--stand-up", action="store_true", help="let ToppleChain stand fallen dominoes up (off by default)")
     a = ap.parse_args()
     task = load(a.task, not a.no_disturb)
+    if a.no_shelves:
+        sc = task.scene
+        sc = sc.model_copy(update={"table": sc.table.model_copy(update={"shelves": False, "width": 1.2})})
+        task = task.model_copy(update={"scene": sc})
     ToppleChain.stand_up = a.stand_up or ToppleChain.stand_up
 
     if a.seeds:
-        report, eps = evaluate(make_env, ToppleChain(), task, range(a.seeds))
-        print(report.summary())
-        for e in eps:
-            if not e.success:
-                print(f"  seed {e.seed}: {e.failure} {e.failure_detail}")
+        env, wins = make_env(task), 0
+        keys = ("relay:", "standup:", "setdown:", "repair:", "pushed:")
+        for seed in range(a.seeds):
+            skill = ToppleChain()
+            ep = run_episode(env, skill, task, seed)
+            wins += ep.success
+            n = {k[:-1]: sum(f":{k}" in line for line in skill.log) for k in keys}
+            shelf = sum(e.startswith("collision:") and "shelf" in e for e in ep.events)
+            fails = [line.split(":", 2)[2] for line in skill.log if " failed: " in line]
+            reasons = {}
+            for f in fails:
+                r = f.split("failed: ", 1)[1].split("(")[0]
+                reasons[r] = reasons.get(r, 0) + 1
+            print(f"seed {seed}: {'OK  ' if ep.success else 'FAIL'} {ep.n_steps:5d} steps  {n}  shelf hits {shelf}"
+                  f"  failures {reasons}", flush=True)
+            for line in skill.log:
+                if ":giving up" in line or ":out of time" in line or ":report:" in line:
+                    print("     ", line)
+        print(f"\n{task.id}: {wins}/{a.seeds} succeeded{' (no shelves)' if a.no_shelves else ''}")
         return
 
     env, skill = make_env(task), ToppleChain()

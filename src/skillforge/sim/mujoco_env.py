@@ -79,6 +79,9 @@ def _gl_unavailable_reason() -> str | None:
     return None
 
 TABLE_TOP_Z = 0.0
+SHELF_CLEAR = 0.11  # metres from a shelf's inner face that arm body origins keep (link radius ~0.06-0.08)
+SHELF_GAIN = 2.0  # null-space push per metre inside that band
+SHELF_WATCH = ("link3", "link4", "link5", "link6", "link7", "hand")
 TABLE_THICKNESS = 0.04
 DROP_Z = TABLE_TOP_Z - 0.05  # an object below this has fallen off the table: episode terminated
 EJECT_SPEED = 3.0  # m/s; a tabletop object moving faster than this was flung by the solver
@@ -310,6 +313,12 @@ class MujocoEnv:
         }
         self._table_geom = m.geom("table").id
         self._shelf_geoms = {m.geom(n).id: n for n in ("shelf_l", "shelf_r") if self.task.scene.table.shelves}
+        # With shelves the IK keeps the arm away from them in its null space (the elbow swivel):
+        # arm bodies whose origin comes within SHELF_CLEAR of a shelf's inner face are pushed back.
+        tb = self.task.scene.table
+        self._shelf_y = (self.task.scene.robot.base_pose.pos[1], tb.width / 2) if tb.shelves else None
+        self._shelf_bodies = [b for b in self._robot_bodies if self._body_name(b) in SHELF_WATCH]
+        self._jacb = np.zeros((3, m.nv))
         self._obj_body = {name: b for b, name in self._obj_bodies.items()}
         self._topple_watch = sorted(
             {c.object for c in success_conditions(self.task.success) if isinstance(c, ObjectToppled)}
@@ -582,6 +591,14 @@ class MujocoEnv:
             # null-space pull toward home posture, first iteration only: the damped projector leaks
             # a little into the task space, which later iterations then clean up
             v = 0.1 * (self._home - q) if it == 0 else np.zeros_like(q)
+            if it == 0 and self._shelf_y is not None:
+                y0, hw = self._shelf_y
+                for b in self._shelf_bodies:
+                    dy = float(s.xpos[b][1]) - y0
+                    over = abs(dy) - (hw - SHELF_CLEAR)
+                    if over > 0:
+                        mujoco.mj_jacBody(m, s, self._jacb, None, b)
+                        v -= SHELF_GAIN * over * math.copysign(1.0, dy) * self._jacb[1, dofs]
             rhs[:, 0], rhs[:, 1] = e, J @ v
             y = np.linalg.solve(J @ J.T + lam2, rhs)
             # DLS step J^T (JJ^T + l^2 I)^-1 e, plus v projected onto the (damped) null space
