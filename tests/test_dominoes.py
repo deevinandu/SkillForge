@@ -453,3 +453,21 @@ def test_a_failed_stand_up_sets_the_domino_down_instead_of_dropping_it(monkeypat
     run_episode(env, sk, t, 0)
     assert any(":setdown:standup failed: no_upright_pose" in e for e in sk.log), sk.log
     assert any(":park:setdown done" in e or ":rehome:setdown done" in e for e in sk.log), sk.log
+
+
+def test_grasps_turn_the_palm_away_from_the_shelf_boards():
+    """MuJoCo, the 55 cm cell: repairs and relays of dominoes near the shelf boards timed out on
+    the approach (the palm, +-10.5 cm along the closing axis, ran into the boards)."""
+    from skillforge.skills.dominoes import Relay, hand_hits, obstacle_boxes
+
+    t = load("franka_rebuild_fallen_dominoes")
+    boxes = obstacle_boxes(t)
+    tcp = np.array([0.40, -0.13, 0.029])
+    # closing along y (toward the boards) hits them; along x does not
+    assert hand_hits(boxes, tcp, 0.0) and not hand_hits(boxes, tcp, math.pi / 2)
+    assert not hand_hits(boxes, np.array([0.40, 0.0, 0.029]), 0.0)  # mid-table: either way is fine
+    # a flat domino near the boards, long axis along x: Relay closes across its length instead of its width
+    flat_x = np.array([math.cos(math.pi / 4), 0.0, math.sin(math.pi / 4), 0.0])  # long axis along x
+    pos = np.array([0.40, -0.13, 0.0079])
+    g = Relay(t, "domino_1", pos, 0.0).grasp(pos, flat_x)
+    assert g is not None and not hand_hits(boxes, g[0], g[1])

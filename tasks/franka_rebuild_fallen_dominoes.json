@@ -306,12 +306,12 @@
         "name": "fallen_r",
         "center": [
           0.41,
-          -0.12,
+          -0.105,
           0.03
         ],
         "half_extents": [
           0.08,
-          0.035,
+          0.025,
           0.04
         ],
         "visible": false

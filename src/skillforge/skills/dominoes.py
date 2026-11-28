@@ -360,6 +360,7 @@ class ReplaceDomino:
         self.obj, self.spot, self.yaw, self.others = obj, np.asarray(spot, dtype=float), float(yaw), list(others)
         self.hh = float(o.size[2])
         self.tallest = max((2 * float(task.scene.object(n).size[2]) for n in others), default=2 * self.hh)
+        self.boxes = obstacle_boxes(task)
         self.ctx = Context(obj=obj, monitor=HandHoldMonitor(dev_tol=0.03, dev_hard=0.05))
         self.runner = Runner(self._build(), self.ctx)
 
@@ -382,7 +383,16 @@ class ReplaceDomino:
             p[2] = 2 * hh - self.grasp_depth
             # Wrist yaw: the first choice is the one closest to DOWN (keeps the last joint mid-range,
             # where the IK is happy); after that follow it, so noise near +-pi/2 does not flip it.
+            # Across its thickness (the face normal) unless the hand would touch a shelf or frame
+            # there; then across its width (MuJoCo, the 55 cm cell: a domino 6-9 cm from the shelf
+            # boards, gripped across a thickness pointing at them, put the palm into the boards).
             dom = heading_x(c.obj_quat)
+            if "grasp_off" not in c.bb:
+                c.bb["grasp_off"] = 0.0
+                if hand_hits(self.boxes, p, wrap_half_pi(dom), rise=self.hover):
+                    if not hand_hits(self.boxes, p, wrap_half_pi(dom + math.pi / 2), rise=self.hover):
+                        c.bb["grasp_off"] = math.pi / 2
+            dom = dom + c.bb["grasp_off"]
             ref = c.bb.setdefault("grasp_yaw", wrap_half_pi(dom))
             c.bb["grasp_yaw"] = nearest_turn(dom, ref, math.pi)
             c.quat = hand_quat(c.bb["grasp_yaw"])
@@ -813,6 +823,27 @@ def work_y_bounds(task: TaskSpec, xs: tuple[float, float] = (0.30, 0.62), z_top:
     return lo, hi
 
 
+def hand_hits(boxes: list[tuple[np.ndarray, np.ndarray]], tcp: np.ndarray, yaw: float, rise: float = 0.10,
+              margin: float = 0.008) -> bool:
+    """Whether a straight-down hand turned `yaw` from DOWN, with its TCP at `tcp` (and on the way
+    down from `rise` above it), would touch an obstacle: fingers (open, +-4.5 cm along the closing
+    axis, from 1 cm above the TCP up) and palm (+-3.2 x +-10.5 cm, from 3.7 cm above the TCP)."""
+    if not boxes:
+        return False
+    R = quat_to_mat(hand_quat(yaw))
+    hx, hy = R[:, 0], R[:, 1]
+    t = np.asarray(tcp, dtype=float)
+    pts = []
+    for sgn in (-1.0, 1.0):
+        for dz in (0.01, 0.03, 0.05):
+            pts.append(t + sgn * 0.045 * hy + [0.0, 0.0, dz])
+    for sx in (-1.0, 1.0):
+        for sy in (-1.0, -0.5, 0.5, 1.0):
+            for dz in np.linspace(0.037, 0.13 + rise, 6):
+                pts.append(t + sx * 0.032 * hx + sy * 0.105 * hy + [0.0, 0.0, float(dz)])
+    return any(in_boxes(q, boxes, margin) for q in pts)
+
+
 class Relay:
     """Take a domino that is not lying cleanly by itself (resting on another, leaning, on a pile,
     in a tight spot or an awkward pose) and lay it down alone at `spot`, turned by `turn` about
@@ -843,6 +874,7 @@ class Relay:
         self.holding = holding  # already in the hand (a failed StandUp): just set it down
         self.size = np.asarray(o.size, dtype=float)
         self.max_width = float(task.scene.robot.max_gripper_width)
+        self.boxes = obstacle_boxes(task)
         self.ctx = Context(obj=obj, monitor=HandHoldMonitor(dev_tol=0.03, dev_hard=0.05))
         self.runner = Runner(self._build(), self.ctx)
 
@@ -854,21 +886,30 @@ class Relay:
         return self.runner.act(obs)
 
     def grasp(self, pos: np.ndarray, quat: np.ndarray, current_yaw: float = 0.0) -> tuple[np.ndarray, float] | None:
-        """(TCP point, hand yaw from DOWN), or None if no short axis fits between the fingers."""
+        """(TCP point, hand yaw from DOWN), or None if no axis fits between the fingers. The fingers
+        close across the most horizontal short axis; if the hand would touch a shelf or frame there
+        (or where it sets the domino down), across the other short axis or the long one (5 cm fits
+        the 8 cm gripper) instead."""
         R = quat_to_mat(quat)
         long = int(np.argmax(self.size))
-        shorts = [k for k in range(3) if k != long and 2 * self.size[k] + 0.01 <= self.max_width]
-        if not shorts:
-            return None
-        k = min(shorts, key=lambda j: abs(R[2, j]))
-        if abs(R[2, k]) > 0.5:
-            return None  # closing axis steep: the pads would not sit on the faces
-        c = R[:, k][:2] / max(float(np.linalg.norm(R[:, k][:2])), 1e-9)
+        axes = [k for k in range(3) if 2 * self.size[k] + 0.01 <= self.max_width and abs(R[2, k]) <= 0.5]
+        if not axes:
+            return None  # every axis that fits is steep: the pads would not sit on the faces
+        axes.sort(key=lambda j: (j == long, abs(R[2, j])))
         L = R[:, long]
         pt = np.asarray(pos, dtype=float) - np.sign(L[2]) * L * self.low_shift * abs(float(L[2]))
         pt[2] = max(float(pt[2]), self.min_grasp_z)
-        yaw = nearest_turn(math.atan2(c[0], -c[1]), current_yaw, math.pi)
-        return pt, yaw
+        first = None
+        for k in axes:
+            c = R[:, k][:2] / max(float(np.linalg.norm(R[:, k][:2])), 1e-9)
+            yaw = nearest_turn(math.atan2(c[0], -c[1]), current_yaw, math.pi)
+            first = first or (pt, yaw)
+            if self.holding or not self.boxes:
+                return pt, yaw
+            dest = np.array([self.spot[0], self.spot[1], self.floor + float(pt[2])])
+            if not hand_hits(self.boxes, pt, yaw) and not hand_hits(self.boxes, dest, yaw + self.turn):
+                return pt, yaw
+        return first
 
     def _build(self):
         st = self.settle_steps
