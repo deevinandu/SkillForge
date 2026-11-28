@@ -148,24 +148,35 @@ class Preview:
         self.frames_written += 1
 
 
+def im_w(img: np.ndarray) -> int:
+    return int(img.shape[1])
+
+
 def _caption(img: np.ndarray, lines: list[str], ok: bool) -> np.ndarray:
-    """Text on a dark band at the top of the image (Pillow if installed, else no text)."""
+    """Text on a dark band at the bottom of the image (Pillow if installed, else no text)."""
     try:
         from PIL import Image, ImageDraw
     except ImportError:  # pragma: no cover
         return img
     from PIL import ImageFont
 
+    # Scaled to the image (26 px text on a 1280-wide frame) and at most 3 lines, so the caption never
+    # hides the table (at 640x480 six 34 px lines covered almost half of it).
+    size = max(11, round(im_w(img) / 50))
+    if len(lines) > 3:
+        lines = lines[:2] + [f"... and {len(lines) - 2} more (see the terminal)"]
     try:
-        font = ImageFont.load_default(size=26)  # Pillow >= 10.1
+        font = ImageFont.load_default(size=size)  # Pillow >= 10.1
     except TypeError:  # pragma: no cover
         font = ImageFont.load_default()
     im = Image.fromarray(img)
     d = ImageDraw.Draw(im)
-    h = 34 * len(lines) + 12
-    d.rectangle([0, 0, im.width, h], fill=(0, 0, 0))
+    step = round(size * 1.3)
+    h = step * len(lines) + 8
+    y0 = im.height - h  # at the bottom: the start area and the cans are in the top half of the view
+    d.rectangle([0, y0, im.width, im.height], fill=(0, 0, 0))
     for i, line in enumerate(lines):
-        d.text((12, 6 + 34 * i), line, fill=(90, 240, 90) if ok else (255, 110, 110), font=font)
+        d.text((8, y0 + 4 + step * i), line, fill=(90, 240, 90) if ok else (255, 110, 110), font=font)
     return np.asarray(im)
 
 
@@ -186,10 +197,10 @@ def make_lab_env(task: TaskSpec, *, extrinsics: str | Path, port: int = 8765, sp
         estimator = IdenticalCylinderEstimator()
         estimator.reset(task)
     if frames is None:
-        # 640x480: the can estimator takes ~110 ms per frame here, ~350 ms at 1280x720 (same positions
-        # within 1 mm on the lab frame). It runs in a background thread during trials anyway.
+        # 1280x720: at 640x480 the far row of cans (~1 m away) fit poorly (0.25-0.43 vs 0.72-0.85) and
+        # failed the placement check. Trials still estimate at half size, in the background (below).
         frames = RealSenseFrameSource([RealSenseCamera(CAMERA, load_extrinsics(extrinsics), serial=serial,
-                                                       width=640, height=480)])
+                                                       width=1280, height=720)])
     if operator is None:
         pic = PlacementPicture(task, frames, estimator, picture) if picture else None
         if free_placement:
@@ -209,7 +220,7 @@ def make_lab_env(task: TaskSpec, *, extrinsics: str | Path, port: int = 8765, sp
     from .background import BackgroundEstimator
 
     if background and not isinstance(estimator, BackgroundEstimator) and getattr(estimator, "needs_frames", False):
-        estimator = BackgroundEstimator(estimator, frames, CAMERA)
+        estimator = BackgroundEstimator(estimator, frames, CAMERA, decimate=2)  # ~110 ms per estimate
     # report_contact_force=False: the Franka's force estimate is not a contact sensor (see RealEnv).
     return RealEnv(task, robot, frames, estimator, controller=MujocoController(task, max_ee_speed=speed),
                    operator=operator, limits=limits, cameras=(CAMERA,), realtime=True, report_contact_force=False)

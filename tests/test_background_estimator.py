@@ -82,3 +82,20 @@ def test_a_held_object_follows_the_hand_between_estimates():
     assert np.linalg.norm(out["held"].pos - ee["p"]) < 0.01  # shifted with the hand
     assert np.allclose(out["table"].pos, [0.5, 0.0, 0.04])  # the table object is not
     b.close()
+
+
+def test_decimated_frames_keep_geometry():
+    """Every 2nd pixel with matching intrinsics back-projects to the same world points."""
+    from skillforge.perception import CameraFrame, backproject
+    from skillforge.real.background import _decimated
+
+    K = np.array([[900.0, 0, 640], [0, 900.0, 360], [0, 0, 1]])
+    T = np.eye(4)
+    T[:3, :3] = [[0, -1, 0], [-1, 0, 0], [0, 0, -1]]
+    T[:3, 3] = [0.5, 0.0, 1.0]
+    f = CameraFrame(rgb=np.zeros((720, 1280, 3), np.uint8), depth=np.full((720, 1280), 1.0, np.float32), K=K, T_world_cam=T)
+    full = backproject(f)
+    half = backproject(_decimated(f, 2))
+    assert len(half) == len(full) // 4
+    np.testing.assert_allclose(half.mean(axis=0), full.mean(axis=0), atol=1e-3)
+    np.testing.assert_allclose(half.min(axis=0), full.min(axis=0), atol=2e-3)

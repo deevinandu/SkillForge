@@ -28,8 +28,11 @@ from skillforge.perception import Estimate
 class BackgroundEstimator:
     needs_frames = False
 
-    def __init__(self, estimator, frames, camera: str, hold_radius: float = 0.05):
+    def __init__(self, estimator, frames, camera: str, hold_radius: float = 0.05, decimate: int = 1):
+        """decimate: in the background thread, use every `decimate`-th pixel (2: a quarter of the
+        points, ~3x faster). The first, synchronous estimate after a reset always uses full frames."""
         self.inner, self.frames, self.camera, self.hold_radius = estimator, frames, camera, hold_radius
+        self.decimate = max(1, int(decimate))
         self.min_confidence = getattr(estimator, "min_confidence", 0.0)
         self._lock = threading.Lock()
         self._thread: threading.Thread | None = None
@@ -83,13 +86,15 @@ class BackgroundEstimator:
 
     # -- the thread --------------------------------------------------------------
 
-    def _once(self) -> None:
+    def _once(self, decimate: int = 1) -> None:
         with self._lock:
             ee = None if self._ee_now is None else self._ee_now.copy()
         t0 = time.monotonic()
         frame = self.frames.capture(self.camera)
         if frame is None:
             return
+        if decimate > 1:
+            frame = _decimated(frame, decimate)
         result = self.inner.estimate([frame])
         self.last_duration = time.monotonic() - t0
         with self._lock:
@@ -99,7 +104,7 @@ class BackgroundEstimator:
     def _run(self) -> None:
         while not self._stop.is_set():
             try:
-                self._once()
+                self._once(self.decimate)
             except Exception as e:  # keep the last good estimate; say why
                 print(f"(background estimator: {type(e).__name__}: {e})")
                 self._stop.wait(0.2)
@@ -109,3 +114,16 @@ class BackgroundEstimator:
             self._stop.set()
             self._thread.join(timeout=5)
             self._thread = None
+
+
+def _decimated(frame, k: int):
+    """Every k-th pixel of a CameraFrame, with intrinsics to match (pixel centres preserved)."""
+    from skillforge.perception import CameraFrame
+
+    K = np.array(frame.K, dtype=float, copy=True)
+    K[0, 0] /= k
+    K[1, 1] /= k
+    K[0, 2] = (K[0, 2] + 0.5) / k - 0.5
+    K[1, 2] = (K[1, 2] + 0.5) / k - 0.5
+    return CameraFrame(rgb=frame.rgb[::k, ::k], depth=np.ascontiguousarray(frame.depth[::k, ::k]), K=K,
+                       T_world_cam=frame.T_world_cam, t=frame.t, name=frame.name)
