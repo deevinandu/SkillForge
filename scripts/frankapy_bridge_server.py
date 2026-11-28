@@ -231,9 +231,14 @@ class FrankapyArm:
     def skill_done(self):
         # ignore_errors=False: the default waits (blocks) until franka-interface recovers from an
         # error, which would freeze the watchdog. Any error means the skill is over.
+        self.last_done_reason = ""
         try:
-            return self.fa.is_skill_done(ignore_errors=False)
+            done = self.fa.is_skill_done(ignore_errors=False)
+            if done:
+                self.last_done_reason = "frankapy is_skill_done() returned True"
+            return done
         except Exception as e:
+            self.last_done_reason = f"frankapy is_skill_done raised {type(e).__name__}: {e}"
             print("skill ended with error:", e, flush=True)
             return True
 
@@ -253,21 +258,23 @@ class Bridge:
         self.last_q = None
         self.last_t = 0.0
         self.holding = False  # the watchdog fired: the arm holds its last target until the next one
+        self.stop_reason = "never started: call home"
         self.grip_closed = False
         self.events = []
         self.t0 = time.time()
         self._alive = True
         threading.Thread(target=self._watch, daemon=True).start()
 
-    def _halt(self, event):
+    def _halt(self, event, detail=""):
         """Stop streaming (under the lock). The arm holds where it is until `home`."""
         if self.streaming:
             self.streaming = False
+            self.stop_reason = event + (f" ({detail})" if detail else "")
             try:
                 self.arm.stop()
             finally:
                 self.events.append(event)
-                print("stopped:", event, flush=True)
+                print("stopped:", self.stop_reason, flush=True)
 
     def _watch(self):
         """Watchdog at 50 Hz; whether the robot ended the skill at 10 Hz (a ROS service call).
@@ -285,7 +292,7 @@ class Bridge:
                     self.holding = True
                     self.events.append("bridge:watchdog_hold")
                 elif self.streaming and n % 5 == 0 and self.arm.skill_done():
-                    self._halt("bridge:robot_ended_skill")
+                    self._halt("bridge:robot_ended_skill", getattr(self.arm, "last_done_reason", ""))
 
     def handle(self, msg):
         cmd = msg.get("cmd")
@@ -300,7 +307,7 @@ class Bridge:
                         "ee_force": force, "events": events, "streaming": self.streaming}
             if cmd == "targets":
                 if not self.streaming:
-                    return {"ok": False, "error": "not streaming: call home first (stopped, or the robot ended the skill)"}
+                    return {"ok": False, "error": f"not streaming since {self.stop_reason}: call home first"}
                 q = [float(x) for x in msg["q"]]
                 if len(q) != 7 or not all(math.isfinite(x) for x in q):
                     return {"ok": False, "error": "q must be 7 finite numbers"}
