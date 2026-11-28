@@ -488,3 +488,22 @@ def test_grasps_turn_the_palm_away_from_the_shelf_boards():
     pos = np.array([0.40, -0.13, 0.0079])
     g = Relay(t, "domino_1", pos, 0.0).grasp(pos, flat_x)
     assert g is not None and not hand_hits(boxes, g[0], g[1])
+
+
+@pytest.mark.parametrize("name", DOMINO_TASKS)
+def test_every_starting_domino_has_a_grip_clear_of_the_shelves(name):
+    """MuJoCo (2026-11-28): the setup task's staging dominoes at y = -0.18, 3 cm from the shelf
+    boards, could not be gripped either way without the hand hitting them (collision, 0/5)."""
+    from skillforge.skills.dominoes import hand_hits, obstacle_boxes
+
+    t = load(name)
+    boxes = obstacle_boxes(t)
+    sc = t.scene.scatter
+    scattered = set(sc.objects or [o.name for o in t.scene.objects if not o.fixed]) if sc is not None else set()
+    points = [(o.name, o.pose.pos[:2]) for o in t.scene.objects if o.name not in scattered]
+    for r in sc.regions if sc is not None else ():  # where scattered dominoes can start: the corners
+        c, h = t.scene.region(r).center, t.scene.region(r).half_extents
+        points += [(r, (c[0] + sx * h[0], c[1] + sy * h[1])) for sx in (-1, 1) for sy in (-1, 1)]
+    for what, xy in points:
+        tcp = np.array([xy[0], xy[1], 0.029])
+        assert not all(hand_hits(boxes, tcp, yaw) for yaw in (0.0, math.pi / 2)), (name, what)
