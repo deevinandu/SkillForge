@@ -59,11 +59,34 @@ class RobotSpec(Spec):
     fingertips: Literal["rigid", "foam"] = "rigid"
 
 
+class MugHandle(Spec):
+    """The handle of a `shape="mug"` object: a closed D-shaped loop on the mug's +x side (object
+    frame), in the mug's x-z plane, so the hole through it runs along the mug's y axis. Made of
+    round bars of radius `radius`; the loop leaves the wall at heights `top` and `bottom` (bar
+    centrelines, metres from the mug's centre) and reaches `reach` beyond the outer wall (outer
+    edge). The clear opening is then (reach - 2 radius) wide and (top - bottom - 2 radius) tall."""
+
+    top: float = 0.025
+    bottom: float = -0.02
+    reach: float = Field(0.03, gt=0)
+    radius: float = Field(0.004, gt=0)
+
+    @model_validator(mode="after")
+    def _open(self) -> MugHandle:
+        if self.reach <= 2 * self.radius or self.top - self.bottom <= 2 * self.radius:
+            raise ValueError("mug handle has no opening: reach and top - bottom must exceed 2 * radius")
+        return self
+
+
 class ObjectSpec(Spec):
     name: str
-    shape: Literal["box", "cylinder", "sphere", "mesh"]
-    size: Vec3 = Field(description="box: half-extents; cylinder: (radius, half-height, 0); sphere: (radius, 0, 0); mesh: scale")
+    shape: Literal["box", "cylinder", "sphere", "mesh", "mug"]
+    size: Vec3 = Field(
+        description="box: half-extents; cylinder: (radius, half-height, 0); sphere: (radius, 0, 0); mesh: scale; "
+        "mug: (outer radius, half-height, wall thickness), open at +z, with a `handle` on its +x side"
+    )
     mesh: str | None = None
+    handle: MugHandle | None = Field(None, description="mug only; None on a mug means MugHandle()")
     mass: float = Field(0.1, gt=0, description="kg")
     friction: float = Field(1.0, gt=0)
     pose: Pose = Pose()
@@ -74,7 +97,22 @@ class ObjectSpec(Spec):
     def _mesh_needs_path(self) -> ObjectSpec:
         if (self.shape == "mesh") != (self.mesh is not None):
             raise ValueError(f"object '{self.name}': mesh path is required for shape 'mesh' and only for it")
+        if self.handle is not None and self.shape != "mug":
+            raise ValueError(f"object '{self.name}': only a mug has a handle")
+        if self.shape == "mug":
+            r, h, w = self.size
+            hd = self.handle or MugHandle()
+            if not (0 < w < r and h > 0):
+                raise ValueError(f"mug '{self.name}': size must be (outer radius, half-height, wall) with 0 < wall < radius")
+            if not (-h < hd.bottom < hd.top < h):
+                raise ValueError(f"mug '{self.name}': handle must leave the wall between the mug's bottom and rim")
         return self
+
+    def mug_handle(self) -> MugHandle:
+        """This mug's handle (the default one if the spec leaves it out)."""
+        if self.shape != "mug":
+            raise ValueError(f"object '{self.name}' is not a mug")
+        return self.handle or MugHandle()
 
 
 class Region(Spec):
@@ -87,6 +125,26 @@ class Region(Spec):
     # in the task logic (spots, lanes): nothing marks them on a real table, and a camera should
     # not see them either.
     visible: bool = True
+
+
+class Knockdown(Spec):
+    """Someone knocks objects over mid-episode (a disturbance to recover from).
+
+    At the control step drawn from `at_step`, `count` movable objects (drawn from the seed, never
+    the one in the gripper) are knocked over, and so is everything resting on them (in a stack,
+    knocking a lower object brings down what stands on it). Each knocked object is laid on its
+    side on the table, at rest, at a free spot within `radius` of where it stood. Both ranges are
+    rounded to integers."""
+
+    at_step: Range
+    count: Range = Range.fixed(1.0)
+    radius: float = Field(0.08, gt=0, description="metres")
+
+    @model_validator(mode="after")
+    def _non_negative(self) -> Knockdown:
+        if self.at_step.lo < 0 or self.count.lo < 0:
+            raise ValueError("knockdown at_step and count must be >= 0")
+        return self
 
 
 class RandomizationSpec(Spec):
@@ -103,6 +161,7 @@ class RandomizationSpec(Spec):
     # Permute the colours among the movable objects that have one, per episode (from the env seed):
     # which object is which colour is then only knowable by looking.
     shuffle_colors: bool = False
+    knockdown: Knockdown | None = None  # None: nobody knocks anything over
 
 
 # How a box rests on the table: "upright" on its own z axis (its spawn convention), "flat" on its
@@ -343,8 +402,31 @@ class ObjectToppled(Spec):
         return self
 
 
+class ObjectHung(Spec):
+    """`object` (a mug) hangs by its handle from `support` (a fixed cylinder: a hook or peg), judged
+    on TRUE state by the env, and has done so for `hold_s` seconds without a break:
+    - threaded: the support's axis segment passes through the inside of the handle loop;
+    - free: the object touches nothing but fixed objects (no robot, table, floor or movable
+      object), so it is neither still held nor resting on something else;
+    - calm: the object's centre moves slower than `max_speed` (a mug swinging gently still hangs;
+      one sliding off the hook does not)."""
+
+    kind: Literal["object_hung"] = "object_hung"
+    object: str
+    support: str
+    hold_s: float = Field(1.0, ge=0, description="seconds the condition must hold without a break")
+    max_speed: float = Field(0.15, gt=0, description="m/s")
+
+    @model_validator(mode="after")
+    def _distinct(self) -> ObjectHung:
+        if self.object == self.support:
+            raise ValueError("object_hung needs two different objects")
+        return self
+
+
 LeafSuccessSpec = Annotated[
-    ObjectInRegion | ObjectLifted | ObjectOnObject | ColorInRegion | ObjectToppled, Field(discriminator="kind")
+    ObjectInRegion | ObjectLifted | ObjectOnObject | ColorInRegion | ObjectToppled | ObjectHung,
+    Field(discriminator="kind"),
 ]
 
 
@@ -357,10 +439,10 @@ class AllOf(Spec):
 
 
 SuccessSpec = Annotated[
-    ObjectInRegion | ObjectLifted | ObjectOnObject | ColorInRegion | ObjectToppled | AllOf,
+    ObjectInRegion | ObjectLifted | ObjectOnObject | ColorInRegion | ObjectToppled | ObjectHung | AllOf,
     Field(discriminator="kind"),
 ]
-_AnySuccess = ObjectInRegion | ObjectLifted | ObjectOnObject | ColorInRegion | ObjectToppled | AllOf
+_AnySuccess = ObjectInRegion | ObjectLifted | ObjectOnObject | ColorInRegion | ObjectToppled | ObjectHung | AllOf
 
 
 def success_conditions(success: _AnySuccess) -> tuple:
@@ -403,6 +485,12 @@ class TaskSpec(Spec):
                     self.scene.object(c.support)
                 if isinstance(c, ObjectToppled) and c.region is not None:
                     self.scene.region(c.region)
+                if isinstance(c, ObjectHung):
+                    sup = self.scene.object(c.support)
+                    if not (sup.fixed and sup.shape == "cylinder"):
+                        raise ValueError(f"object_hung: support '{c.support}' must be a fixed cylinder")
+                    if self.scene.object(c.object).shape != "mug":
+                        raise ValueError(f"object_hung: '{c.object}' must be a mug")
         except KeyError as e:
             raise ValueError(f"success refers to a missing name: {e.args[0]}") from None
         return self

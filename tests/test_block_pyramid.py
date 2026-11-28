@@ -68,3 +68,27 @@ def test_builds_the_pyramid_bottom_up(mj):
     assert ep.success, (ep.failure, ep.failure_detail)
     grasps = [e.split(":")[1] for e in ep.events if e.startswith("grasp:")]
     assert grasps == [f"block_{i}" for i in range(1, 7)]
+
+
+def test_cylinder_pyramid_geometry_and_placers():
+    from skillforge.skills.tube_rack import TubeIntoRack
+
+    t = load("franka_stack_cylinder_pyramid")
+    c = t.scene.object("cyl_1")
+    assert c.shape == "cylinder"
+    assert 2 * c.size[0] == pytest.approx(2 * 0.0254) and 2 * c.size[1] == pytest.approx(0.0838, abs=1e-4)  # 2 in x 3.3 in
+    assert 2 * c.size[0] + 0.01 < t.scene.robot.max_gripper_width  # grippable across the diameter
+    spots = {cc.object: np.asarray(t.scene.region(cc.region).center) for cc in success_conditions(t.success)}
+    assert spots["cyl_4"][2] == pytest.approx(3 * c.size[1]) and spots["cyl_6"][2] == pytest.approx(5 * c.size[1])
+    sk = PlaceInOrder()
+    sk.reset(t)
+    assert all(isinstance(s, TubeIntoRack) and s.carry_accel == sk.upright_accel for s in sk.skills)
+    sk.reset(load("franka_stack_block_pyramid"))
+    assert all(isinstance(s, SpotPlace) for s in sk.skills)  # boxes keep the spot placer
+
+
+def test_builds_the_cylinder_pyramid(mj):
+    evaluate, make_env = mj
+    t = load("franka_stack_cylinder_pyramid")
+    _, (ep,) = evaluate(make_env, PlaceInOrder(), t, [0])
+    assert ep.success, (ep.failure, ep.failure_detail)

@@ -2,8 +2,8 @@
   "task_id": "franka_stack_block_pyramid",
   "task_sha": "f92d021f1d46a20d",
   "skill": "place_in_order",
-  "skill_version": "0.1.0",
-  "code_sha": "a69f81d17517cbb0",
+  "skill_version": "0.2.0",
+  "code_sha": "9b1c8a74be655672",
   "seeds": [
     0,
     1,
@@ -217,5 +217,5 @@
     99
   ],
   "min_success": null,
-  "created_at": "2026-11-25T17:47:10+00:00"
+  "created_at": "2026-11-25T19:02:18+00:00"
 }

@@ -83,7 +83,7 @@ class TubeIntoRack(PickPlace):
 
     def _build(self):
         hv, tol, st = self.hover, self.tol, self.settle_steps
-        slot = np.asarray(self.region.center, dtype=float)
+        slot = self.slot = np.asarray(self.region.center, dtype=float).copy()  # see `redirect`
 
         below_tcp = 2 * self.half_len - self.grasp_depth  # tube length hanging below the fingertips
 
@@ -120,7 +120,10 @@ class TubeIntoRack(PickPlace):
             return np.array([slot[0] - o[0], slot[1] - o[1], bottom_z + self.half_len - o[2]])
 
         def over_slot(obs, c):
-            return ee_for(self.rack_top + self.clear_height, offset(obs, c))
+            # align with the bottom `clear_height` above the rack, or above the seated height when
+            # the spot is higher than the rack (e.g. on top of other objects in a stack)
+            bottom = max(self.rack_top, slot[2] - self.half_len)
+            return ee_for(bottom + self.clear_height, offset(obs, c))
 
         def seated(obs, c):
             return ee_for(slot[2] - self.half_len, offset(obs, c))
@@ -218,6 +221,12 @@ class TubeIntoRack(PickPlace):
         return Retry(attempt, budgets, on_retry=self._on_retry)
 
     # -- steps ---------------------------------------------------------------
+
+    def redirect(self, region) -> None:
+        """Put the object at `region` instead (e.g. its target lost its support mid-carry). Takes
+        effect at once: every target in the tree reads the slot in place."""
+        self.region = region
+        self.slot[:] = np.asarray(region.center, dtype=float)
 
     def _release_cmd(self) -> float:
         if self.release_margin is None:

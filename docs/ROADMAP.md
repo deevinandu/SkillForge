@@ -10,3 +10,6 @@ Living version with status: https://claude.ai/artifact/YWy3bV6TqXLWLTfGJrjUwj
 | 3 Real world | T6, T7 | a sim-hardened skill succeeds on a real arm, measured |
 | 4 Scale | T8, T5, T3 | ~50 tasks, skill library, benchmark results worth a paper |
 | 5 Launch | | paper, open-source release, DARWIN adapter if wanted, company decision |
+
+Project focus (Team Echo): a scoped skill library across arms, see [`PROJECT.md`](PROJECT.md)
+and [`tracks/scoped-library.md`](tracks/scoped-library.md).
