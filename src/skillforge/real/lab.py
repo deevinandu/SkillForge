@@ -200,5 +200,6 @@ def make_lab_env(task: TaskSpec, *, extrinsics: str | Path, port: int = 8765, sp
     if robot is None:
         robot = FrankaBridgeRobotIO(port=port)
     limits = SafetyLimits(ee_speed=speed)
+    # report_contact_force=False: the Franka's force estimate is not a contact sensor (see RealEnv).
     return RealEnv(task, robot, frames, estimator, controller=MujocoController(task, max_ee_speed=speed),
-                   operator=operator, limits=limits, cameras=(CAMERA,), realtime=True)
+                   operator=operator, limits=limits, cameras=(CAMERA,), realtime=True, report_contact_force=False)

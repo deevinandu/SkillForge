@@ -776,3 +776,17 @@ def test_overlay_draws_the_target_in_green_and_the_estimate_in_red(stub_task):
     assert abs(red[:, 1].mean() - (80 - 20.8)) < 1.5 and abs(red[:, 0].mean() - (60 - 10.4)) < 1.5
     hidden = Estimate(pos=est.pos, quat=est.quat, found=False, confidence=0.0)
     assert not (placement_overlay(frame, spec, target, hidden) == RED).all(axis=2).any()
+
+
+def test_hiding_contact_force_from_the_skill_keeps_the_safety_limit(stub_task):
+    """Lab, 2026-11-27: the Franka's force estimate read > 5 N while moving with nothing touching,
+    and the skill's descend-until-contact closed the gripper in mid-air. With
+    report_contact_force=False the skill sees None, while the safety limit still reads it."""
+    env, cell = cell_env(stub_task, report_contact_force=False)
+    obs = env.reset(0)
+    cell.force = np.array([0.0, 0.0, -6.0])
+    obs, info = env.step(go(obs.ee_pos))
+    assert obs.contact_force is None and not info.terminated
+    cell.force = np.array([0.0, 0.0, -50.0])  # above SafetyLimits.force
+    obs, info = env.step(go(obs.ee_pos))
+    assert info.terminated and "safety:force" in info.events

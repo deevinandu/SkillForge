@@ -240,3 +240,18 @@ def test_preview_draws_and_stops(tmp_path):
     finally:
         cam.src.close()
         scene.close()
+
+
+def test_sim_prediction_env_hides_contact_force():
+    pytest.importorskip("mujoco")
+    from skillforge.contracts import Action
+    from skillforge.real.free_placement import make_env_no_contact_force
+
+    env = make_env_no_contact_force(task())
+    try:
+        obs = env.reset(0)
+        assert obs.contact_force is None
+        obs, _ = env.step(Action(mode="ee", ee_pos=obs.ee_pos, ee_quat=obs.ee_quat, gripper=0.0))
+        assert obs.contact_force is None
+    finally:
+        env.close()

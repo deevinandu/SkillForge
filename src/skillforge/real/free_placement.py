@@ -102,13 +102,45 @@ class Prediction:
         return f"sim predicts {self.n_success}/{self.n} for this layout (95% CI {self.lo:.0%}-{self.hi:.0%}){fails}"
 
 
-def sim_prediction(task: TaskSpec, src: SkillSource, n: int = 50, workers: int | None = None) -> Prediction:
-    """Run the skill `n` times in sim on `task` (normally a `pinned_task`)."""
+class _NoContactForce:
+    """A SimEnv whose observations carry no contact force, as the lab RealEnv reports none."""
+
+    def __init__(self, env):
+        self._env = env
+
+    def reset(self, seed):
+        return self._strip(self._env.reset(seed))
+
+    def step(self, action):
+        obs, info = self._env.step(action)
+        return self._strip(obs), info
+
+    @staticmethod
+    def _strip(obs):
+        obs.contact_force = None
+        return obs
+
+    def __getattr__(self, name):
+        return getattr(self._env, name)
+
+
+def make_env_no_contact_force(task: TaskSpec):
+    """Module level (picklable) for `evaluate_parallel`."""
+    from skillforge.sim import make_env
+
+    return _NoContactForce(make_env(task))
+
+
+def sim_prediction(task: TaskSpec, src: SkillSource, n: int = 50, workers: int | None = None,
+                   contact_force: bool = False) -> Prediction:
+    """Run the skill `n` times in sim on `task` (normally a `pinned_task`). By default the skill
+    sees no contact force, matching the lab RealEnv (`report_contact_force=False`)."""
     from skillforge.eval import evaluate_parallel
     from skillforge.eval.harness import wilson
     from skillforge.sim import make_env
 
-    report, eps = evaluate_parallel(make_env, src, task, range(n), workers=workers)
+    report, eps = evaluate_parallel(make_env if contact_force else make_env_no_contact_force, src, task, range(n),
+                                    workers=workers)
     lo, hi = wilson(report.n_success, report.n_rollouts)
     fails: dict[str, int] = {}
     for e in eps:

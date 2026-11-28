@@ -167,6 +167,8 @@ class _Arm:
     """The robot half of `RealEnv`: a SimEnv whose observations have no objects. `RealEnv` wraps
     it in T6's `PerceivedEnv`, which fills the objects in from the cameras."""
 
+    report_contact_force = True  # set by RealEnv; False hides the arm's force estimate from skills
+
     def __init__(self, task, robot, controller, safety, operator, measure, realtime, clock, sleep):
         self.task: TaskSpec = task
         self.robot: RobotIO = robot
@@ -271,7 +273,8 @@ class _Arm:
             ee_pos=np.asarray(pos, dtype=float).copy(),
             ee_quat=np.asarray(quat, dtype=float).copy(),
             gripper_width=float(state.gripper_width),
-            contact_force=None if state.ee_force is None else np.asarray(state.ee_force, dtype=float).copy(),
+            contact_force=None if (state.ee_force is None or not self.report_contact_force)
+            else np.asarray(state.ee_force, dtype=float).copy(),
         )
 
 
@@ -304,6 +307,7 @@ class RealEnv:
         clock: Callable[[], float] = time.monotonic,
         sleep: Callable[[float], None] = time.sleep,
         perception: dict | None = None,
+        report_contact_force: bool = True,
     ):
         if estimator is not None and estimator.needs_frames and frames is None:
             raise ValueError("this estimator needs camera frames: pass `frames`")
@@ -315,6 +319,11 @@ class RealEnv:
         self.safety = Safety(limits or SafetyLimits(), workspace or Workspace.from_task(task))
         self._arm = _Arm(task, robot, controller, self.safety, operator or AutoOperator(), self._measure,
                          realtime, clock, sleep)
+        # False: skills get no contact force. A torque-based estimate (the Franka's O_F_ext_hat_K)
+        # reads several newtons while the arm moves with nothing touching; a skill that stops
+        # descending on |F| > 5 N then closes in mid-air (lab, 2026-11-27, first pyramid trial).
+        # The safety force limit still reads the raw value either way.
+        self._arm.report_contact_force = report_contact_force
         self._env = self._arm if estimator is None else PerceivedEnv(
             self._arm, estimator, source=frames, cameras=self.cameras, **(perception or {})
         )

@@ -397,6 +397,7 @@ class Bridge:
                         "limits": {"max_joint_speed": self.max_speed, "watchdog_s": self.watchdog_s, "margin": self.margin}}
             if cmd == "state":
                 q, qvel, width, force = self.arm.state()
+                self._record("measured", list(q) + [width] + (list(force) if force else []))  # q, width, F
                 events, self.events = self.events, []
                 return {"ok": True, "t": time.time() - self.t0, "q": q, "qvel": qvel, "gripper_width": width,
                         "ee_force": force, "events": events, "streaming": self.streaming}
