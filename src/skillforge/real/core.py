@@ -170,6 +170,11 @@ class _Arm:
     report_contact_force = True  # set by RealEnv; False hides the arm's force estimate from skills
     resync_rad = 0.05  # watchdog: restart the reference from the measured joints only beyond this ...
     resync_after = 1.0  # ... and only after a gap this long (s), when the arm has settled
+    settle_gain = 0.0  # 1/s: steady-state correction (0 = off; a real arm under impedance control needs it)
+    settle_step = 2e-4  # rad per step: a command moving less than this counts as stationary
+    bias_max = 0.03  # rad per joint: the most the correction may add (~1.5 cm at the hand)
+    _q_meas: np.ndarray | None = None
+    _q_prev: np.ndarray | None = None
 
     def __init__(self, task, robot, controller, safety, operator, measure, realtime, clock, sleep):
         self.task: TaskSpec = task
@@ -206,6 +211,9 @@ class _Arm:
         self.controller.reset(state.q)
         self._q_cmd = np.asarray(state.q, dtype=float).copy()
         self._grip = 0.0
+        self._bias = np.zeros_like(self._q_cmd)
+        self._q_prev = None
+        self._q_meas = self._q_cmd.copy()
         home, _ = self.controller.fk(self._q_cmd)
         if not self.safety.workspace.contains(home):
             raise RuntimeError(f"home tool point {np.round(home, 3)} is outside the workspace {self.safety.workspace}")
@@ -233,6 +241,7 @@ class _Arm:
                 if self._q_cmd.size != q_meas.size or np.max(np.abs(q_meas - self._q_cmd)) > self.resync_rad:
                     self._q_cmd = q_meas.copy()
                     self.controller.sync(self._q_cmd)
+                    self._bias = np.zeros_like(self._q_cmd)  # restarted from where the arm is: no offset
         self.watchdog.feed()
         act, ev = self.safety.check_action(action, self.controller.fk)
         events += ev
@@ -245,7 +254,22 @@ class _Arm:
             if q is not q_des:
                 self.controller.sync(q)
             self._q_cmd = q
-        self.robot.send_joint_targets(self._q_cmd, self._grip)
+        sent = self._q_cmd
+        if self.settle_gain > 0 and self._q_meas is not None and self._q_meas.size == self._q_cmd.size:
+            # Steady-state correction. A real arm under joint impedance settles a little short of its
+            # command (gravity, payload, friction): on the lab Franka ~2 mm, holding a can over its
+            # spot, and the skill, which waits for the can to be aligned to 1.5 mm before setting it
+            # down, waited forever (2026-11-28, trial 6). While the command is stationary, integrate
+            # the measured error into an offset on what is sent, so the arm ends where it was told
+            # to, as the sim arm does. Not while moving: lag during motion is not an offset.
+            stationary = self._q_prev is not None and np.max(np.abs(self._q_cmd - self._q_prev)) < self.settle_step
+            if stationary:
+                self._bias = np.clip(self._bias + self.settle_gain * self.dt * (self._q_cmd - self._q_meas),
+                                     -self.bias_max, self.bias_max)
+            sent = self._q_cmd + self._bias
+        self._q_prev = self._q_cmd.copy()
+        self.last_sent = np.asarray(sent, dtype=float).copy()
+        self.robot.send_joint_targets(sent, self._grip)
         if self.realtime:
             wait = self._t0 + self._k * self.dt - self.clock()
             if wait > 0:
@@ -256,6 +280,7 @@ class _Arm:
                 # lurch (lab, 2026-11-27, trial 4).
                 self._t0 = self.clock() - self._k * self.dt
         state = self.robot.read_state()
+        self._q_meas = np.asarray(state.q, dtype=float).copy()
         events += state.events
         if self.safety.force_exceeded(state.ee_force):
             events.append("safety:force")
@@ -324,6 +349,7 @@ class RealEnv:
         sleep: Callable[[float], None] = time.sleep,
         perception: dict | None = None,
         report_contact_force: bool = True,
+        settle_gain: float = 0.0,
     ):
         if estimator is not None and estimator.needs_frames and frames is None:
             raise ValueError("this estimator needs camera frames: pass `frames`")
@@ -340,6 +366,7 @@ class RealEnv:
         # descending on |F| > 5 N then closes in mid-air (lab, 2026-11-27, first pyramid trial).
         # The safety force limit still reads the raw value either way.
         self._arm.report_contact_force = report_contact_force
+        self._arm.settle_gain = settle_gain  # steady-state correction, 1/s (0 = off; see _Arm.step)
         self._env = self._arm if estimator is None else PerceivedEnv(
             self._arm, estimator, source=frames, cameras=self.cameras, **(perception or {})
         )

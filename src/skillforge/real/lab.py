@@ -183,10 +183,11 @@ def _caption(img: np.ndarray, lines: list[str], ok: bool) -> np.ndarray:
 def make_lab_env(task: TaskSpec, *, extrinsics: str | Path, port: int = 8765, speed: float = 0.1,
                  serial: str | None = None, picture: str | Path | None = "runs/real/placement.png",
                  free_placement: bool = False, predict=None, layout_dir: str | Path | None = None,
-                 background: bool = True, perception: str = "table", robot=None, frames=None, estimator=None,
+                 background: bool = True, perception: str = "table", settle_gain: float = 2.0, robot=None, frames=None, estimator=None,
                  operator=None) -> RealEnv:
     """The lab cell as a `RealEnv`. `speed`: tool speed limit (m/s); 0.1 until 10 clean trials (T7 brief).
 
+    settle_gain: RealEnv's steady-state correction (1/s): the Franka settles ~2 mm short under load.
     perception: "table" (default: bookkeeping for precision, camera re-measurements whenever the view
     is clear to catch dropped or knocked cans; see TablePerception), "once" (start of trial only),
     "background" (live, in a thread), or "inline" (live, in the control step).
@@ -234,4 +235,5 @@ def make_lab_env(task: TaskSpec, *, extrinsics: str | Path, port: int = 8765, sp
             estimator = BackgroundEstimator(estimator, frames, CAMERA, decimate=2)
     # report_contact_force=False: the Franka's force estimate is not a contact sensor (see RealEnv).
     return RealEnv(task, robot, frames, estimator, controller=MujocoController(task, max_ee_speed=speed),
-                   operator=operator, limits=limits, cameras=(CAMERA,), realtime=True, report_contact_force=False)
+                   operator=operator, limits=limits, cameras=(CAMERA,), realtime=True, report_contact_force=False,
+                   settle_gain=settle_gain)

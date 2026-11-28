@@ -196,3 +196,58 @@ def test_a_can_dropped_mid_carry_is_found_and_placed():
     finally:
         env.close()
         cam.src.close()
+
+
+class _SaggingTwin:
+    """The twin, but the arm settles `sag` (rad, per joint) short of every command."""
+
+    def __init__(self, twin, sag):
+        self.twin, self.sag = twin, np.asarray(sag, float)
+
+    def send_joint_targets(self, q, g):
+        self.twin.send_joint_targets(np.asarray(q, float) - self.sag, g)
+
+    def __getattr__(self, n):
+        return getattr(self.twin, n)
+
+
+@pytest.mark.parametrize("settle_gain, placed", [(0.0, False), (2.0, True)])
+def test_an_arm_that_settles_short_still_places_the_can(settle_gain, placed):
+    """Lab, 2026-11-28, trial 6: the Franka settled ~2 mm short of its command holding a can over its
+    spot; the skill waits for 1.5 mm alignment before setting it down, and waited forever. RealEnv's
+    steady-state correction closes the gap (off: stuck, as on the arm; on: placed)."""
+    from skillforge.real import MujocoController, MujocoTwin, RealEnv, SafetyLimits, Workspace
+    from skillforge.real.background import TablePerception
+    from skillforge.real.cans import IdenticalCylinderEstimator
+    from skillforge.skills import PlaceInOrder
+
+    task = TaskSpec.model_validate(json.loads(TASK.read_text()))
+    if make_env(task).render() is None:
+        pytest.skip("no GL context")
+    limits = SafetyLimits(ee_speed=0.1)
+    twin = MujocoTwin(task)
+    ctl = MujocoController(task, max_ee_speed=0.1, max_ee_ang_speed=limits.ee_ang_speed)
+    cam = SimCamera(twin.env)
+    k = [0]
+    per = TablePerception(IdenticalCylinderEstimator(), cam, CAMERA, sync=True, clock=lambda: k[0] * 0.05)
+    env = RealEnv(task, _SaggingTwin(twin, [0, 0.005, 0, 0, 0, 0, 0]), None, per, controller=ctl, operator=twin,
+                  limits=limits, workspace=Workspace.from_task(task, include=[ctl.fk(ctl.home)[0]]),
+                  cameras=(CAMERA,), report_contact_force=False, settle_gain=settle_gain)
+    skill = PlaceInOrder()
+    events = []
+    try:
+        obs = env.reset(0)
+        skill.reset(task)
+        for k[0] in range(600):
+            obs, info = env.step(skill.act(obs))
+            events += info.events
+            if "release:cyl_1" in events:
+                break
+        assert "grasp:cyl_1" in events and ("release:cyl_1" in events) is placed
+        if placed:
+            m, d = twin.env.model, twin.env.data
+            spot = np.array(task.scene.region("spot_cyl_1").center)
+            assert np.linalg.norm(d.xpos[m.body("cyl_1").id][:2] - spot[:2]) < 0.01
+    finally:
+        env.close()
+        cam.src.close()
