@@ -903,7 +903,7 @@ def _hand_yaw(obs: Observation) -> float:
 
 class ToppleChain:
     name = "topple_chain"
-    version = "0.3.0"
+    version = "0.3.1"
 
     survey_steps = 8  # observations averaged per survey (observation noise is per step)
     lat_tol = 0.006  # metres across the lane that count as on the spot
