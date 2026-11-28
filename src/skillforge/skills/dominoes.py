@@ -831,6 +831,7 @@ class Relay:
     gap = 0.004
     settle_steps = 10
     low_shift = 0.010  # metres toward the lower end of a tilted domino (scaled by how tilted)
+    lower_ok = 0.014
 
     def __init__(self, task: TaskSpec, obj: str, spot: np.ndarray, turn: float, holding: bool = False,
                  floor: float = 0.0, lift_z: float | None = None):
@@ -938,7 +939,9 @@ class Relay:
                 grip(settle=st),
                 Ramp(up, self.lift_step, gripper=1.0, check=held, timeout=250, name="lift"),
                 CarryRamp(over, self.carry_step, gripper=1.0, check=held, timeout=300, name="carry"),
-                CarryRamp(down, self.lower_step, eps=0.003, ok=0.006, gripper=1.0, check=held, timeout=200,
+                # a stall within `lower_ok` just lets it drop that far (MuJoCo: the fingertips
+                # reach the shelf board before a domino laid on it is all the way down)
+                CarryRamp(down, self.lower_step, eps=0.003, ok=self.lower_ok, gripper=1.0, check=held, timeout=200,
                           name="lower"),
                 release(settle=st),
                 Ramp(up, self.lift_step, gripper=0.0, timeout=200, name="retreat"),
@@ -1454,10 +1457,10 @@ class ToppleChain:
         for f in self.task.scene.fixtures:  # lying under a shelf board
             c, h = np.asarray(f.center), np.asarray(f.half_extents)
             if c[2] - h[2] > p[2] and bool(np.all(np.abs(p[:2] - c[:2]) <= h[:2] + 0.01)):
-                return f"under {f.name}"
+                return f"under {f.name} (at {p[0]:.2f},{p[1]:.2f},{p[2]:.3f})"
         # a straight-down hand over it: fingers, hand and flange clear of every obstacle
         if any(in_boxes(np.asarray(p, dtype=float) + [0.0, 0.0, d], self.boxes, 0.035) for d in (0.03, 0.10, 0.21)):
-            return "against a shelf or frame"
+            return f"against a shelf or frame (at {p[0]:.2f},{p[1]:.2f},{p[2]:.3f})"
         return None
 
     def _on_ledge(self, k: str, p: np.ndarray, q: np.ndarray) -> str | None:
