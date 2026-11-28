@@ -70,6 +70,7 @@ from skillforge.skills.primitives import (
     HoldMonitor,
     MoveTo,
     Node,
+    Retry,
     Runner,
     Sequence,
     fail,
@@ -207,6 +208,34 @@ class HandHoldMonitor(HoldMonitor):
         return super().check(obs, obj, obj_pos)
 
 
+class CarryRamp(Ramp):
+    """Ramp that judges a stall: once the reference has reached the goal, if the EE has not got
+    closer by `progress` metres in `window` steps, it is done when within `ok` of the goal (the
+    next step finishes the job), and fails `stalled:<name>` otherwise (the arm cannot get there
+    in this orientation: try another)."""
+
+    def __init__(self, goal, step: float, ok: float = 0.012, window: int = 20, progress: float = 0.001, **kw):
+        self.ok, self.window, self.progress = ok, window, progress
+        self.errs: list[float] = []
+        super().__init__(goal, step, **kw)
+
+    def reset(self) -> None:
+        super().reset()
+        self.errs = []
+
+    def tick(self, obs, ctx):
+        act, st = super().tick(obs, ctx)
+        if st.running and self.arrived and self.g is not None:
+            e = float(np.linalg.norm(obs.ee_pos - self.g))
+            self.errs.append(e)
+            if len(self.errs) > self.window and self.errs[-self.window - 1] - e < self.progress:
+                if e < self.ok:
+                    ctx.bb[f"{self.name}_stalled_at"] = round(e, 4)
+                    return None, DONE
+                return None, fail(f"stalled:{self.name}({e:.3f}m)")
+        return act, st
+
+
 class Turn(Node):
     """Hold the EE still (gripper fixed) until its orientation is within `tol` of `ctx.quat`."""
 
@@ -260,6 +289,7 @@ class StandTurn(Node):
         cands = ctx.bb.get("stand_cands") or []
         if self.at is None:
             self.at = obs.ee_pos.copy()
+            self.i = int(ctx.bb.get("stand_start", 0))  # after a failed carry: the next pose
         if self.check is not None and (why := self.check(obs, ctx)):
             return None, fail(why)
         self.n += 1
@@ -483,8 +513,9 @@ class StandUp:
     turn_rate = 0.04  # radians per step (0.8 rad/s) while turning the domino upright
     turn_z = 0.30  # height of the point in front of the robot where the domino is turned upright
 
-    def __init__(self, task: TaskSpec, obj: str, spot: np.ndarray, lane_dir: np.ndarray):
+    def __init__(self, task: TaskSpec, obj: str, spot: np.ndarray, lane_dir: np.ndarray, variant: int = 0):
         o = task.scene.object(obj)
+        self.variant = variant  # which grasp option (the skill passes the attempt number)
         self.obj, self.spot, self.lane = obj, np.asarray(spot, dtype=float), np.asarray(lane_dir, dtype=float)[:2]
         self.size = np.asarray(o.size, dtype=float)
         self.h = float(self.size[np.argmax(self.size)])  # half-length: centre height when upright
@@ -510,20 +541,25 @@ class StandUp:
         return tcp_z + float(R_h[2, 2]) * self.wrist[0] - self.wrist[1] >= self.min_clear
 
     def plan_grasp(self, pos: np.ndarray, quat: np.ndarray) -> tuple[np.ndarray, np.ndarray, float] | None:
-        """(TCP point, hand orientation matrix, tilt) for the least-tilted grasp that is clear of the
-        table both now and once the domino is stood up; None if no tilt works."""
+        """(TCP point, hand orientation matrix, tilt) for grasp option number `variant` (wrapping
+        around) among those clear of the table both now and once the domino is stood up, in the
+        order: least tilt first, tilt one way then the other, wrist as planned then turned half a
+        revolution (same pinch, the arm's joints the other way round). None if none is clear."""
+        opts = self.grasp_options(pos, quat)
+        return opts[self.variant % len(opts)] if opts else None
+
+    def grasp_options(self, pos: np.ndarray, quat: np.ndarray) -> list[tuple[np.ndarray, np.ndarray, float]]:
         pt, yaw = lying_grasp(self.size, pos, quat, self.base, self.max_width, self.end_offset, self.min_grasp_z)
         R_d = quat_to_mat(quat)
-        R0 = quat_to_mat(hand_quat(yaw))
-        c = R0[:, 1]  # closing axis (horizontal)
+        out = []
         for t in self.tilts:
             for sgn in ((1.0,) if t == 0 else (1.0, -1.0)):
-                R_h = _axis_rot(c, sgn * t) @ R0
-                if not self._clear(R_h, float(pt[2])):
-                    continue
-                if self.upright_hand(R_h, R_d, pt, pos) is not None:
-                    return pt, R_h, sgn * t
-        return None
+                for flip in (0.0, math.pi):
+                    R0 = quat_to_mat(hand_quat(yaw + flip))
+                    R_h = _axis_rot(R0[:, 1], sgn * t) @ R0  # tilt about the closing axis
+                    if self._clear(R_h, float(pt[2])) and self.upright_hand(R_h, R_d, pt, pos) is not None:
+                        out.append((pt, R_h, sgn * t))
+        return out
 
     def upright_hand(self, R_h: np.ndarray, R_d: np.ndarray, p_e: np.ndarray, p_d: np.ndarray) -> np.ndarray | None:
         """Hand orientation (matrix) that stands the gripped domino up at `spot`, or None."""
@@ -615,6 +651,10 @@ class StandUp:
             c.bb["offsets"] = []
             return None
 
+        def next_pose(c, reason):  # the carry could not get there in this pose: back, turn, retry
+            c.bb["stand_start"] = int(c.bb.get("stand_start", 0)) + 1
+            c.bb["offsets"] = []
+
         def turn_point(obs, c):
             # turn in front of the robot, high: the wrist has the most room there
             mid = 0.5 * (np.asarray(c.bb["rise_xy"]) + self.spot[:2])
@@ -652,9 +692,18 @@ class StandUp:
                 Ramp(risen, self.lift_step, gripper=1.0, check=held, timeout=250, name="lift"),
                 Ramp(turn_point, self.carry_step, gripper=1.0, check=held, timeout=300, name="to_turn"),
                 Do(plan, name="plan"),
-                StandTurn(1.0, rate=self.turn_rate, check=held, name="stand"),
-                Ramp(over_spot, self.carry_step, gripper=1.0, check=held, timeout=300, name="carry"),
-                Ramp(on_spot, self.lower_step, eps=0.003, gripper=1.0, check=held, timeout=200, name="lower"),
+                Retry(
+                    Sequence([
+                        CarryRamp(turn_point, self.carry_step, gripper=1.0, check=held, timeout=300, name="to_turn"),
+                        StandTurn(1.0, rate=self.turn_rate, check=held, name="stand"),
+                        CarryRamp(over_spot, self.carry_step, gripper=1.0, check=held, timeout=300, name="carry"),
+                    ], name="stand_and_carry"),
+                    budgets={"stalled:carry": 5, "timeout:carry": 5},
+                    on_retry=next_pose,
+                    name="other_pose",
+                ),
+                CarryRamp(on_spot, self.lower_step, eps=0.003, ok=0.006, gripper=1.0, check=held, timeout=200,
+                          name="lower"),
                 release(settle=st),
                 Do(note_out, name="note_out"),
                 Ramp(lambda obs, c: c.bb["out"], self.lower_step, gripper=0.0, timeout=150, name="back_out"),
@@ -695,7 +744,7 @@ class ToppleChain:
     quiet_steps = 10
     quiet_tol = 0.01  # radians of tilt change per step that counts as still
     max_nudges = 4
-    max_standups = 3  # per domino
+    max_standups = 4  # per domino (each with a different grasp option)
     # Stand a fallen domino back up (StandUp): OFF. MuJoCo, diag_standup.py, 3 seeds per cell:
     # round 2 (8 cm domino) 3/24 face-down, 6/24 on its side; round 3 (real 5 cm domino, touch-down
     # at 10-40 N, grasp tilted 0.5 rad, slow turn) 0/24 face-down, 4/24 on its side, and 0/10 on
@@ -848,7 +897,8 @@ class ToppleChain:
                     self.log.append(f"{self.steps}:no clear spot to stand {k} up")
                     continue
                 self.standups[k] += 1
-                self.job = StandUp(self.task, k, spot, self.d)
+                # each attempt on this domino uses the next grasp option (tilt way, wrist turned)
+                self.job = StandUp(self.task, k, spot, self.d, variant=self.standups[k] - 1)
                 self._go("standup", f"{k}#{self.standups[k]} at ({spot[0]:.2f},{spot[1]:.2f}) [{summary}]")
                 return
         standing = [k for k in self.order if st[k] in ("ok", "misplaced")]
