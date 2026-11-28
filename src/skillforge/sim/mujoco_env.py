@@ -82,6 +82,12 @@ TABLE_TOP_Z = 0.0
 TABLE_THICKNESS = 0.04
 DROP_Z = TABLE_TOP_Z - 0.05  # an object below this has fallen off the table: episode terminated
 EJECT_SPEED = 3.0  # m/s; a tabletop object moving faster than this was flung by the solver
+# Foam fingertips (RobotSpec.fingertips = "foam"): sliding, torsional, rolling friction; a slower,
+# softer contact (time constant 15 ms instead of MuJoCo's 20 ms default but with a lower impedance
+# floor, so the pad gives a few mm under load).
+FOAM_FRICTION = (1.6, 0.02, 0.001)
+FOAM_SOLREF = (0.015, 1.0)
+FOAM_SOLIMP = (0.6, 0.95, 0.004, 0.5, 2.0)
 TOPPLE_EVENT_TILT = 0.5  # radians: an object_toppled object past this tilt emits 'toppled:<obj>' once
 PENETRATION_TOL = 0.002  # metres: a teleported object may overlap a neighbour by at most this
 TCP_OFFSET = 0.1034  # metres from the hand frame to the fingertip pad centre, along hand z
@@ -194,6 +200,15 @@ class MujocoEnv:
             for g in spec.body(fb).geoms:
                 if g.type == mujoco.mjtGeom.mjGEOM_BOX and g.size[0] < 0.008 and g.contype:
                     g.contype = g.conaffinity = 0
+        if rs.fingertips == "foam":  # foam on the pads: grippy, soft, resists twisting in the grasp
+            for fb in p.finger_bodies:
+                for g in spec.body(fb).geoms:
+                    if g.type == mujoco.mjtGeom.mjGEOM_BOX and g.contype:  # the pad (knobs are off above)
+                        g.friction = list(FOAM_FRICTION)
+                        g.condim = 6
+                        g.priority = 2  # above objects (1): the pad's friction and softness govern
+                        g.solref = list(FOAM_SOLREF)
+                        g.solimp = list(FOAM_SOLIMP)
         grip = spec.actuator(p.gripper_actuator)
         lo, hi = grip.ctrlrange  # menagerie: 0..255 -> tendon length 0..0.04 m
         grip.gainprm[0] = 0.04 * GRIP_KP / (hi - lo)

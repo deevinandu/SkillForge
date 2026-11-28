@@ -335,3 +335,23 @@ def test_mujoco_relocate(mj):
     assert "disturbance:relocate:d1" in evs
     assert tilt_of(obs.objects["d1"].quat) == pytest.approx(math.pi / 2, abs=0.05)
     assert abs(obs.objects["d1"].pos[1]) > 0.14 and obs.objects["d1"].pos[2] < 0.01
+
+
+def test_fingertips_default_rigid():
+    assert domino_task().scene.robot.fingertips == "rigid"
+
+
+def test_mujoco_foam_fingertips(mj):
+    d = json.loads(domino_task(source="menagerie:franka_emika_panda").model_dump_json())
+    d["scene"]["robot"]["fingertips"] = "foam"
+    env = mj(TaskSpec.model_validate(d))
+    m = env.model
+    pads = [g for g in range(m.ngeom) if m.geom_bodyid[g] in env._finger_bodies and m.geom_contype[g]
+            and m.geom_type[g] == 6]  # mjGEOM_BOX
+    assert pads and all(m.geom_friction[g][0] == pytest.approx(1.6) and m.geom_priority[g] == 2 for g in pads)
+    assert all(m.geom_condim[g] == 6 for g in pads)
+    env.reset(0)
+    a = _park(env)
+    for _ in range(20):  # still steps fine
+        obs, info = env.step(a)
+    assert "sim_unstable" not in info.events

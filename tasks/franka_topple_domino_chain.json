@@ -7,7 +7,8 @@
       "source": "menagerie:franka_emika_panda",
       "ee_site": "tcp",
       "gripper": "parallel",
-      "max_gripper_width": 0.08
+      "max_gripper_width": 0.08,
+      "fingertips": "foam"
     },
     "objects": [
       {

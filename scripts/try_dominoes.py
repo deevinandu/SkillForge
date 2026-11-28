@@ -6,6 +6,7 @@
     python scripts/try_dominoes.py --task franka_topple_domino_chain_knock --seed 3
     python scripts/try_dominoes.py --no-disturb                      # same task, disturbances off
     python scripts/try_dominoes.py --seeds 20                        # success rate over seeds 0..19
+    python scripts/try_dominoes.py --seeds 10 --task franka_rebuild_fallen_dominoes --stand-up
     python scripts/try_dominoes.py --view --task franka_build_domino_chain_scattered   # random starts
     python scripts/try_dominoes.py --view --task franka_rebuild_domino_chain           # laid-down dominoes
 
@@ -45,8 +46,10 @@ def main() -> None:
     ap.add_argument("--speed", type=float, default=1.0, help="viewer playback speed")
     ap.add_argument("--gif", default=None)
     ap.add_argument("--no-disturb", action="store_true")
+    ap.add_argument("--stand-up", action="store_true", help="let ToppleChain stand fallen dominoes up (off by default)")
     a = ap.parse_args()
     task = load(a.task, not a.no_disturb)
+    ToppleChain.stand_up = a.stand_up or ToppleChain.stand_up
 
     if a.seeds:
         report, eps = evaluate(make_env, ToppleChain(), task, range(a.seeds))

@@ -53,6 +53,10 @@ class RobotSpec(Spec):
     ee_site: str = "tcp"
     gripper: Literal["parallel", "suction", "none"] = "parallel"
     max_gripper_width: float = Field(0.08, gt=0, description="metres")
+    # "foam": the fingertip pads are covered in foam: high friction, soft (compliant) contact and
+    # torsional grip. "rigid": the model's bare pads. Only the sim reads it (the real gripper has
+    # what it has).
+    fingertips: Literal["rigid", "foam"] = "rigid"
 
 
 class ObjectSpec(Spec):
