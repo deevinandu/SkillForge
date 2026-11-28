@@ -207,6 +207,9 @@ class FrankapyArm:
         rospy.Subscriber(robot_state_topic, RobotState, self._on_state, queue_size=1)
         self.last_done_reason = ""
 
+    def ros_down(self):
+        return self._rospy.is_shutdown()
+
     def _on_state(self, msg):
         self.mode, self.mode_t = int(msg.robot_mode), time.time()
 
@@ -382,6 +385,12 @@ class Bridge:
 
     def handle(self, msg):
         cmd = msg.get("cmd")
+        if getattr(self.arm, "ros_down", lambda: False)():
+            with self.lock:
+                self.streaming = False
+            return {"ok": False, "error": "this bridge lost its ROS connection: another frankapy program (another bridge, "
+                    "guide_mode.py, ...) started a node with the same name and ROS shut this one down. Stop the "
+                    "other program, then restart this bridge server."}
         with self.lock:
             if cmd == "hello":
                 return {"ok": True, "mode": "fake" if self.fake else "frankapy", "joints": 7,
@@ -469,12 +478,23 @@ class Bridge:
             self._halt("bridge:shutdown")
 
 
-def serve(bridge, host, port, ready=None):
+def listen(host, port):
+    """Claim the port BEFORE frankapy starts its ROS node: frankapy's node has a fixed name, and a
+    second copy of this server would shut down the first one's node (ROS allows one node per name)
+    before failing on the port (2026-11-27). Now a second copy fails here, harmlessly."""
     srv = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     srv.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     srv.settimeout(None)  # rospy sets a process-wide socket timeout; an idle server must not die of it
-    srv.bind((host, port))
+    try:
+        srv.bind((host, port))
+    except OSError as e:
+        raise SystemExit(f"port {port} is taken ({e}): a bridge server is probably already running. Use that one.") from None
     srv.listen(1)
+    return srv
+
+
+def serve(bridge, host, port, ready=None, srv=None):
+    srv = srv or listen(host, port)
     print("bridge listening on {}:{} ({})".format(host, srv.getsockname()[1], "fake" if bridge.fake else "frankapy"), flush=True)
     if ready:
         ready(srv.getsockname()[1])
@@ -511,8 +531,9 @@ def main():
                     help="interpolate between client targets and publish at this rate (0 = pass targets straight through)")
     ap.add_argument("--log", help="append every target and published point (JSON lines) to this file")
     a = ap.parse_args()
+    srv = listen(a.host, a.port)
     arm = FakeArm() if a.fake else FrankapyArm()
-    serve(Bridge(arm, a.max_joint_speed, a.watchdog, a.margin, a.fake, a.publish_hz, a.log), a.host, a.port)
+    serve(Bridge(arm, a.max_joint_speed, a.watchdog, a.margin, a.fake, a.publish_hz, a.log), a.host, a.port, srv=srv)
 
 
 if __name__ == "__main__":

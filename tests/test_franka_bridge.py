@@ -64,7 +64,7 @@ def test_a_far_target_is_limited_to_the_joint_speed(server):
     with connect(server) as robot:
         robot.home()
         far = np.array(SIM_HOME) + [0.5, 0, 0, 0, 0, 0, 0]
-        stream_to(robot, far, n=1, dt=0.0)
+        stream_to(robot, far, n=1, dt=0.15)  # the server reaches each target over one period
         s = robot.read_state()
         moved = s.q[0] - SIM_HOME[0]
         assert 0 < moved <= SPEED * 0.1 + 1e-9  # at most one (capped) control period's worth
@@ -349,3 +349,15 @@ def test_publish_hz_zero_passes_targets_through(tmp_path):
     finally:
         p.terminate()
         p.wait(5)
+
+
+def test_a_second_server_fails_on_the_port_and_leaves_the_first_alone(server):
+    """2026-11-27: a second server registered frankapy's node first (same name: ROS shut down the
+    running server's node) and only then failed on the port. The port is now claimed first."""
+    p = subprocess.Popen([sys.executable, str(SERVER), "--fake", "--port", str(server)],
+                         stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+    out, _ = p.communicate(timeout=10)
+    assert p.returncode != 0 and "already running" in out
+    with connect(server) as robot:  # the first server still works
+        robot.home()
+        stream_to(robot, SIM_HOME)
