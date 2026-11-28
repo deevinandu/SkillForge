@@ -199,23 +199,35 @@ def test_a_can_dropped_mid_carry_is_found_and_placed():
 
 
 class _SaggingTwin:
-    """The twin, but the arm settles `sag` (rad, per joint) short of every command."""
+    """The twin, but the arm settles `sag` (rad, per joint) short of every command (only while the
+    gripper is closed with `loaded=True`: on the arm the wrist lagged while carrying a can)."""
 
-    def __init__(self, twin, sag):
-        self.twin, self.sag = twin, np.asarray(sag, float)
+    def __init__(self, twin, sag, loaded=False):
+        self.twin, self.sag, self.loaded = twin, np.asarray(sag, float), loaded
 
     def send_joint_targets(self, q, g):
-        self.twin.send_joint_targets(np.asarray(q, float) - self.sag, g)
+        on = not self.loaded or g > 0.5
+        self.twin.send_joint_targets(np.asarray(q, float) - (self.sag if on else 0.0), g)
 
     def __getattr__(self, n):
         return getattr(self.twin, n)
 
 
-@pytest.mark.parametrize("settle_gain, placed", [(0.0, False), (2.0, True)])
-def test_an_arm_that_settles_short_still_places_the_can(settle_gain, placed):
+WRIST_LAG = [0, 0, 0, 0, 0, 0.068, 0]  # lab, 2026-11-28 (11:23, 11:25, 12:16): joint 6 held 0.05-0.07 rad short
+
+
+@pytest.mark.parametrize("sag, settle_gain, bias_max, placed", [
+    ([0, 0.005, 0, 0, 0, 0, 0], 0.0, None, False),
+    ([0, 0.005, 0, 0, 0, 0, 0], 2.0, None, True),
+    (WRIST_LAG, 2.0, 0.03, False),  # the old cap: hovers ~1 cm over the spot, as on the arm
+    (WRIST_LAG, 2.0, None, True),  # the current cap
+])
+def test_an_arm_that_settles_short_still_places_the_can(sag, settle_gain, bias_max, placed):
     """Lab, 2026-11-28, trial 6: the Franka settled ~2 mm short of its command holding a can over its
     spot; the skill waits for 1.5 mm alignment before setting it down, and waited forever. RealEnv's
-    steady-state correction closes the gap (off: stuck, as on the arm; on: placed)."""
+    steady-state correction closes the gap (off: stuck, as on the arm; on: placed). Later trials: the
+    wrist (joint 6) held 0.05-0.07 rad short while setting the first can down; a 0.03 rad cap on the
+    correction could not close that, the skill timed out and held the can ~1 cm over its spot."""
     from skillforge.real import MujocoController, MujocoTwin, RealEnv, SafetyLimits, Workspace
     from skillforge.real.background import TablePerception
     from skillforge.real.cans import IdenticalCylinderEstimator
@@ -230,9 +242,11 @@ def test_an_arm_that_settles_short_still_places_the_can(settle_gain, placed):
     cam = SimCamera(twin.env)
     k = [0]
     per = TablePerception(IdenticalCylinderEstimator(), cam, CAMERA, sync=True, clock=lambda: k[0] * 0.05)
-    env = RealEnv(task, _SaggingTwin(twin, [0, 0.005, 0, 0, 0, 0, 0]), None, per, controller=ctl, operator=twin,
+    env = RealEnv(task, _SaggingTwin(twin, sag, loaded=sag is WRIST_LAG), None, per, controller=ctl, operator=twin,
                   limits=limits, workspace=Workspace.from_task(task, include=[ctl.fk(ctl.home)[0]]),
                   cameras=(CAMERA,), report_contact_force=False, settle_gain=settle_gain)
+    if bias_max is not None:
+        env._arm.bias_max = bias_max
     skill = PlaceInOrder()
     events = []
     try:
@@ -251,3 +265,46 @@ def test_an_arm_that_settles_short_still_places_the_can(settle_gain, placed):
     finally:
         env.close()
         cam.src.close()
+
+
+class _AllOnSpots:
+    """Estimator stand-in: every can sits on its pyramid spot; `held` names the can in the hand."""
+
+    needs_frames = False
+
+    def __init__(self, task):
+        self.task, self.held = task, None
+
+    def reset(self, task):
+        pass
+
+    def estimate(self, frames, obs=None):
+        from skillforge.perception import Estimate
+
+        return {o.name: Estimate(pos=np.array(self.task.scene.region(f"spot_{o.name}").center, float),
+                                 quat=np.array([1.0, 0, 0, 0]), found=True, confidence=1.0)
+                for o in self.task.scene.objects}
+
+
+def test_success_waits_until_the_last_can_is_released():
+    """Lab, 2026-11-28 (11:10 and 11:47 trials): bookkeeping carries a held can with the hand, so the
+    last can was 'on its spot' while still gripped; success ended the trial and left it in the gripper."""
+    from skillforge.real import MujocoController, MujocoTwin, RealEnv, SafetyLimits, Workspace
+
+    task = TaskSpec.model_validate(json.loads(TASK.read_text()))
+    limits = SafetyLimits(ee_speed=0.1)
+    twin = MujocoTwin(task)
+    ctl = MujocoController(task, max_ee_speed=0.1, max_ee_ang_speed=limits.ee_ang_speed)
+    est = _AllOnSpots(task)
+    env = RealEnv(task, twin, None, est, controller=ctl, operator=twin, limits=limits,
+                  workspace=Workspace.from_task(task, include=[ctl.fk(ctl.home)[0]]), cameras=(CAMERA,),
+                  report_contact_force=False)
+    try:
+        obs = env.reset(0)
+        hold = Action(mode="ee", ee_pos=obs.ee_pos, ee_quat=obs.ee_quat, gripper=0.0)
+        est.held = "cyl_6"
+        assert not env.step(hold)[1].success
+        est.held = None
+        assert env.step(hold)[1].success
+    finally:
+        env.close()

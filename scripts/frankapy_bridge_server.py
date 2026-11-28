@@ -245,8 +245,17 @@ class FrankapyArm:
         now = self.fa.get_joints()
         dist = max(abs(a - b) for a, b in zip(q, now))
         q, duration = frankapy_joints_args(q, max(4.0, dist / 0.3))  # at most 0.3 rad/s on any joint
+        t0 = time.time()
         self.fa.goto_joints(q, duration=duration, ignore_virtual_walls=False)
-        err = max(abs(a - b) for a, b in zip(q, self.fa.get_joints()))
+        # frankapy's blocking wait can return while the move is still running (seen 2026-11-28:
+        # it returned ~0.7 s into a 4 s move, and the arm then reached home). So wait for the
+        # joints themselves; a wall, reflex or e-stop still leaves the error large and fails.
+        deadline = t0 + duration + 5.0
+        while True:
+            err = max(abs(a - b) for a, b in zip(q, self.fa.get_joints()))
+            if err <= 0.02 or time.time() > deadline:
+                break
+            time.sleep(0.05)
         if err > 0.02:
             raise RuntimeError(f"home not reached: max joint error {err:.3f} rad (wall, reflex or e-stop?)")
 

@@ -350,9 +350,13 @@ def test_a_dry_run_at_sim_speed_matches_the_sim_run(cube_task):
     for a, b in zip(sim, dry, strict=True):
         assert a.success and b.success
         # not step-identical: the sim reports the tool pose one physics substep stale, the
-        # real env computes it from the measured joints
-        assert abs(a.n_steps - b.n_steps) <= 2
-        assert sorted(a.events) == sorted(b.events)
+        # real env computes it from the measured joints; and the real env also waits for the
+        # hand to let go and rise clear of the objects (RealEnv._hand_clear), the sim does not
+        assert 0 <= b.n_steps - a.n_steps <= 30
+        extra = list(b.events)
+        for e in a.events:
+            extra.remove(e)
+        assert all(e.startswith("release:") for e in extra)  # the extra steps are the let-go
         assert b.randomization["real.dry_run"] == 1.0
         assert {k: v for k, v in b.randomization.items() if k in a.randomization} == a.randomization
 

@@ -172,7 +172,10 @@ class _Arm:
     resync_after = 1.0  # ... and only after a gap this long (s), when the arm has settled
     settle_gain = 0.0  # 1/s: steady-state correction (0 = off; a real arm under impedance control needs it)
     settle_step = 2e-4  # rad per step: a command moving less than this counts as stationary
-    bias_max = 0.03  # rad per joint: the most the correction may add (~1.5 cm at the hand)
+    # rad per joint: the most the correction may add. 0.03 was too little: on 2026-11-28 the lab
+    # Franka's wrist (joint 6) held 0.05-0.07 rad short while setting a can down, and the skill
+    # timed out holding it ~1 cm over its spot (11:23, 11:25, 12:16 trials).
+    bias_max = 0.08
     _q_meas: np.ndarray | None = None
     _q_prev: np.ndarray | None = None
 
@@ -408,10 +411,18 @@ class RealEnv:
         needed = success_objects(self.task.success)
         success = (
             self._arm.stopped is None
+            and self._hand_clear(obs)
             and all(n in obs.objects for n in needed)
             and is_success(self.task, {n: s.pos for n, s in obs.objects.items()}, self._start)
         )
         return obs, StepInfo(success=bool(success), terminated=info.terminated, events=info.events)
+
+    def _hand_clear(self, obs: Observation) -> bool:
+        """Success counts only once the gripper has let go. Bookkeeping carries a held can with the
+        hand, so the last can is 'on its spot' while still gripped, and success ends the trial: lab,
+        2026-11-28 (11:10 and 11:47 trials), the arm stopped holding the 6th can over the pyramid.
+        The estimator's `held` clears when the fingers open past the can's width."""
+        return getattr(self.estimator, "held", None) is None
 
     def randomization_sample(self) -> dict[str, float]:
         """The drawn placement and where the object was measured to be. A twin that really
