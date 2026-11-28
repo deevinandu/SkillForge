@@ -1,20 +1,37 @@
-"""ToppleChain v0.1: stand dominoes on their spots, fix what gets disturbed, then topple the chain.
+"""ToppleChain v0.4: stand dominoes up and on their spots, fix what gets disturbed, then topple.
 
 For a task whose success is `all_of` `object_toppled` conditions that share one `direction`, and
 whose scene has a region `spot_<domino>` per domino (where it must stand, its centre at the
 domino's resting centre), ToppleChain loops:
 
-  park -> survey -> (repair one domino -> park -> survey)* -> push the first -> watch -> survey ...
+  park -> survey -> (stand one up | repair one -> park -> survey)* -> push the first -> watch -> ...
 
 - survey: average `survey_steps` observations, then sort every domino into
   ok (standing on its spot, yawed along the lane), misplaced (standing, off its spot or yaw),
-  leaning (in between: wait and look again), down (fallen the right way, inside its region) or
-  down_bad (fallen any other way or anywhere else: this version cannot stand one back up).
+  leaning (in between: wait and look again; still leaning after a while = fallen), down (fallen
+  the right way, inside its region) or down_bad (lying or fallen any other way, or anywhere else).
+- stand up (`StandUp`; `stand_up = False` turns it off and only reports lying dominoes), before
+  the robot's own push, for every down_bad domino, top of a pile first: grasp near its +z end, tilted about the closing axis just enough that palm and wrist
+  stay clear of the table both now and once it stands; lift; turn the hand so the domino hangs
+  upright (+z end up, chosen from how it actually sits in the fingers); set it down standing on
+  its own spot if that is clear, else on the nearest clear point of a grid beside the lane; open,
+  back the hand out along its axis. It is then "misplaced" and repaired like any other.
+- judge first (v0.3): a fallen domino is stood up directly only if it lies cleanly by itself;
+  one leaning, resting on another or next to one, or whose stand-up failed because of its pose,
+  is first relayed (`Relay`: side pinch at its centre, lift, lay it down alone on a clear bench
+  point, turned so StandUp has the most grasp options there). Out of reach, against the shelves
+  (`TableSpec.shelves`: the hand stays inside the table width), no grasp, or attempts used up:
+  given up on, with the reasons logged; jobs that no longer fit in the steps left are skipped and
+  the row is rebuilt from what stands. A final `report` line lists what was stood up and why the
+  rest was not.
+- ledge (v0.4): with a shelf board marked `ledge` in the scene, a cleanly lying domino is first
+  stood up off its edge (`LedgeStandUp`: laid over the edge, pinched by the overhang with the
+  hand level, turned upright hanging below a straight-down hand), then StandUp if that fails.
 - repair (`ReplaceDomino`): top-down grasp across the domino's width, rate-limited lift, carry
   over everything standing, turn the wrist so the domino arrives at the lane's yaw, lower to
   `drop` above the table, open, retreat. Misplaced dominoes are repaired farthest-first; each at
   most `max_repairs` times. Dominoes still in a staging area are "misplaced" too, so the same
-  skill sets up a chain from scratch.
+  skill sets up a chain from scratch. A repair whose domino falls over before it is grasped stops.
 - push: before the fingers reach the domino, every domino is watched (smoothed xy, yaw, tilt);
   if one moves away from what the survey saw, the push is called off and the skill surveys again.
   Then: fingers nearly closed (width ~8 mm, so neither a grasp nor a grasp_miss is reported) and
@@ -23,12 +40,14 @@ domino's resting centre), ToppleChain loops:
 - watch: wait for the chain to stop moving, then survey again. A chain that stalled (or was
   partly knocked over early) is nudged at its first standing domino, at most `max_nudges` times.
 
-Disturbances (SceneSpec.disturbances) are handled by construction: every decision is taken on a
-fresh survey, so a domino moved before, during or after a repair is found and repaired again.
+Disturbances (SceneSpec.disturbances) and random starts (SceneSpec.scatter) are handled by
+construction: every decision is taken on a fresh survey of what the robot sees (no event from the
+sim is used), so a domino moved, turned or laid down before, during or after a repair is found
+and rebuilt.
 
-Limits (v0.1): a domino knocked over sideways or backwards is reported and left (standing a
-flat domino back up needs a regrasp/pivot primitive); a nudge behind a domino whose predecessor
-leans on it may hit that predecessor. Units: metres, radians. Loadable as a `SkillSource` (imports
+Limits (v0.2): after the robot's own push nothing is rebuilt (dominoes that fell the right way
+count, the rest are nudged); a domino standing on its head is treated as fallen; a nudge behind a
+domino whose predecessor leans on it may hit that predecessor. Units: metres, radians. Loadable as a `SkillSource` (imports
 only `skillforge.*` and numpy).
 """
 
@@ -46,7 +65,14 @@ from skillforge.contracts import (
     TaskSpec,
     success_conditions,
 )
-from skillforge.skills.grasp import DOWN, quat_angle, quat_from_axis_angle, quat_mul, quat_to_mat
+from skillforge.skills.grasp import (
+    DOWN,
+    mat_to_quat,
+    quat_angle,
+    quat_from_axis_angle,
+    quat_mul,
+    quat_to_mat,
+)
 from skillforge.skills.primitives import (
     DONE,
     RUNNING,
@@ -55,6 +81,7 @@ from skillforge.skills.primitives import (
     HoldMonitor,
     MoveTo,
     Node,
+    Retry,
     Runner,
     Sequence,
     fail,
@@ -133,15 +160,113 @@ class Ramp(MoveTo):
         return self.arrived and float(np.linalg.norm(obs.ee_pos - self.g)) < self.eps
 
 
+class TouchDown(Ramp):
+    """Ramp down toward `goal` (and up to `extra` metres past it) and stop as soon as the fingers
+    touch something: contact force above `force`, or the EE lagging its reference by `lag` (it is
+    resting on the table). For picking a domino that lies flat, where the pads must get as low as
+    the fingertips allow and a fixed target height is either above the domino or in the table."""
+
+    def __init__(self, goal, step: float, extra: float = 0.012, force: float = 2.0, lag: float = 0.002,
+                 slow: float = 0.001, slow_from: float = 0.02, **kw):
+        self.extra, self.force, self.lag = extra, force, lag
+        self.slow, self.slow_from = slow, slow_from  # step per tick within `slow_from` of the goal
+        self.last_z: float | None = None
+        super().__init__(goal, step, **kw)
+
+    def reset(self) -> None:
+        super().reset()
+        self.last_z = None
+
+    def _target(self, obs, ctx):
+        g = np.asarray(self.goal(obs, ctx) if callable(self.goal) else self.goal, dtype=float).copy()
+        g[2] -= self.extra
+        self.g = g
+        if self.ref is None:
+            self.ref = obs.ee_pos.copy()
+        d = g - self.ref
+        n = float(np.linalg.norm(d))
+        step = self.slow if self.ref[2] - (g[2] + self.extra) < self.slow_from else self.step
+        self.arrived = n <= step
+        self.ref = g.copy() if self.arrived else self.ref + d * (step / n)
+        return self.ref
+
+    def _near(self, obs, ctx):
+        f = obs.contact_force
+        if f is not None and float(np.linalg.norm(f)) > self.force:
+            ctx.bb["touch"] = f"force {float(np.linalg.norm(f)):.1f}N at z={obs.ee_pos[2]:.4f}"
+            return True
+        # blocked: the reference is already down near the goal, the EE is above it and has stopped
+        z, last = float(obs.ee_pos[2]), self.last_z
+        self.last_z = z
+        near_goal = self.ref is not None and self.ref[2] <= self.g[2] + self.extra + 0.002
+        if near_goal and last is not None and z - self.ref[2] > self.lag and abs(z - last) < 0.0005:
+            ctx.bb["touch"] = f"blocked at z={z:.4f}"
+            return True
+        return self.arrived and float(np.linalg.norm(obs.ee_pos - self.g)) < self.eps
+
+
+class HandHoldMonitor(HoldMonitor):
+    """HoldMonitor whose object-to-EE offset is kept in the hand frame, so turning the wrist with
+    the object in it (a stand-up turns it ~90 deg) is not mistaken for the object drifting."""
+
+    def arm(self, obs: Observation, obj_pos: np.ndarray) -> None:
+        super().arm(obs, obj_pos)
+        self.off_hand = quat_to_mat(obs.ee_quat).T @ self.offset
+
+    def check(self, obs: Observation, obj: str, obj_pos: np.ndarray | None = None) -> str | None:
+        if self.armed:
+            self.offset = quat_to_mat(obs.ee_quat) @ self.off_hand
+        return super().check(obs, obj, obj_pos)
+
+
+class CarryRamp(Ramp):
+    """Ramp that judges a stall: once the reference has reached the goal, if the EE has not got
+    closer by `progress` metres in `window` steps, it is done when within `ok` of the goal (the
+    next step finishes the job), and fails `stalled:<name>` otherwise (the arm cannot get there
+    in this orientation: try another)."""
+
+    def __init__(self, goal, step: float, ok: float = 0.012, window: int = 20, progress: float = 0.001, **kw):
+        self.ok, self.window, self.progress = ok, window, progress
+        self.errs: list[float] = []
+        super().__init__(goal, step, **kw)
+
+    def reset(self) -> None:
+        super().reset()
+        self.errs = []
+
+    def tick(self, obs, ctx):
+        act, st = super().tick(obs, ctx)
+        if st.running and self.arrived and self.g is not None:
+            e = float(np.linalg.norm(obs.ee_pos - self.g))
+            self.errs.append(e)
+            if len(self.errs) > self.window and self.errs[-self.window - 1] - e < self.progress:
+                if e < self.ok:
+                    ctx.bb[f"{self.name}_stalled_at"] = round(e, 4)
+                    return None, DONE
+                return None, fail(f"stalled:{self.name}({e:.3f}m)")
+        return act, st
+
+
 class Turn(Node):
     """Hold the EE still (gripper fixed) until its orientation is within `tol` of `ctx.quat`."""
 
-    def __init__(self, gripper: float, tol: float = 0.04, timeout: int = 60, check=None, name: str = "turn"):
+    def __init__(self, gripper: float, tol: float = 0.04, timeout: int = 60, check=None, name: str = "turn",
+                 rate: float | None = None):
         self.gripper, self.tol, self.timeout, self.check, self.name = gripper, tol, timeout, check, name
-        self.n, self.at = 0, None
+        self.rate = rate  # radians per step the commanded orientation may turn (None: command the goal)
+        self.n, self.at, self.ref = 0, None, None
 
     def reset(self) -> None:
-        self.n, self.at = 0, None
+        self.n, self.at, self.ref = 0, None, None
+
+    def _command(self, obs, goal: np.ndarray) -> np.ndarray:
+        if self.rate is None:
+            return goal
+        if self.ref is None:
+            self.ref = np.asarray(obs.ee_quat, dtype=float)
+        ang = quat_angle(self.ref, goal)
+        self.ref = goal.copy() if ang <= self.rate else _slerp(self.ref, goal, self.rate / ang)
+        return self.ref
 
     def tick(self, obs, ctx):
         if self.at is None:
@@ -153,7 +278,65 @@ class Turn(Node):
         self.n += 1
         if self.n > self.timeout:
             return None, fail(f"timeout:{self.name}")
-        return Action(ee_pos=self.at, ee_quat=ctx.quat, gripper=self.gripper), RUNNING
+        return Action(ee_pos=self.at, ee_quat=self._command(obs, ctx.quat), gripper=self.gripper), RUNNING
+
+
+class StandTurn(Node):
+    """Turn the hand (holding position) to the first of `ctx.bb["stand_cands"]` (quaternions,
+    best first) it can reach: rate-limited; if the turn stalls (error not down by `progress` rad
+    in `window` steps) it accepts the pose when within `loose` rad, else moves on to the next
+    candidate. Sets `ctx.quat` to the pose it ends on."""
+
+    def __init__(self, gripper: float, rate: float, tol: float = 0.04, loose: float = 0.12,
+                 window: int = 20, progress: float = 0.01, timeout: int = 400, check=None, name: str = "stand"):
+        self.gripper, self.rate, self.tol, self.loose = gripper, rate, tol, loose
+        self.window, self.progress, self.timeout, self.check, self.name = window, progress, timeout, check, name
+        self.reset()
+
+    def reset(self) -> None:
+        self.i, self.n, self.at, self.ref, self.hist = 0, 0, None, None, []
+
+    def tick(self, obs, ctx):
+        cands = ctx.bb.get("stand_cands") or []
+        if self.at is None:
+            self.at = obs.ee_pos.copy()
+            self.i = int(ctx.bb.get("stand_start", 0))  # after a failed carry: the next pose
+        if self.check is not None and (why := self.check(obs, ctx)):
+            return None, fail(why)
+        self.n += 1
+        if self.i >= len(cands) or self.n > self.timeout:
+            return None, fail(f"timeout:{self.name}")
+        goal = cands[self.i]
+        err = quat_angle(obs.ee_quat, goal)
+        if err < self.tol:
+            ctx.quat = goal
+            return None, DONE
+        self.hist.append(err)
+        if len(self.hist) > self.window and self.hist[-self.window - 1] - err < self.progress:
+            if err < self.loose:  # nearly upright: it settles when set down
+                ctx.quat = goal
+                ctx.bb["stand_loose"] = round(err, 3)
+                return None, DONE
+            self.i, self.hist, self.ref = self.i + 1, [], None  # stuck: try the next pose
+            ctx.bb["stand_tries"] = self.i + 1
+            return Action(ee_pos=self.at, ee_quat=obs.ee_quat, gripper=self.gripper), RUNNING
+        if self.ref is None:
+            self.ref = np.asarray(obs.ee_quat, dtype=float)
+        ang = quat_angle(self.ref, goal)
+        self.ref = goal.copy() if ang <= self.rate else _slerp(self.ref, goal, self.rate / ang)
+        return Action(ee_pos=self.at, ee_quat=self.ref, gripper=self.gripper), RUNNING
+
+
+def _slerp(a: np.ndarray, b: np.ndarray, t: float) -> np.ndarray:
+    a, b = np.asarray(a, dtype=float), np.asarray(b, dtype=float)
+    d = float(a @ b)
+    if d < 0:
+        b, d = -b, -d
+    if d > 0.9995:
+        q = a + t * (b - a)
+        return q / np.linalg.norm(q)
+    th = math.acos(d)
+    return (math.sin((1 - t) * th) * a + math.sin(t * th) * b) / math.sin(th)
 
 
 # ---------------------------------------------------------------- one repair
@@ -177,7 +360,8 @@ class ReplaceDomino:
         self.obj, self.spot, self.yaw, self.others = obj, np.asarray(spot, dtype=float), float(yaw), list(others)
         self.hh = float(o.size[2])
         self.tallest = max((2 * float(task.scene.object(n).size[2]) for n in others), default=2 * self.hh)
-        self.ctx = Context(obj=obj, monitor=HoldMonitor(dev_tol=0.03, dev_hard=0.05))
+        self.boxes = obstacle_boxes(task)
+        self.ctx = Context(obj=obj, monitor=HandHoldMonitor(dev_tol=0.03, dev_hard=0.05))
         self.runner = Runner(self._build(), self.ctx)
 
     @property
@@ -199,7 +383,16 @@ class ReplaceDomino:
             p[2] = 2 * hh - self.grasp_depth
             # Wrist yaw: the first choice is the one closest to DOWN (keeps the last joint mid-range,
             # where the IK is happy); after that follow it, so noise near +-pi/2 does not flip it.
+            # Across its thickness (the face normal) unless the hand would touch a shelf or frame
+            # there; then across its width (MuJoCo, the 55 cm cell: a domino 6-9 cm from the shelf
+            # boards, gripped across a thickness pointing at them, put the palm into the boards).
             dom = heading_x(c.obj_quat)
+            if "grasp_off" not in c.bb:
+                c.bb["grasp_off"] = 0.0
+                if hand_hits(self.boxes, p, wrap_half_pi(dom), rise=self.hover):
+                    if not hand_hits(self.boxes, p, wrap_half_pi(dom + math.pi / 2), rise=self.hover):
+                        c.bb["grasp_off"] = math.pi / 2
+            dom = dom + c.bb["grasp_off"]
             ref = c.bb.setdefault("grasp_yaw", wrap_half_pi(dom))
             c.bb["grasp_yaw"] = nearest_turn(dom, ref, math.pi)
             c.quat = hand_quat(c.bb["grasp_yaw"])
@@ -242,12 +435,16 @@ class ReplaceDomino:
             o = offset(obs, c)
             return np.array([self.spot[0] - o[0], self.spot[1] - o[1], hh + self.drop - o[2]])
 
+        def standing(obs, c):  # it fell over while the hand was on its way: survey again
+            return "target_fell" if c.obj_quat is not None and tilt(c.obj_quat) > 0.3 else None
+
         held = hold_check("grasp_slip")
         return Sequence(
             [
                 Ramp(clear_z, self.carry_step, gripper=0.0, timeout=200, name="clear"),
-                MoveTo(above_grasp, gripper=0.0, tol=0.006, timeout=250, name="approach"),
-                Ramp(grasp_target, self.lower_step, eps=0.004, gripper=0.0, timeout=150, name="descend"),
+                MoveTo(above_grasp, gripper=0.0, tol=0.006, timeout=250, check=standing, name="approach"),
+                Ramp(grasp_target, self.lower_step, eps=0.004, gripper=0.0, timeout=150, check=standing,
+                     name="descend"),
                 grip(settle=st),
                 Do(note, name="note"),
                 Ramp(risen, self.lift_step, gripper=1.0, check=held, timeout=200, name="lift"),
@@ -263,6 +460,686 @@ class ReplaceDomino:
         )
 
 
+# ---------------------------------------------------------------- stand a fallen domino up
+
+
+def _rot(axis: int, angle: float) -> np.ndarray:
+    c, s = math.cos(angle), math.sin(angle)
+    if axis == 0:
+        return np.array([[1, 0, 0], [0, c, -s], [0, s, c]])
+    if axis == 1:
+        return np.array([[c, 0, s], [0, 1, 0], [-s, 0, c]])
+    return np.array([[c, -s, 0], [s, c, 0], [0, 0, 1]])
+
+
+def _axis_rot(axis: np.ndarray, angle: float) -> np.ndarray:
+    """Rotation matrix about a unit axis (Rodrigues)."""
+    k = np.asarray(axis, dtype=float) / np.linalg.norm(axis)
+    K = np.array([[0, -k[2], k[1]], [k[2], 0, -k[0]], [-k[1], k[0], 0]])
+    return np.eye(3) + math.sin(angle) * K + (1 - math.cos(angle)) * K @ K
+
+
+def lying_grasp(size: np.ndarray, pos: np.ndarray, quat: np.ndarray, base_xy: np.ndarray, max_width: float,
+                end_offset: float, min_z: float) -> tuple[np.ndarray, float]:
+    """Top-down grasp of a box that is not standing: fingers close across its most horizontal short
+    axis, `end_offset` from the centre toward the +end of its long axis. That end goes up when it
+    is stood up, so the box's own z axis points up again: `object_toppled` judges which way a
+    domino fell by where its +z end went. Returns (TCP point, hand yaw from DOWN)."""
+    R = quat_to_mat(quat)
+    long = int(np.argmax(size))
+    shorts = [k for k in range(3) if k != long and 2 * size[k] + 0.01 <= max_width] or [k for k in range(3) if k != long]
+    k = min(shorts, key=lambda j: abs(R[2, j]))
+    c = R[:, k][:2]
+    c = c / max(float(np.linalg.norm(c)), 1e-9)
+    pt = np.asarray(pos, dtype=float) + R[:, long] * end_offset
+    pt[2] = max(pt[2], min_z)
+    return pt, wrap_half_pi(math.atan2(c[0], -c[1]))  # hand_quat(yaw) closes along (sin, -cos)
+
+
+class StandUp:
+    """Pick a domino that is not standing (face down, on its side, leaning) near one end, turn the
+    hand so it hangs upright with the gripped end on top, and set it down standing at `spot`.
+
+    The upright pose is chosen once it is in the air, from how it actually sits in the fingers:
+    among all upright orientations (its own z axis up, yaw on a 10 deg grid) keep those where the
+    gripped end is the top, the hand does not point up, and the palm and wrist stay above the
+    table when the domino stands on it; prefer the hand pointing down and away from the robot,
+    the domino's face across the lane, and the least wrist turn.
+
+    A domino gripped straight from above stands up with the hand horizontal, which puts the wrist
+    at the table. So the grasp is tilted about the closing axis (by `tilts`), the smallest tilt
+    for which both the grasp and the stand-up pose keep the palm and wrist clear, checked before
+    the hand goes down."""
+
+    end_offset = 0.026  # grasp this far from the centre toward one end (8.5 mm pad half-height inside)
+    min_grasp_z = 0.006  # aim for the pad centre here; TouchDown stops on contact (fingertips touch at ~9 mm)
+    ease_up = 0.001  # after touching down, back off this much before closing
+    lift_z = 0.24
+    hover = 0.10
+    lift_step = 0.006
+    carry_step = 0.012
+    lower_step = 0.004
+    drop = 0.004
+    back_off = 0.08  # metres the hand backs out along its own axis after letting go
+    settle_steps = 10
+    # Hand box in the TCP frame (its z axis is the approach, pointing out of the fingers, so the
+    # palm sits at negative z): |x|, |y|, z from, z to. From menagerie's collision geoms, see
+    # pick_clutter.py. Plus a point on the hand axis behind the palm (the flange/link 7) and the
+    # arm's radius there.
+    palm = (0.032, 0.105, -0.13, -0.037)
+    wrist = (-0.21, 0.065)
+    min_clear = 0.008
+    tilts = (0.5, 0.65, 0.8, 1.0)  # radians of grasp tilt about the closing axis, tried in order
+    max_up = -0.45  # the standing pose's hand axis must point down at least ~27 deg (reachable, wrist high)
+    max_up_relaxed = -0.20  # second try, once in the air (~12 deg down)
+    min_clear_relaxed = 0.004
+    turn_rate = 0.04  # radians per step (0.8 rad/s) while turning the domino upright
+    turn_z = 0.30  # height of the point in front of the robot where the domino is turned upright
+    # With shelves: points on the hand's axis behind the TCP (hand body, flange, forearm) must stay
+    # this far inside the shelves. MuJoCo, 75 cm: hand and links 5-7 hit the shelf when a tilted
+    # hand pointed toward the middle, putting the wrist and forearm out over the shelf side.
+    arm_points = (0.10, 0.21, 0.32)
+    arm_shelf_clear = 0.07
+
+    def __init__(self, task: TaskSpec, obj: str, spot: np.ndarray, lane_dir: np.ndarray, variant: int = 0):
+        o = task.scene.object(obj)
+        self.variant = variant  # which grasp option (the skill passes the attempt number)
+        self.obj, self.spot, self.lane = obj, np.asarray(spot, dtype=float), np.asarray(lane_dir, dtype=float)[:2]
+        self.size = np.asarray(o.size, dtype=float)
+        self.h = float(self.size[np.argmax(self.size)])  # half-length: centre height when upright
+        self.max_width = float(task.scene.robot.max_gripper_width)
+        self.base = np.asarray(task.scene.robot.base_pose.pos[:2], dtype=float)
+        self.end_offset = min(self.end_offset, self.h - 0.009)  # pads (8.5 mm half-height) stay on the domino
+        self.boxes = obstacle_boxes(task)
+        self.y0 = float(task.scene.robot.base_pose.pos[1])
+        self.ctx = Context(obj=obj, monitor=HandHoldMonitor(dev_tol=0.03, dev_hard=0.05))
+        self.runner = Runner(self._build(), self.ctx)
+
+    @property
+    def status(self):
+        return self.runner.status
+
+    def act(self, obs: Observation) -> Action:
+        return self.runner.act(obs)
+
+    def _arm_clear(self, R_h: np.ndarray, tcp: np.ndarray) -> bool:
+        """Hand body, flange and forearm (points back along the hand axis) clear of every obstacle."""
+        a = R_h[:, 2]
+        return not any(in_boxes(np.asarray(tcp, dtype=float) - a * d, self.boxes, self.arm_shelf_clear)
+                       for d in self.arm_points)
+
+    def _clear(self, R_h: np.ndarray, tcp_z: float) -> bool:
+        """Palm box and wrist above the table for a hand at orientation R_h with its TCP at tcp_z."""
+        px, py, z0, z1 = self.palm
+        corners = np.array([[sx * px, sy * py, z] for sx in (-1, 1) for sy in (-1, 1) for z in (z0, z1)])
+        if tcp_z + float(np.min(corners @ R_h[2, :])) < self.min_clear:
+            return False
+        return tcp_z + float(R_h[2, 2]) * self.wrist[0] - self.wrist[1] >= self.min_clear
+
+    def plan_grasp(self, pos: np.ndarray, quat: np.ndarray) -> tuple[np.ndarray, np.ndarray, float] | None:
+        """(TCP point, hand orientation matrix, tilt) for grasp option number `variant` (wrapping
+        around) among those clear of the table both now and once the domino is stood up, in the
+        order: least tilt first, tilt one way then the other, wrist as planned then turned half a
+        revolution (same pinch, the arm's joints the other way round). None if none is clear."""
+        opts = self.grasp_options(pos, quat)
+        return opts[self.variant % len(opts)] if opts else None
+
+    def grasp_options(self, pos: np.ndarray, quat: np.ndarray) -> list[tuple[np.ndarray, np.ndarray, float]]:
+        pt, yaw = lying_grasp(self.size, pos, quat, self.base, self.max_width, self.end_offset, self.min_grasp_z)
+        R_d = quat_to_mat(quat)
+        out = []
+        for t in self.tilts:
+            for sgn in ((1.0,) if t == 0 else (1.0, -1.0)):
+                for flip in (0.0, math.pi):
+                    R0 = quat_to_mat(hand_quat(yaw + flip))
+                    R_h = _axis_rot(R0[:, 1], sgn * t) @ R0  # tilt about the closing axis
+                    if (self._clear(R_h, float(pt[2])) and self._arm_clear(R_h, pt)
+                            and self.upright_hand(R_h, R_d, pt, pos) is not None):
+                        out.append((pt, R_h, sgn * t))
+        return out
+
+    def upright_hand(self, R_h: np.ndarray, R_d: np.ndarray, p_e: np.ndarray, p_d: np.ndarray) -> np.ndarray | None:
+        """Hand orientation (matrix) that stands the gripped domino up at `spot`, or None."""
+        c = self.upright_hands(R_h, R_d, p_e, p_d)
+        return c[0] if c else None
+
+    def upright_hands(self, R_h: np.ndarray, R_d: np.ndarray, p_e: np.ndarray, p_d: np.ndarray,
+                      k: int = 6, min_sep: float = 0.35) -> list[np.ndarray]:
+        """Up to `k` feasible standing hand orientations, best first, at least `min_sep` rad apart."""
+        R_hd = R_h.T @ R_d
+        p_hd = R_h.T @ (np.asarray(p_d, dtype=float) - p_e)
+        radial = self.spot[:2] - self.base
+        radial = radial / max(float(np.linalg.norm(radial)), 1e-9)
+        scored: list[tuple[float, np.ndarray]] = []
+        for flip in (np.eye(3),):  # +z up only (see lying_grasp)
+            for i in range(36):
+                R_ds = _rot(2, -math.pi + i * math.pi / 18) @ flip
+                R_hs = R_ds @ R_hd.T
+                tcp_rel = -R_hs @ p_hd  # TCP minus the domino's centre
+                if tcp_rel[2] < 0.012:
+                    continue  # the gripped end must be the top one
+                a = R_hs[:, 2]
+                if a[2] > self.max_up:
+                    continue  # hand level or pointing up: hard for the arm, wrist low
+                if not self._clear(R_hs, self.h + self.drop + tcp_rel[2]):
+                    continue  # palm or wrist in the table
+                if not self._arm_clear(R_hs, np.array([self.spot[0], self.spot[1], 0.0]) + tcp_rel):
+                    continue  # wrist or forearm over a shelf
+                face = R_ds[:2, 0]  # the standing domino's face normal
+                turn = math.acos(float(np.clip((np.trace(R_h.T @ R_hs) - 1) / 2, -1, 1)))
+                score = -a[2] + 0.6 * float(a[:2] @ radial) + 0.3 * abs(float(face @ self.lane)) - 0.2 * turn
+                scored.append((score, R_hs))
+        out: list[np.ndarray] = []
+        for _, R in sorted(scored, key=lambda x: -x[0]):
+            sep = [math.acos(float(np.clip((np.trace(R.T @ Q) - 1) / 2, -1, 1))) for Q in out]
+            if all(x >= min_sep for x in sep):
+                out.append(R)
+            if len(out) >= k:
+                break
+        return out
+
+    def _build(self):
+        st = self.settle_steps
+
+        def grasp_target(obs, c):
+            # re-planned only when the domino has moved, so the hand does not chase noise
+            key = c.bb.get("grasp_key")
+            if key is None or float(np.linalg.norm(c.obj_pos - key[0])) > 0.004 or quat_angle(c.obj_quat, key[1]) > 0.06:
+                g = self.plan_grasp(c.obj_pos, c.obj_quat)
+                c.bb["grasp_key"] = (c.obj_pos.copy(), c.obj_quat.copy())
+                c.bb["grasp"] = g
+                if g is not None:
+                    c.quat = mat_to_quat(g[1])
+            g = c.bb["grasp"]
+            if g is None:
+                return obs.ee_pos.copy()  # check_grasp fails the node
+            return g[0] + (c.obj_pos - c.bb["grasp_key"][0])
+
+        def check_grasp(obs, c):
+            return "no_clear_grasp" if c.bb.get("grasp_key") is not None and c.bb.get("grasp") is None else None
+
+        def above_grasp(obs, c):
+            # back off along the (possibly tilted) approach, so the hand comes in along it
+            pt = grasp_target(obs, c)
+            return pt - quat_to_mat(c.quat)[:, 2] * self.hover
+
+        def up_here(obs, c):
+            return np.array([obs.ee_pos[0], obs.ee_pos[1], max(obs.ee_pos[2], self.lift_z)])
+
+        def note(obs, c):
+            c.bb["rise_xy"] = obs.ee_pos[:2].copy()
+            return None
+
+        def note_touch(obs, c):
+            c.bb["eased"] = obs.ee_pos + [0.0, 0.0, self.ease_up]
+            return None
+
+        def eased(obs, c):
+            return c.bb["eased"]
+
+        def risen(obs, c):
+            return np.array([*c.bb["rise_xy"], self.lift_z])
+
+        def plan(obs, c):
+            o = obs.objects[c.obj]
+            args = (quat_to_mat(obs.ee_quat), quat_to_mat(o.quat), obs.ee_pos, o.pos)
+            cands = self.upright_hands(*args)
+            if not cands:
+                # The domino turned in the fingers while lifting (MuJoCo: the most common stand-up
+                # failure): accept a flatter hand and a closer table before giving up.
+                strict = (self.max_up, self.min_clear)
+                self.max_up, self.min_clear = self.max_up_relaxed, self.min_clear_relaxed
+                try:
+                    cands = self.upright_hands(*args)
+                finally:
+                    self.max_up, self.min_clear = strict
+            if not cands:
+                return "no_upright_pose"  # none keeps the palm and wrist clear of the table
+            c.bb["stand_cands"] = [mat_to_quat(R) for R in cands]
+            c.quat = c.bb["stand_cands"][0]
+            c.bb["offsets"] = []
+            return None
+
+        def next_pose(c, reason):  # the carry could not get there in this pose: back, turn, retry
+            c.bb["stand_start"] = int(c.bb.get("stand_start", 0)) + 1
+            c.bb["offsets"] = []
+
+        def turn_point(obs, c):
+            # turn in front of the robot, high: the wrist has the most room there
+            mid = 0.5 * (np.asarray(c.bb["rise_xy"]) + self.spot[:2])
+            # (on the robot's centre line, as far from both shelves as it gets)
+            return np.array([float(np.clip(mid[0], 0.40, 0.50)), self.y0, self.turn_z])
+
+        def offset(obs, c):
+            if c.obj in obs.objects and c.bb.get("offset_step") != c.steps:
+                c.bb["offset_step"] = c.steps
+                c.bb.setdefault("offsets", []).append(np.asarray(obs.objects[c.obj].pos) - obs.ee_pos)
+            return np.mean(c.bb["offsets"][-8:], axis=0)
+
+        def over_spot(obs, c):
+            o = offset(obs, c)
+            return np.array([self.spot[0] - o[0], self.spot[1] - o[1], self.h + self.drop - o[2] + self.hover])
+
+        def on_spot(obs, c):
+            o = offset(obs, c)
+            return np.array([self.spot[0] - o[0], self.spot[1] - o[1], self.h + self.drop - o[2]])
+
+        def note_out(obs, c):
+            c.bb["out"] = obs.ee_pos - quat_to_mat(obs.ee_quat)[:, 2] * self.back_off
+            return None
+
+        held = hold_check("grasp_slip")
+        return Sequence(
+            [
+                Ramp(up_here, self.carry_step, gripper=0.0, timeout=200, name="clear"),
+                MoveTo(above_grasp, gripper=0.0, tol=0.006, timeout=250, check=check_grasp, name="approach"),
+                TouchDown(grasp_target, self.lower_step, eps=0.003, gripper=0.0, timeout=200, check=check_grasp,
+                          name="descend"),
+                Do(note_touch, name="note_touch"),
+                Ramp(eased, 0.001, eps=0.0015, gripper=0.0, timeout=20, name="ease"),
+                grip(settle=st),
+                Do(note, name="note"),
+                Ramp(risen, self.lift_step, gripper=1.0, check=held, timeout=250, name="lift"),
+                Ramp(turn_point, self.carry_step, gripper=1.0, check=held, timeout=300, name="to_turn"),
+                Do(plan, name="plan"),
+                Retry(
+                    Sequence([
+                        CarryRamp(turn_point, self.carry_step, gripper=1.0, check=held, timeout=300, name="to_turn"),
+                        StandTurn(1.0, rate=self.turn_rate, check=held, name="stand"),
+                        CarryRamp(over_spot, self.carry_step, gripper=1.0, check=held, timeout=300, name="carry"),
+                    ], name="stand_and_carry"),
+                    budgets={"stalled:carry": 5, "timeout:carry": 5},
+                    on_retry=next_pose,
+                    name="other_pose",
+                ),
+                CarryRamp(on_spot, self.lower_step, eps=0.003, ok=0.006, gripper=1.0, check=held, timeout=200,
+                          name="lower"),
+                release(settle=st),
+                Do(note_out, name="note_out"),
+                Ramp(lambda obs, c: c.bb["out"], self.lower_step, gripper=0.0, timeout=150, name="back_out"),
+                Ramp(up_here, self.lift_step, gripper=0.0, timeout=200, name="retreat"),
+            ],
+            name=f"stand_up_{self.obj}",
+        )
+
+
+def lowest_point(size: np.ndarray, pos: np.ndarray, quat: np.ndarray) -> float:
+    """Height of a box's lowest corner."""
+    R = quat_to_mat(quat)
+    return float(pos[2]) - float(np.abs(R[2, :]) @ np.asarray(size, dtype=float))
+
+
+def rest_pose(size: np.ndarray, quat: np.ndarray) -> tuple[np.ndarray, float]:
+    """The orientation (quat) and centre height of a box set down on the face that points most
+    nearly down, keeping the heading of its long axis (how a domino let go just above the table
+    lands, roughly)."""
+    size = np.asarray(size, dtype=float)
+    R = quat_to_mat(quat)
+    v = int(np.argmax(np.abs(R[2, :])))
+    j = int(np.argmax(size)) if v != int(np.argmax(size)) else 0
+    out = np.zeros((3, 3))
+    out[:, v] = [0.0, 0.0, 1.0 if R[2, v] > 0 else -1.0]
+    h = R[:, j].copy()
+    h[2] = 0.0
+    out[:, j] = h / max(float(np.linalg.norm(h)), 1e-9)
+    i = 3 - v - j
+    out[:, i] = np.cross(out[:, (i + 1) % 3], out[:, (i + 2) % 3])
+    return mat_to_quat(out), float(size[v])
+
+
+def obstacle_boxes(task: TaskSpec) -> list[tuple[np.ndarray, np.ndarray]]:
+    """(low, high) corners of everything static the arm can hit besides the table top: the
+    scene's fixtures, and the side panels of `TableSpec.shelves`."""
+    out = [(np.asarray(f.center, dtype=float) - f.half_extents, np.asarray(f.center, dtype=float) + f.half_extents)
+           for f in task.scene.fixtures]
+    tb = task.scene.table
+    if tb.shelves:
+        bx, by = task.scene.robot.base_pose.pos[0], task.scene.robot.base_pose.pos[1]
+        x0 = bx - tb.back
+        for sg in (1.0, -1.0):
+            y_in, y_out = by + sg * tb.width / 2, by + sg * (tb.width / 2 + tb.shelf_thickness)
+            out.append((np.array([x0, min(y_in, y_out), 0.0]), np.array([x0 + tb.depth, max(y_in, y_out), tb.shelf_height])))
+    return out
+
+
+def in_boxes(p: np.ndarray, boxes: list[tuple[np.ndarray, np.ndarray]], inflate: float = 0.0) -> bool:
+    return any(bool(np.all(p >= lo - inflate) and np.all(p <= hi + inflate)) for lo, hi in boxes)
+
+
+def work_y_bounds(task: TaskSpec, xs: tuple[float, float] = (0.30, 0.62), z_top: float = 0.45,
+                  margin: float = 0.10, edge: float = 0.05) -> tuple[float, float]:
+    """World y range for points where the hand works low over the table (stand-up and bench points):
+    `edge` inside the table's sides, `margin` from any obstacle beside the work area that comes
+    lower than `z_top`."""
+    y0, hw = float(task.scene.robot.base_pose.pos[1]), task.scene.table.width / 2
+    lo, hi = y0 - hw + edge, y0 + hw - edge
+    for b_lo, b_hi in obstacle_boxes(task):
+        if b_lo[2] > z_top or b_hi[0] < xs[0] or b_lo[0] > xs[1]:
+            continue
+        if b_lo[1] >= y0:
+            hi = min(hi, float(b_lo[1]) - margin)
+        elif b_hi[1] <= y0:
+            lo = max(lo, float(b_hi[1]) + margin)
+    return lo, hi
+
+
+def hand_hits(boxes: list[tuple[np.ndarray, np.ndarray]], tcp: np.ndarray, yaw: float, rise: float = 0.10,
+              margin: float = 0.008) -> bool:
+    """Whether a straight-down hand turned `yaw` from DOWN, with its TCP at `tcp` (and on the way
+    down from `rise` above it), would touch an obstacle: fingers (open, +-4.5 cm along the closing
+    axis, from 1 cm above the TCP up) and palm (+-3.2 x +-10.5 cm, from 3.7 cm above the TCP)."""
+    if not boxes:
+        return False
+    R = quat_to_mat(hand_quat(yaw))
+    hx, hy = R[:, 0], R[:, 1]
+    t = np.asarray(tcp, dtype=float)
+    pts = []
+    for sgn in (-1.0, 1.0):
+        for dz in (0.01, 0.03, 0.05):
+            pts.append(t + sgn * 0.045 * hy + [0.0, 0.0, dz])
+    for sx in (-1.0, 1.0):
+        for sy in (-1.0, -0.5, 0.5, 1.0):
+            for dz in np.linspace(0.037, 0.13 + rise, 6):
+                pts.append(t + sx * 0.032 * hx + sy * 0.105 * hy + [0.0, 0.0, float(dz)])
+    return any(in_boxes(q, boxes, margin) for q in pts)
+
+
+class Relay:
+    """Take a domino that is not lying cleanly by itself (resting on another, leaning, on a pile,
+    in a tight spot or an awkward pose) and lay it down alone at `spot`, turned by `turn` about
+    world z: hand straight down, fingers closing across its most horizontal short axis, at its
+    centre (a little toward its lower end, clear of what it leans on); lift above everything,
+    carry, turn the wrist, lower until its lowest corner is `gap` above the table, open. It
+    lands on the face that was most nearly down. From that clean pose StandUp has room and a
+    grasp chosen in advance (see ToppleChain.relay_plan)."""
+
+    min_grasp_z = 0.006
+    lift_z = 0.11
+    hover = 0.07
+    lift_step = 0.005
+    carry_step = 0.012
+    lower_step = 0.003
+    gap = 0.004
+    settle_steps = 10
+    low_shift = 0.010  # metres toward the lower end of a tilted domino (scaled by how tilted)
+    lower_ok = 0.014
+
+    def __init__(self, task: TaskSpec, obj: str, spot: np.ndarray, turn: float, holding: bool = False,
+                 floor: float = 0.0, lift_z: float | None = None):
+        o = task.scene.object(obj)
+        self.obj, self.spot, self.turn = obj, np.asarray(spot, dtype=float), float(turn)
+        self.floor = float(floor)  # height of what it is set down on (table 0, a shelf board's top)
+        if lift_z is not None:
+            self.lift_z = float(lift_z)
+        self.holding = holding  # already in the hand (a failed StandUp): just set it down
+        self.size = np.asarray(o.size, dtype=float)
+        self.max_width = float(task.scene.robot.max_gripper_width)
+        self.boxes = obstacle_boxes(task)
+        self.ctx = Context(obj=obj, monitor=HandHoldMonitor(dev_tol=0.03, dev_hard=0.05))
+        self.runner = Runner(self._build(), self.ctx)
+
+    @property
+    def status(self):
+        return self.runner.status
+
+    def act(self, obs: Observation) -> Action:
+        return self.runner.act(obs)
+
+    def grasp(self, pos: np.ndarray, quat: np.ndarray, current_yaw: float = 0.0) -> tuple[np.ndarray, float] | None:
+        """(TCP point, hand yaw from DOWN), or None if no axis fits between the fingers. The fingers
+        close across the most horizontal short axis; if the hand would touch a shelf or frame there
+        (or where it sets the domino down), across the other short axis or the long one (5 cm fits
+        the 8 cm gripper) instead."""
+        R = quat_to_mat(quat)
+        long = int(np.argmax(self.size))
+        axes = [k for k in range(3) if 2 * self.size[k] + 0.01 <= self.max_width and abs(R[2, k]) <= 0.5]
+        if not axes:
+            return None  # every axis that fits is steep: the pads would not sit on the faces
+        axes.sort(key=lambda j: (j == long, abs(R[2, j])))
+        L = R[:, long]
+        pt = np.asarray(pos, dtype=float) - np.sign(L[2]) * L * self.low_shift * abs(float(L[2]))
+        pt[2] = max(float(pt[2]), self.min_grasp_z)
+        first = None
+        for k in axes:
+            c = R[:, k][:2] / max(float(np.linalg.norm(R[:, k][:2])), 1e-9)
+            yaw = nearest_turn(math.atan2(c[0], -c[1]), current_yaw, math.pi)
+            first = first or (pt, yaw)
+            if self.holding or not self.boxes:
+                return pt, yaw
+            dest = np.array([self.spot[0], self.spot[1], self.floor + float(pt[2])])
+            if not hand_hits(self.boxes, pt, yaw) and not hand_hits(self.boxes, dest, yaw + self.turn):
+                return pt, yaw
+        return first
+
+    def _build(self):
+        st = self.settle_steps
+
+        def g(obs, c):
+            key = c.bb.get("key")
+            if key is None or float(np.linalg.norm(c.obj_pos - key)) > 0.004:
+                c.bb["key"] = c.obj_pos.copy()
+                c.bb["g"] = self.grasp(c.obj_pos, c.obj_quat, _hand_yaw(obs))
+                if c.bb["g"] is not None:
+                    c.quat = hand_quat(c.bb["g"][1])
+            return c.bb["g"]
+
+        def check(obs, c):
+            return "no_side_grasp" if c.bb.get("key") is not None and c.bb.get("g") is None else None
+
+        def target(obs, c):
+            gg = g(obs, c)
+            return obs.ee_pos.copy() if gg is None else gg[0]
+
+        def above(obs, c):
+            return target(obs, c) + [0.0, 0.0, self.hover]
+
+        def up(obs, c):
+            return np.array([obs.ee_pos[0], obs.ee_pos[1], max(obs.ee_pos[2], self.lift_z)])
+
+        def note_touch(obs, c):
+            c.bb["eased"] = obs.ee_pos + [0.0, 0.0, 0.001]
+            c.bb["yaw_end"] = c.bb["g"][1] + self.turn
+            return None
+
+        def keep(obs, c):  # holding: keep the hand's orientation, only move
+            c.quat = obs.ee_quat.copy()
+            c.bb["yaw_end"] = None
+            return None
+
+        def over(obs, c):
+            if c.bb["yaw_end"] is not None:
+                c.quat = hand_quat(c.bb["yaw_end"])
+            o = obs.objects[c.obj].pos - obs.ee_pos
+            return np.array([self.spot[0] - o[0], self.spot[1] - o[1], self.lift_z])
+
+        def down(obs, c):
+            lo = lowest_point(self.size, obs.objects[c.obj].pos, obs.objects[c.obj].quat)
+            o = obs.objects[c.obj].pos - obs.ee_pos
+            z = obs.ee_pos[2] - (lo - self.floor - self.gap)
+            return np.array([self.spot[0] - o[0], self.spot[1] - o[1], max(z, self.floor + 0.010)])
+
+        held = hold_check("grasp_slip")
+        if self.holding:
+            return Sequence(
+                [
+                    Do(keep, name="keep"),
+                    CarryRamp(over, self.carry_step, gripper=1.0, timeout=300, name="carry"),
+                    CarryRamp(down, self.lower_step, eps=0.003, ok=0.006, gripper=1.0, timeout=200, name="lower"),
+                    release(settle=st),
+                    Ramp(up, self.lift_step, gripper=0.0, timeout=200, name="retreat"),
+                ],
+                name=f"set_down_{self.obj}",
+            )
+        return Sequence(
+            [
+                Ramp(up, self.carry_step, gripper=0.0, timeout=200, name="clear"),
+                MoveTo(above, gripper=0.0, tol=0.006, timeout=250, check=check, name="approach"),
+                TouchDown(target, self.lower_step, eps=0.003, gripper=0.0, timeout=200, check=check, name="descend"),
+                Do(note_touch, name="note_touch"),
+                Ramp(lambda obs, c: c.bb["eased"], 0.001, eps=0.0015, gripper=0.0, timeout=20, name="ease"),
+                grip(settle=st),
+                Ramp(up, self.lift_step, gripper=1.0, check=held, timeout=250, name="lift"),
+                CarryRamp(over, self.carry_step, gripper=1.0, check=held, timeout=300, name="carry"),
+                # a stall within `lower_ok` just lets it drop that far (MuJoCo: the fingertips
+                # reach the shelf board before a domino laid on it is all the way down)
+                CarryRamp(down, self.lower_step, eps=0.003, ok=self.lower_ok, gripper=1.0, check=held, timeout=200,
+                          name="lower"),
+                release(settle=st),
+                Ramp(up, self.lift_step, gripper=0.0, timeout=200, name="retreat"),
+            ],
+            name=f"relay_{self.obj}",
+        )
+
+
+class LedgeStandUp:
+    """Stand a lying domino up using a shelf board's edge (a `Fixture` with `ledge=True`), the way
+    a person would pick a card up off a table edge:
+
+    1. (unless `placed`) lay it on the board, alone, long axis across the edge, its +z end
+       overhanging by `overhang` (Relay with the board as the floor);
+    2. bring the hand level beside the board, pointing into it, fingers closing vertically, and
+       slide in so the pads pinch the overhanging end on its two big faces;
+    3. pull it off the board (it hangs from the pinched end), rise to a turn point over the middle;
+    4. turn the hand to point straight down: the domino now hangs upright below the fingers, +z end
+       on top, its face across the lane;
+    5. carry, lower until it stands at `spot`, open, go straight up.
+
+    Unlike StandUp, the hand never has to be tilted near the table: it points straight down when
+    the domino is set down, so palm and wrist are high, and the pads hold the domino by its big
+    faces (more contact than StandUp's pinch across its width)."""
+
+    overhang = 0.020  # metres of the domino over the edge (its centre stays ~5 mm on the board)
+    back_off = 0.08  # metres from the grip point, outward, where the level hand starts sliding in
+    pull = 0.07
+    in_step = 0.003
+    lift_step = 0.005
+    carry_step = 0.012
+    lower_step = 0.003
+    drop = 0.004
+    turn_z = 0.36
+    turn_rate = 0.04
+    settle_steps = 10
+
+    def __init__(self, task: TaskSpec, obj: str, ledge, spot: np.ndarray, lane_dir: np.ndarray,
+                 quat: np.ndarray, placed: bool = False, x_pref: float = 0.45):
+        o = task.scene.object(obj)
+        self.task, self.obj, self.spot = task, obj, np.asarray(spot, dtype=float)
+        self.lane = np.asarray(lane_dir, dtype=float)[:2]
+        self.size = np.asarray(o.size, dtype=float)
+        self.h = float(self.size.max())
+        c, hx = np.asarray(ledge.center, dtype=float), np.asarray(ledge.half_extents, dtype=float)
+        y0 = float(task.scene.robot.base_pose.pos[1])
+        self.sgn = 1.0 if y0 > c[1] else -1.0  # from the board toward the middle of the work area
+        self.n = np.array([0.0, self.sgn, 0.0])
+        self.edge_y = float(c[1] + self.sgn * hx[1])
+        self.top = float(c[2] + hx[2])
+        self.x = float(np.clip(x_pref, c[0] - hx[0] + 0.04, c[0] + hx[0] - 0.04))
+        self.place_xy = np.array([self.x, self.edge_y + self.sgn * (self.overhang - self.h)])
+        self.placed = placed
+        # turn for Relay: the domino's +z end (its long axis) toward the middle, over the edge
+        L = quat_to_mat(quat)[:, int(np.argmax(self.size))]
+        self.turn = wrap_pi(math.atan2(self.sgn, 0.0) - math.atan2(float(L[1]), float(L[0])))
+        self.ctx = Context(obj=obj, monitor=HandHoldMonitor(dev_tol=0.03, dev_hard=0.05))
+        self.runner = Runner(self._build(), self.ctx)
+
+    @property
+    def status(self):
+        return self.runner.status
+
+    def act(self, obs: Observation) -> Action:
+        return self.runner.act(obs)
+
+    def level_quat(self) -> np.ndarray:
+        """Hand level, pointing into the board (-n), fingers closing along world z."""
+        z = -self.n
+        y = np.array([0.0, 0.0, 1.0])
+        return mat_to_quat(np.column_stack([np.cross(y, z), y, z]))
+
+    def down_quats(self) -> list[np.ndarray]:
+        """Hand straight down, closing along the lane (so the domino's face is across it)."""
+        yaw = math.atan2(float(self.lane[0]), float(-self.lane[1]))  # hand_quat(yaw) closes along (sin, -cos)
+        return [hand_quat(yaw), hand_quat(yaw + math.pi)]
+
+    def _build(self):
+        st = self.settle_steps
+        held = hold_check("grasp_slip")
+        q_level = self.level_quat()
+
+        def grip_pt(obs, c):
+            o = obs.objects[c.obj].pos
+            return np.array([float(o[0]), self.edge_y + self.sgn * self.overhang / 2, float(o[2])])
+
+        def out_pt(obs, c):
+            return grip_pt(obs, c) + self.n * self.back_off
+
+        def above_out(obs, c):
+            return out_pt(obs, c) + [0.0, 0.0, 0.06]
+
+        def level(obs, c):
+            c.bb["stand_cands"], c.bb["stand_start"] = [q_level.copy()], 0
+            return None
+
+        def check_on_ledge(obs, c):
+            o = obs.objects[c.obj]
+            if o.pos[2] < self.top or abs(float(o.pos[1] - self.place_xy[1])) > 0.015:
+                return "not_on_ledge"
+            return None
+
+        def note_pull(obs, c):
+            c.bb["pulled"] = obs.ee_pos + self.n * self.pull
+            return None
+
+        def turn_pt(obs, c):
+            return np.array([float(np.clip(self.spot[0], 0.40, 0.50)), self.edge_y + self.sgn * 0.14, self.turn_z])
+
+        def cands(obs, c):
+            c.bb["stand_cands"], c.bb["stand_start"] = self.down_quats(), 0
+            c.bb["offsets"] = []
+            return None
+
+        def offset(obs, c):
+            if c.obj in obs.objects and c.bb.get("offset_step") != c.steps:
+                c.bb["offset_step"] = c.steps
+                c.bb.setdefault("offsets", []).append(np.asarray(obs.objects[c.obj].pos) - obs.ee_pos)
+            return np.mean(c.bb["offsets"][-8:], axis=0)
+
+        def over_spot(obs, c):
+            o = offset(obs, c)
+            return np.array([self.spot[0] - o[0], self.spot[1] - o[1], self.h + self.drop - o[2] + 0.08])
+
+        def on_spot(obs, c):
+            o = offset(obs, c)
+            return np.array([self.spot[0] - o[0], self.spot[1] - o[1], self.h + self.drop - o[2]])
+
+        def up(obs, c):
+            return np.array([obs.ee_pos[0], obs.ee_pos[1], max(obs.ee_pos[2], 0.25)])
+
+        nodes = []
+        if not self.placed:
+            nodes.append(Relay(self.task, self.obj, np.array([*self.place_xy, 0.0]), self.turn,
+                               floor=self.top, lift_z=self.top + 0.10)._build())
+        nodes += [
+            Do(check_on_ledge, name="on_ledge"),
+            Ramp(above_out, self.carry_step, gripper=0.0, timeout=300, name="to_ledge"),
+            Do(level, name="level"),
+            StandTurn(0.0, rate=self.turn_rate, name="level_hand"),
+            Ramp(out_pt, self.lift_step, gripper=0.0, timeout=150, name="beside"),
+            Ramp(grip_pt, self.in_step, eps=0.003, gripper=0.0, timeout=150, name="slide_in"),
+            grip(settle=st),
+            Do(note_pull, name="note_pull"),
+            Ramp(lambda obs, c: c.bb["pulled"], self.in_step, gripper=1.0, check=held, timeout=150, name="pull"),
+            Ramp(turn_pt, self.carry_step, gripper=1.0, check=held, timeout=300, name="to_turn"),
+            Do(cands, name="cands"),
+            StandTurn(1.0, rate=self.turn_rate, check=held, name="stand"),
+            CarryRamp(over_spot, self.carry_step, gripper=1.0, check=held, timeout=300, name="carry"),
+            CarryRamp(on_spot, self.lower_step, eps=0.003, ok=0.006, gripper=1.0, check=held, timeout=200,
+                      name="lower"),
+            release(settle=st),
+            Ramp(up, self.lift_step, gripper=0.0, timeout=200, name="retreat"),
+        ]
+        return Sequence(nodes, name=f"ledge_stand_{self.obj}")
+
+
 def _hand_yaw(obs: Observation) -> float:
     """Yaw of the gripper relative to DOWN (0 = closing along world y)."""
     return heading_x(obs.ee_quat)
@@ -273,7 +1150,7 @@ def _hand_yaw(obs: Observation) -> float:
 
 class ToppleChain:
     name = "topple_chain"
-    version = "0.1.0"
+    version = "0.4.0"
 
     survey_steps = 8  # observations averaged per survey (observation noise is per step)
     lat_tol = 0.006  # metres across the lane that count as on the spot
@@ -288,15 +1165,51 @@ class ToppleChain:
     push_gripper = 0.9  # ~8 mm between the fingers: no grasp (only the front finger touches), no grasp_miss
     push_back = 0.03  # metres behind the domino's back face where the TCP comes down
     push_speed = 0.004  # metres per step (8 cm/s at 20 Hz)
-    push_travel = 0.06
+    push_travel = 0.045  # less than the spacing plus a thickness, so the fingers never reach the next domino
     tipped = 0.35  # radians: the pushed domino is going, stop pushing
     watch_steps = 80
     quiet_steps = 10
     quiet_tol = 0.01  # radians of tilt change per step that counts as still
     max_nudges = 4
+    max_standups = 4  # per domino (each with a different grasp option)
+    # Stand a fallen domino back up (StandUp). Taped 15.7 mm dominoes, foam pads, MuJoCo: the
+    # all-fallen task went 0/10 -> 4/10 over rounds 4-6 (see HANDOVER). On by default: it only acts
+    # on dominoes that are otherwise unrecoverable. False only reports them.
+    stand_up = True
+    # where a fallen domino is stood up before it is carried to its spot: a grid on both sides of
+    # the lane, close to the robot (picks from far out slipped in MuJoCo)
+    # (MuJoCo: standing up at (0.40, 0.22) or (0.34, -0.16) failed while carrying or lowering;
+    # near the lane centre it works, so the grid hugs the lane)
+    standup_xs = (0.40, 0.46, 0.52)
+    standup_ys = (0.09, 0.13)
+    standup_ys_far = (0.17, 0.21)  # used only when no point of the near rows is clear
+    standup_clear = 0.08  # metres from every other domino
+    standup_off_spot = 0.07  # a grid point this close to any lane spot is not used
+    rehome_step = 0.03  # rad per step when returning the joints to their start after a failed job
     abort_xy = 0.008  # metres a smoothed domino position may drift from the survey before a push is called off
     abort_yaw = 0.08  # radians
     abort_alpha = 0.3
+    # Judging what is worth trying (v0.3). A fallen domino is stood up directly only when it lies
+    # cleanly by itself (flat or on its side, on the table, nothing within `clean_dist`, inside
+    # the reach band, and StandUp has a grasp for it); otherwise, or after a StandUp failure that
+    # says the pose was the problem, it is first relayed (Relay) to a clear bench point, turned so
+    # StandUp has the most grasp options there. A domino with no feasible grasp, out of reach or
+    # against the shelves, or whose stand-ups and relays are used up, is given up on (logged with
+    # the reasons) instead of being tried again; the rest of the row is still rebuilt and pushed.
+    max_relays = 2  # per domino
+    # Ledge stand-up (LedgeStandUp): when the scene has a fixture with ledge=True, a fallen domino
+    # lying cleanly is first tried this way (lay it over the board's edge, pinch the overhang,
+    # turn it upright hanging below a straight-down hand), at most `max_ledges` times, then StandUp.
+    use_ledge = True
+    max_ledges = 2
+    clean_dist = 0.06  # metres between centres for a lying domino to count as by itself
+    reach = (0.28, 0.66)  # metres from the robot base where the hand works well, looking down
+    bench_xs = (0.34, 0.40, 0.46, 0.52)
+    bench_ys = (0.12, 0.15, 0.175)
+    pose_failures = ("no_upright_pose", "no_clear_grasp", "timeout:descend", "stalled", "timeout:carry",
+                     "timeout:to_turn", "timeout:approach", "ik")
+    # time: a job is started only if it, the repairs still to do and a push fit in the steps left
+    cost = {"standup": 380, "relay": 260, "repair": 160, "push": 200, "ledge": 520}
 
     def reset(self, task: TaskSpec) -> None:
         conds = success_conditions(task.success)
@@ -311,6 +1224,12 @@ class ToppleChain:
         self.yaw = wrap_half_pi(math.atan2(self.d[1], self.d[0]))  # a domino's face normal along the lane
         self.task = task
         self.lane = {c.object: c.region for c in conds}
+        # object_toppled(restood=True): a domino must stand again after it fell before its fall
+        # counts, so until then a fallen one is down_bad (to be stood up), whichever way it lies
+        self.restand = {c.object for c in conds if c.restood}
+        self.fell_seen: set[str] = set()
+        self.restood_seen: set[str] = set()
+        self.home_q: np.ndarray | None = None  # joint posture at the first step
         self.spots: dict[str, np.ndarray] = {}
         for c in conds:
             o = task.scene.object(c.object)
@@ -325,12 +1244,32 @@ class ToppleChain:
         self.park = self.spots[self.order[0]] - 0.05 * self.d  # above the lane, behind its first spot
         self.park[2] = self.park_height
         self.repairs = {k: 0 for k in self.order}
+        self.standups = {k: 0 for k in self.order}
+        self.relays = {k: 0 for k in self.order}
+        self.fails: dict[str, list[str]] = {k: [] for k in self.order}
+        self.need_relay: set[str] = set()
+        self.infeasible: dict[str, str] = {}
+        self.out_of_time = False
+        self.max_steps = int(task.max_steps)
+        tb = task.scene.table
+        base = np.asarray(task.scene.robot.base_pose.pos[:2], dtype=float)
+        self.base_xy = base
+        del tb  # work points: work_y_bounds (fixtures, shelves, table sides)
+        self.job_kind, self.job_obj = "", ""
+        self.variant = {k: 0 for k in self.order}
+        self.ledges = {k: 0 for k in self.order}
+        ledges = [f for f in task.scene.fixtures if f.ledge]
+        self.ledge = max(ledges, key=lambda f: f.center[2] + f.half_extents[2]) if ledges else None
+        self.y_lo, self.y_hi = work_y_bounds(task)
+        self.boxes = obstacle_boxes(task)
+        self.pushed = False  # once the robot has pushed, fallen dominoes are left to the chain
+        self.fell_right: dict[str, bool] = {}
         self.nudges = 0
         self.log: list[str] = []
         self.phase, self.n_phase = "park", 0
         self.samples: list[Observation] = []
         self.state: dict[str, str] = {}
-        self.job: ReplaceDomino | None = None
+        self.job: ReplaceDomino | StandUp | Relay | None = None
         self.push: dict | None = None
         self.last_tilts: dict[str, float] | None = None
         self.quiet = 0
@@ -340,6 +1279,14 @@ class ToppleChain:
     # -- dispatch --------------------------------------------------------------
 
     def act(self, obs: Observation) -> Action:
+        if self.home_q is None:
+            self.home_q = np.asarray(obs.qpos, dtype=float).copy()
+        for k in self.restand:  # the same history the env keeps, from what the robot sees
+            t = tilt(obs.objects[k].quat)
+            if t >= 0.6:
+                self.fell_seen.add(k)
+            elif t <= 0.15 and k in self.fell_seen:
+                self.restood_seen.add(k)
         self.steps += 1
         self.n_phase += 1
         return getattr(self, f"_{self.phase}")(obs)
@@ -379,14 +1326,17 @@ class ToppleChain:
             p = np.mean([s.objects[k].pos for s in samples], axis=0)
             q = samples[-1].objects[k].quat
             t = tilt(q)
-            if t > self.down_tilt:
+            if t > self.standing_tilt:
                 top = up_of(q)[:2]
                 ang = math.acos(float(np.clip(top @ self.d[:2] / max(np.linalg.norm(top), 1e-9), -1, 1)))
                 lane = self.lane.get(k)
                 inside = lane is None or bool(np.all(
                     np.abs(p - np.asarray(self.task.scene.region(lane).center))
                     <= np.asarray(self.task.scene.region(lane).half_extents)))
-                out[k] = "down" if ang <= self.down_dir_tol and inside else "down_bad"
+                self.fell_right[k] = ang <= self.down_dir_tol and inside and (
+                    k not in self.restand or k in self.restood_seen)
+            if t > self.down_tilt:
+                out[k] = "down" if self.fell_right[k] else "down_bad"
             elif t > self.standing_tilt:
                 out[k] = "leaning"
             else:
@@ -402,9 +1352,36 @@ class ToppleChain:
         if any(v == "leaning" for v in st.values()) and self.n_phase < 6 * self.survey_steps:
             self.samples = []  # something is still moving: look again
             return
+        for k in self.order:  # leaning for a while now: it rests on something; judge it as fallen
+            if st[k] == "leaning":
+                st[k] = "down" if self.fell_right.get(k) else "down_bad"
+        # Before the robot's own push, a domino that is not standing and did not fall the chain's
+        # way is rebuilt: stood up in a clear spot (then repaired onto its spot like any other).
+        # Top of a pile first, so nothing is resting on the one being picked.
+        bad = [k for k in self.order if st[k] == "down_bad" and k not in self.infeasible
+               and (self.stand_up or self.standups[k] < self.max_standups)]
+        if bad and self.pushed and not any(st[k] in ("ok", "misplaced", "leaning") for k in self.order) and any(
+                k in self.restand and k not in self.restood_seen for k in bad):
+            # the robot's own push toppled dominoes that still had to be stood back up first
+            # (e.g. the knock did not bring the row down): the row is still, so rebuild it again
+            self.pushed = False
+            self.log.append(f"{self.steps}:rebuild again: fell before being stood back up [{summary}]")
+        if bad and not self.pushed and not self.stand_up:
+            new = [k for k in bad if self.standups[k] == 0]
+            for k in new:
+                self.standups[k] = self.max_standups  # report once
+                self.log.append(f"{self.steps}:cannot stand {k} up (stand_up is off) [{summary}]")
+            bad = []
+        bad = [k for k in bad if k not in self.infeasible]
+        if bad and not self.pushed and self.stand_up and not self.out_of_time:
+            if self._fallen_job(obs, st, bad, summary):
+                return
+            bad = []
         standing = [k for k in self.order if st[k] in ("ok", "misplaced")]
         fix = [k for k in standing if st[k] == "misplaced" and self.repairs[k] < self.max_repairs]
         fallen = [k for k in self.order if st[k] in ("down", "down_bad", "leaning")]
+        if fix and not self._time_for("repair", len(fix)):
+            fix = []
         if fix:
             k = fix[-1]  # farthest along the lane first
             self.repairs[k] += 1
@@ -414,6 +1391,7 @@ class ToppleChain:
             return
         if not standing:
             self._go("idle", f"nothing standing [{summary}]")
+            self._report()
             return
         if fallen and self.nudges >= self.max_nudges:
             self._go("idle", f"out of nudges [{summary}]")
@@ -424,12 +1402,322 @@ class ToppleChain:
         self._start_push(obs, k)
         self._go("push", f"{k} [{summary}]")
 
+    # -- fallen dominoes: judge, relay, stand up -------------------------------------
+
+    def _fallen_job(self, obs: Observation, st: dict[str, str], bad: list[str], summary: str) -> bool:
+        """Start a Relay or a StandUp for one of the `bad` dominoes (top of a pile first), giving
+        up on those that cannot be done. False if none was started."""
+        pos = {k: np.mean([s.objects[k].pos for s in self.samples], axis=0) for k in self.order}
+        quat = {k: self.samples[-1].objects[k].quat for k in self.order}
+        fallen = [j for j in self.order if st[j] in ("down", "down_bad")]
+        for k in sorted(bad, key=lambda j: -float(pos[j][2])):
+            why = self._unreachable(k, pos[k], quat[k])
+            if why:
+                self._give_up(k, why)
+                continue
+            stands_left = self.standups[k] < self.max_standups
+            relays_left = self.relays[k] < self.max_relays
+            if not stands_left and not relays_left and not (self.ledge is not None and self.use_ledge
+                                                            and self.ledges[k] < self.max_ledges):
+                self._give_up(k, f"tried {self.standups[k]} stand-ups and {self.relays[k]} relays "
+                                 f"({', '.join(self.fails[k][-4:])})")
+                continue
+            spot = self.standup_spot(k, pos, fallen)
+            ledge_state = self._on_ledge(k, pos[k], quat[k])
+            dirty = None if ledge_state == "ready" else self._dirty(k, pos, quat)
+            if (self.use_ledge and self.ledge is not None and spot is not None and dirty is None
+                    and self.ledges[k] < self.max_ledges):
+                if not self._time_for("ledge"):
+                    return self._out_of_time()
+                self.ledges[k] += 1
+                self.job = LedgeStandUp(self.task, k, self.ledge, spot, self.d, quat[k], placed=ledge_state == "ready")
+                self.job_kind, self.job_obj = "ledge", k
+                self._go("ledge", f"{k}#{self.ledges[k]} {'from the ledge' if ledge_state else 'via ' + self.ledge.name}"
+                                  f" to ({spot[0]:.2f},{spot[1]:.2f}) [{summary}]")
+                return True
+            opts = []
+            if spot is not None and stands_left:
+                opts = StandUp(self.task, k, spot, self.d).grasp_options(pos[k], quat[k])
+            direct = spot is not None and stands_left and bool(opts) and dirty is None and k not in self.need_relay
+            if not direct and relays_left:
+                plan = self.relay_plan(k, pos, quat)
+                if plan is not None:
+                    if not self._time_for("relay"):
+                        return self._out_of_time()
+                    bench, turn = plan
+                    self.relays[k] += 1
+                    self.job = Relay(self.task, k, bench, turn)
+                    self.job_kind, self.job_obj = "relay", k
+                    if dirty:
+                        reason = dirty
+                    elif k in self.need_relay and self.fails[k]:
+                        reason = "after " + self.fails[k][-1]
+                    else:
+                        reason = "no stand-up grasp here"
+                    self._go("relay", f"{k}#{self.relays[k]} to ({bench[0]:.2f},{bench[1]:.2f}) turn "
+                                      f"{math.degrees(turn):.0f}deg ({reason}) [{summary}]")
+                    return True
+                self.relays[k] = self.max_relays  # nowhere to put it / no side grasp: do not plan it again
+                self.fails[k].append("no relay plan")
+            if spot is not None and stands_left and opts:
+                if not self._time_for("standup"):
+                    return self._out_of_time()
+                self.standups[k] += 1
+                self.job = StandUp(self.task, k, spot, self.d, variant=self.variant[k])
+                self.variant[k] += 1
+                self.job_kind, self.job_obj = "standup", k
+                self._go("standup", f"{k}#{self.standups[k]} at ({spot[0]:.2f},{spot[1]:.2f}) [{summary}]")
+                return True
+            if spot is None:
+                self.log.append(f"{self.steps}:no clear spot to stand {k} up")
+                continue
+            if not stands_left:
+                self._give_up(k, f"{self.standups[k]} stand-ups failed ({', '.join(self.fails[k][-4:])})")
+            else:
+                self._give_up(k, "no grasp keeps the hand clear of the table here" + (f" ({dirty})" if dirty else ""))
+        return False
+
+    def _dirty(self, k: str, pos: dict[str, np.ndarray], quat: dict[str, np.ndarray]) -> str | None:
+        """Why domino `k` does not lie cleanly by itself, or None."""
+        t = tilt(quat[k])
+        if t < 1.25:
+            return f"leaning, tilt {t:.2f}"
+        if lowest_point(self.size[k], pos[k], quat[k]) > 0.006:
+            return "resting on something"
+        near = [j for j in self.order if j != k and float(np.linalg.norm(pos[j][:2] - pos[k][:2])) < self.clean_dist]
+        if near:
+            return f"next to {near[0]}"
+        return None
+
+    def _unreachable(self, k: str, p: np.ndarray, q: np.ndarray) -> str | None:
+        r = float(np.linalg.norm(p[:2] - self.base_xy))
+        if not self.reach[0] <= r <= self.reach[1]:
+            return f"out of reach ({r:.2f} m from the base)"
+        if self._on_ledge(k, p, q) is not None:
+            return None  # put there on purpose
+        for f in self.task.scene.fixtures:  # lying under a shelf board
+            c, h = np.asarray(f.center), np.asarray(f.half_extents)
+            if c[2] - h[2] > p[2] and bool(np.all(np.abs(p[:2] - c[:2]) <= h[:2] + 0.01)):
+                return f"under {f.name} (at {p[0]:.2f},{p[1]:.2f},{p[2]:.3f})"
+        # a straight-down hand over it: fingers, hand and flange clear of every obstacle
+        if any(in_boxes(np.asarray(p, dtype=float) + [0.0, 0.0, d], self.boxes, 0.035) for d in (0.03, 0.10, 0.21)):
+            return f"against a shelf or frame (at {p[0]:.2f},{p[1]:.2f},{p[2]:.3f})"
+        return None
+
+    def _on_ledge(self, k: str, p: np.ndarray, q: np.ndarray) -> str | None:
+        """'ready' if domino `k` lies on the ledge board as LedgeStandUp leaves it (long axis across
+        the edge, +z end overhanging), 'other' if it is on the board some other way, else None."""
+        if self.ledge is None:
+            return None
+        c, h = np.asarray(self.ledge.center), np.asarray(self.ledge.half_extents)
+        top = c[2] + h[2]
+        if p[2] < top or not bool(np.all(np.abs(p[:2] - c[:2]) <= h[:2] + self.size[k].max())):
+            return None
+        sgn = 1.0 if self.base_xy[1] > c[1] else -1.0
+        L = quat_to_mat(q)[:, int(np.argmax(self.size[k]))]
+        edge = c[1] + sgn * h[1]
+        over = float(p[1] - edge) * sgn + float(self.size[k].max())
+        return "ready" if L[1] * sgn > 0.9 and 0.010 <= over <= 0.030 else "other"
+
+    def relay_plan(self, k: str, pos: dict[str, np.ndarray],
+                   quat: dict[str, np.ndarray]) -> tuple[np.ndarray, float] | None:
+        """(bench point, turn about z) for relaying `k`: the clear bench point, and the turn that
+        gives StandUp the most grasp options for the domino as it will lie there (least turn on
+        ties). None if no bench point is clear or no option exists."""
+        if Relay(self.task, k, pos[k], 0.0).grasp(pos[k], quat[k]) is None:
+            return None
+        others = [pos[j][:2] for j in self.order if j != k]
+        spots = [self.spots[j][:2] for j in self.order]
+        cands = []
+        for x in self.bench_xs:
+            for y0 in self.bench_ys:
+                for y in (y0, -y0):
+                    pt = np.array([x, self.base_xy[1] + y])
+                    if not self.y_lo <= pt[1] <= self.y_hi:
+                        continue
+                    if any(float(np.linalg.norm(pt - o)) < self.standup_clear for o in others):
+                        continue
+                    if any(float(np.linalg.norm(pt - sp)) < self.standup_off_spot for sp in spots):
+                        continue
+                    cands.append((float(np.linalg.norm(pt - pos[k][:2])), pt))
+        best, best_key = None, None
+        z = np.array([0.0, 0.0, 1.0])
+        for _, pt in sorted(cands, key=lambda c: c[0])[:3]:
+            for i in range(13):
+                turn = -math.pi / 2 + i * math.pi / 12
+                q, zc = rest_pose(self.size[k], quat_mul(quat_from_axis_angle(z, turn), quat[k]))
+                p_rest = np.array([pt[0], pt[1], zc])
+                n = len(StandUp(self.task, k, self.spots[k], self.d).grasp_options(p_rest, q))
+                if n == 0:
+                    continue
+                key = (-n, abs(turn), float(np.linalg.norm(pt - pos[k][:2])))
+                if best_key is None or key < best_key:
+                    best, best_key = (np.array([pt[0], pt[1], 0.0]), turn), key
+        return best
+
+    def _time_for(self, kind: str, n: int = 1) -> bool:
+        """Whether `n` jobs of `kind`, then the repairs still ahead and a push, fit in the steps left."""
+        st = self.state or {}
+        ahead = sum(1 for v in st.values() if v != "ok") if kind in ("standup", "relay") else 0
+        need = self.cost[kind] * n + self.cost["repair"] * ahead + self.cost["push"]
+        return self.max_steps - self.steps >= need
+
+    def _out_of_time(self) -> bool:
+        if not self.out_of_time:
+            self.out_of_time = True
+            self.log.append(f"{self.steps}:out of time: rebuilding the row with what stands")
+        return False
+
+    def _give_up(self, k: str, why: str) -> None:
+        if k not in self.infeasible:
+            self.infeasible[k] = why
+            self.log.append(f"{self.steps}:giving up on {k}: {why}")
+
+    def _report(self) -> None:
+        if getattr(self, "_reported", False):
+            return
+        self._reported = True
+        up = [k for k in self.order if k in self.restood_seen]
+        gave = "; ".join(f"{k}: {w}" for k, w in self.infeasible.items()) or "none"
+        self.log.append(f"{self.steps}:report: stood back up {up or 'none'}; given up on {gave}")
+
+    def _job_finished(self, ok: bool, reason: str) -> None:
+        k, kind = self.job_obj, self.job_kind
+        if not k:
+            return
+        if kind == "relay":
+            if ok:
+                self.need_relay.discard(k)
+                self.variant[k] = 0  # a new pose: its grasp options from the first
+            else:
+                self.fails[k].append("relay:" + reason)
+                if reason.startswith("no_side_grasp"):
+                    self.relays[k] = self.max_relays
+        elif kind == "ledge" and not ok:
+            self.fails[k].append("ledge:" + reason)
+        elif kind == "standup" and not ok:
+            self.fails[k].append(reason)
+            if any(reason.startswith(f) for f in self.pose_failures):
+                self.need_relay.add(k)  # the pose was the problem: lay it down somewhere better first
+            elif sum(1 for f in self.fails[k][-2:] if f.startswith(("grasp_slip", "grasp_miss"))) >= 2:
+                self.need_relay.add(k)  # two grip failures in a row here: try it from a fresh pose
+        self.job_kind, self.job_obj = "", ""
+
+    def standup_spot(self, k: str, pos: dict[str, np.ndarray], fallen: list[str] | None = None) -> np.ndarray | None:
+        """Where to stand domino `k` up. While other dominoes are still lying (`fallen`), on a
+        parking grid beside the lane, not on the lane: the lane stays empty, so nothing stands
+        between the arm and the next fallen domino; the side away from the ones still lying is
+        preferred, then the point nearest to `k`. They are carried into the lane (repairs) once
+        all stand. The last fallen domino goes to its own spot if that is clear. Clear:
+        `standup_clear` from every other domino, room behind it (toward the robot) for the hand."""
+        base = np.asarray(self.task.scene.robot.base_pose.pos[:2], dtype=float)
+        others = [pos[j][:2] for j in self.order if j != k]
+        lying = [pos[j][:2] for j in (fallen or []) if j != k]
+
+        def clear(pt: np.ndarray) -> bool:
+            back = pt - 0.10 * (pt - base) / max(float(np.linalg.norm(pt - base)), 1e-9)
+            return not any(float(np.linalg.norm(pt - o)) < self.standup_clear or float(np.linalg.norm(back - o)) < 0.07
+                           for o in others)
+
+        own = self.spots[k][:2]
+        if not lying and clear(own):
+            return np.array([own[0], own[1], 0.0])
+        best, best_key = None, None
+        spots = [self.spots[j][:2] for j in self.order]
+        for x, y0 in [(x, y) for x in self.standup_xs for y in self.standup_ys] + [
+                (x, y) for x in self.standup_xs for y in self.standup_ys_far]:
+            if best is not None and y0 in self.standup_ys_far:
+                break  # a near point was found
+            for y in (y0, -y0):
+                pt = np.array([x, y])
+                if not self.y_lo <= y <= self.y_hi:
+                    continue  # too near a shelf or the table's side
+                if any(float(np.linalg.norm(pt - sp)) < self.standup_off_spot for sp in spots):
+                    continue
+                if not clear(pt):
+                    continue
+                away = min((float(np.linalg.norm(pt - q)) for q in lying), default=1.0)
+                key = (-round(away / 0.05), float(np.linalg.norm(pt - pos[k][:2])))  # far from the lying, then near
+                if best_key is None or key < best_key:
+                    best, best_key = np.array([x, y, 0.0]), key
+        return best
+
+    def _standup(self, obs: Observation) -> Action:
+        a = self.job.act(obs)
+        st = self.job.status
+        if not st.running:
+            k = self.job_obj
+            self._job_finished(not st.failed, st.reason or "")
+            if st.failed and k and self._holding(obs, k):
+                # still in the fingers (no upright pose, a stalled carry): set it down low instead
+                # of opening the hand in the air, so it is not thrown across the table
+                self.job = Relay(self.task, k, self.job.spot, 0.0, holding=True)
+                self.job_kind, self.job_obj = "setdown", k
+                self._go("setdown", f"standup failed: {st.reason}; setting {k} down at "
+                                    f"({self.job.spot[0]:.2f},{self.job.spot[1]:.2f})")
+                return a
+            self._after_job(obs, f"standup {'failed: ' + st.reason if st.failed else 'done'}", st.failed)
+        return a
+
+    def _holding(self, obs: Observation, k: str) -> bool:
+        w = getattr(obs, "gripper_width", None)
+        near = float(np.linalg.norm(np.asarray(obs.objects[k].pos) - obs.ee_pos)) < 0.06
+        return near and (w is None or w > 0.004) and obs.objects[k].pos[2] > 0.04
+
+    def _setdown(self, obs: Observation) -> Action:
+        a = self.job.act(obs)
+        st = self.job.status
+        if not st.running:
+            self.job_kind, self.job_obj = "", ""
+            self._after_job(obs, f"setdown {'failed: ' + st.reason if st.failed else 'done'}", True)
+        return a
+
+    def _ledge(self, obs: Observation) -> Action:
+        a = self.job.act(obs)
+        st = self.job.status
+        if not st.running:
+            k = self.job_obj
+            self._job_finished(not st.failed, st.reason or "")
+            if st.failed and k and self._holding(obs, k):
+                spot = self.standup_spot(k, {j: obs.objects[j].pos for j in self.order}, None)
+                spot = spot if spot is not None else self.job.spot
+                self.job = Relay(self.task, k, spot, 0.0, holding=True)
+                self.job_kind, self.job_obj = "setdown", k
+                self._go("setdown", f"ledge failed: {st.reason}; setting {k} down at ({spot[0]:.2f},{spot[1]:.2f})")
+                return a
+            self._after_job(obs, f"ledge {'failed: ' + st.reason if st.failed else 'done'}", st.failed)
+        return a
+
+    def _relay(self, obs: Observation) -> Action:
+        a = self.job.act(obs)
+        st = self.job.status
+        if not st.running:
+            self._job_finished(not st.failed, st.reason or "")
+            self._after_job(obs, f"relay {'failed: ' + st.reason if st.failed else 'done'}", st.failed)
+        return a
+
     def _repair(self, obs: Observation) -> Action:
         a = self.job.act(obs)
         st = self.job.status
         if not st.running:
-            self._go("park", f"repair {'failed: ' + st.reason if st.failed else 'done'}")
+            self._after_job(obs, f"repair {'failed: ' + st.reason if st.failed else 'done'}", st.failed)
         return a
+
+    def _after_job(self, obs: Observation, why: str, failed: bool) -> None:
+        # A failed job can leave the arm in a posture from which the IK cannot reach the next
+        # targets (MuJoCo: every later move failed). So after a failure, rehome the joints first.
+        if failed and self.home_q is not None:
+            self.q_cmd = np.asarray(obs.qpos, dtype=float).copy()
+            self._go("rehome", why)
+        else:
+            self._go("park", why)
+
+    def _rehome(self, obs: Observation) -> Action:
+        d = self.home_q - self.q_cmd
+        self.q_cmd = self.q_cmd + np.clip(d, -self.rehome_step, self.rehome_step)
+        if float(np.max(np.abs(np.asarray(obs.qpos) - self.home_q))) < 0.05 or self.n_phase > 250:
+            self._go("park", "rehomed")
+        return Action(mode="joint", joint_targets=self.q_cmd.copy(), gripper=0.0)
 
     # -- push and watch -----------------------------------------------------------
 
@@ -479,6 +1767,7 @@ class ToppleChain:
             P["tcp"] = P["back"].copy() if n <= 0.004 else P["tcp"] + d * (0.004 / n)
             if n <= 0.004 and float(np.linalg.norm(obs.ee_pos - P["back"])) < 0.004:
                 P["stage"] = "push"
+                self.pushed = True  # from here on the chain may be falling: no more rebuilding
             return Action(ee_pos=P["tcp"], ee_quat=P["quat"], gripper=g)
         if P["stage"] == "push":
             P["s"] = min(P["s"] + self.push_speed, self.push_travel)
