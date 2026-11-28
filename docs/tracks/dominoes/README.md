@@ -22,7 +22,14 @@ that layout still needs its MuJoCo run. All T1 domino tests pass on MuJoCo.
 Try it: `python scripts/try_dominoes.py --view` (one episode with the skill's log; `--task`,
 `--seed`, `--no-disturb`, `--gif`, `--seeds N`). Where picks fail: `python scripts/diag_pick.py`.
 
-Tasks: `franka_topple_domino_chain`, `franka_topple_domino_chain_knock`, `franka_setup_domino_chain`.
+Tasks: `franka_topple_domino_chain`, `franka_topple_domino_chain_knock`, `franka_setup_domino_chain`,
+`franka_build_domino_chain_scattered` (random standing starts beside the lane, random spot and angle),
+`franka_rebuild_domino_chain` (dominoes taken out of the chain and stood beside the lane).
+`franka_rebuild_fallen_dominoes` (all four start fallen, face down or on their side: stand them up,
+rebuild, topple). Standing a fallen domino up (`StandUp` in `skills/dominoes.py`, round 3: gentle
+touch-down, grasp tilted >= 0.5 rad, slow turn) is on; earlier rounds failed in MuJoCo (see
+HANDOVER). Check it with `python scripts/diag_standup.py`; `ToppleChain.stand_up = False` only
+reports lying dominoes.
 
 Briefs: [T1](T1-sim.md) · [T2](T2-skills.md) · [T3](T3-agents.md) · [T4](T4-eval.md) ·
 [T5](T5-learning.md) · [T6](T6-perception.md) · [T7](T7-real.md)
