@@ -241,6 +241,51 @@ class Turn(Node):
         return Action(ee_pos=self.at, ee_quat=self._command(obs, ctx.quat), gripper=self.gripper), RUNNING
 
 
+class StandTurn(Node):
+    """Turn the hand (holding position) to the first of `ctx.bb["stand_cands"]` (quaternions,
+    best first) it can reach: rate-limited; if the turn stalls (error not down by `progress` rad
+    in `window` steps) it accepts the pose when within `loose` rad, else moves on to the next
+    candidate. Sets `ctx.quat` to the pose it ends on."""
+
+    def __init__(self, gripper: float, rate: float, tol: float = 0.04, loose: float = 0.12,
+                 window: int = 20, progress: float = 0.01, timeout: int = 400, check=None, name: str = "stand"):
+        self.gripper, self.rate, self.tol, self.loose = gripper, rate, tol, loose
+        self.window, self.progress, self.timeout, self.check, self.name = window, progress, timeout, check, name
+        self.reset()
+
+    def reset(self) -> None:
+        self.i, self.n, self.at, self.ref, self.hist = 0, 0, None, None, []
+
+    def tick(self, obs, ctx):
+        cands = ctx.bb.get("stand_cands") or []
+        if self.at is None:
+            self.at = obs.ee_pos.copy()
+        if self.check is not None and (why := self.check(obs, ctx)):
+            return None, fail(why)
+        self.n += 1
+        if self.i >= len(cands) or self.n > self.timeout:
+            return None, fail(f"timeout:{self.name}")
+        goal = cands[self.i]
+        err = quat_angle(obs.ee_quat, goal)
+        if err < self.tol:
+            ctx.quat = goal
+            return None, DONE
+        self.hist.append(err)
+        if len(self.hist) > self.window and self.hist[-self.window - 1] - err < self.progress:
+            if err < self.loose:  # nearly upright: it settles when set down
+                ctx.quat = goal
+                ctx.bb["stand_loose"] = round(err, 3)
+                return None, DONE
+            self.i, self.hist, self.ref = self.i + 1, [], None  # stuck: try the next pose
+            ctx.bb["stand_tries"] = self.i + 1
+            return Action(ee_pos=self.at, ee_quat=obs.ee_quat, gripper=self.gripper), RUNNING
+        if self.ref is None:
+            self.ref = np.asarray(obs.ee_quat, dtype=float)
+        ang = quat_angle(self.ref, goal)
+        self.ref = goal.copy() if ang <= self.rate else _slerp(self.ref, goal, self.rate / ang)
+        return Action(ee_pos=self.at, ee_quat=self.ref, gripper=self.gripper), RUNNING
+
+
 def _slerp(a: np.ndarray, b: np.ndarray, t: float) -> np.ndarray:
     a, b = np.asarray(a, dtype=float), np.asarray(b, dtype=float)
     d = float(a @ b)
@@ -436,6 +481,7 @@ class StandUp:
     tilts = (0.5, 0.65, 0.8, 1.0)  # radians of grasp tilt about the closing axis, tried in order
     max_up = -0.45  # the standing pose's hand axis must point down at least ~27 deg (reachable, wrist high)
     turn_rate = 0.04  # radians per step (0.8 rad/s) while turning the domino upright
+    turn_z = 0.30  # height of the point in front of the robot where the domino is turned upright
 
     def __init__(self, task: TaskSpec, obj: str, spot: np.ndarray, lane_dir: np.ndarray):
         o = task.scene.object(obj)
@@ -481,11 +527,17 @@ class StandUp:
 
     def upright_hand(self, R_h: np.ndarray, R_d: np.ndarray, p_e: np.ndarray, p_d: np.ndarray) -> np.ndarray | None:
         """Hand orientation (matrix) that stands the gripped domino up at `spot`, or None."""
+        c = self.upright_hands(R_h, R_d, p_e, p_d)
+        return c[0] if c else None
+
+    def upright_hands(self, R_h: np.ndarray, R_d: np.ndarray, p_e: np.ndarray, p_d: np.ndarray,
+                      k: int = 6, min_sep: float = 0.35) -> list[np.ndarray]:
+        """Up to `k` feasible standing hand orientations, best first, at least `min_sep` rad apart."""
         R_hd = R_h.T @ R_d
         p_hd = R_h.T @ (np.asarray(p_d, dtype=float) - p_e)
         radial = self.spot[:2] - self.base
         radial = radial / max(float(np.linalg.norm(radial)), 1e-9)
-        best, best_score = None, -np.inf
+        scored: list[tuple[float, np.ndarray]] = []
         for flip in (np.eye(3),):  # +z up only (see lying_grasp)
             for i in range(36):
                 R_ds = _rot(2, -math.pi + i * math.pi / 18) @ flip
@@ -501,9 +553,15 @@ class StandUp:
                 face = R_ds[:2, 0]  # the standing domino's face normal
                 turn = math.acos(float(np.clip((np.trace(R_h.T @ R_hs) - 1) / 2, -1, 1)))
                 score = -a[2] + 0.6 * float(a[:2] @ radial) + 0.3 * abs(float(face @ self.lane)) - 0.2 * turn
-                if score > best_score:
-                    best, best_score = R_hs, score
-        return best
+                scored.append((score, R_hs))
+        out: list[np.ndarray] = []
+        for _, R in sorted(scored, key=lambda x: -x[0]):
+            sep = [math.acos(float(np.clip((np.trace(R.T @ Q) - 1) / 2, -1, 1))) for Q in out]
+            if all(x >= min_sep for x in sep):
+                out.append(R)
+            if len(out) >= k:
+                break
+        return out
 
     def _build(self):
         st = self.settle_steps
@@ -549,12 +607,18 @@ class StandUp:
 
         def plan(obs, c):
             o = obs.objects[c.obj]
-            R = self.upright_hand(quat_to_mat(obs.ee_quat), quat_to_mat(o.quat), obs.ee_pos, o.pos)
-            if R is None:
+            cands = self.upright_hands(quat_to_mat(obs.ee_quat), quat_to_mat(o.quat), obs.ee_pos, o.pos)
+            if not cands:
                 return "no_upright_pose"  # none keeps the palm and wrist clear of the table
-            c.quat = mat_to_quat(R)
+            c.bb["stand_cands"] = [mat_to_quat(R) for R in cands]
+            c.quat = c.bb["stand_cands"][0]
             c.bb["offsets"] = []
             return None
+
+        def turn_point(obs, c):
+            # turn in front of the robot, high: the wrist has the most room there
+            mid = 0.5 * (np.asarray(c.bb["rise_xy"]) + self.spot[:2])
+            return np.array([float(np.clip(mid[0], 0.40, 0.50)), 0.5 * float(mid[1]), self.turn_z])
 
         def offset(obs, c):
             if c.obj in obs.objects and c.bb.get("offset_step") != c.steps:
@@ -586,8 +650,9 @@ class StandUp:
                 grip(settle=st),
                 Do(note, name="note"),
                 Ramp(risen, self.lift_step, gripper=1.0, check=held, timeout=250, name="lift"),
+                Ramp(turn_point, self.carry_step, gripper=1.0, check=held, timeout=300, name="to_turn"),
                 Do(plan, name="plan"),
-                Turn(1.0, check=held, timeout=160, name="stand", rate=self.turn_rate),
+                StandTurn(1.0, rate=self.turn_rate, check=held, name="stand"),
                 Ramp(over_spot, self.carry_step, gripper=1.0, check=held, timeout=300, name="carry"),
                 Ramp(on_spot, self.lower_step, eps=0.003, gripper=1.0, check=held, timeout=200, name="lower"),
                 release(settle=st),

@@ -295,3 +295,20 @@ def test_stand_up_path_when_switched_on(name):
         assert ep.success, (seed, ep.failure_detail, sk.log)
         stood += sum(":standup:" in e for e in sk.log)
     assert stood > 0
+
+
+def test_stand_turn_tries_the_next_pose_when_stuck():
+    from skillforge.skills.dominoes import StandTurn, hand_quat
+    from skillforge.skills.primitives import Context
+
+    c = Context(obj="domino_1")
+    far, near = hand_quat(1.0), hand_quat(0.05)  # stuck at DOWN: 1 rad off the first, 0.05 off the second
+    c.bb["stand_cands"] = [far, near]
+    node = StandTurn(1.0, rate=0.04, window=5)
+    obs = _obs({"domino_1": ((0.4, 0.2, 0.3), (1, 0, 0, 0))})
+    status = None
+    for _ in range(40):
+        _, status = node.tick(obs, c)
+        if status.done or status.failed:
+            break
+    assert status.done and c.bb.get("stand_tries") == 2 and np.allclose(c.quat, near)
