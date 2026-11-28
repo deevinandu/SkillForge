@@ -53,6 +53,10 @@ class RobotSpec(Spec):
     ee_site: str = "tcp"
     gripper: Literal["parallel", "suction", "none"] = "parallel"
     max_gripper_width: float = Field(0.08, gt=0, description="metres")
+    # "foam": the fingertip pads are covered in foam: high friction, soft (compliant) contact and
+    # torsional grip. "rigid": the model's bare pads. Only the sim reads it (the real gripper has
+    # what it has).
+    fingertips: Literal["rigid", "foam"] = "rigid"
 
 
 class MugHandle(Spec):
@@ -117,6 +121,10 @@ class Region(Spec):
     name: str
     center: Vec3
     half_extents: Vec3
+    # Drawn in the sim (a translucent green box) when True. Set False for regions that only exist
+    # in the task logic (spots, lanes): nothing marks them on a real table, and a camera should
+    # not see them either.
+    visible: bool = True
 
 
 class Knockdown(Spec):
@@ -156,6 +164,25 @@ class RandomizationSpec(Spec):
     knockdown: Knockdown | None = None  # None: nobody knocks anything over
 
 
+# How a box rests on the table: "upright" on its own z axis (its spawn convention), "flat" on its
+# largest face (thinnest axis vertical, a domino lying face down), "side" on the remaining face
+# (middle axis vertical, a domino lying on its long edge).
+RestFace = Literal["upright", "flat", "side"]
+
+
+class Scatter(Spec):
+    """Random initial poses, drawn from the seed at reset: each of `objects` (empty = every movable
+    one) rests on one of `faces` (uniform), at a yaw ~ U(-max_yaw, max_yaw), at a uniform xy in one of `regions`
+    (uniform), at least `min_dist` (centre to centre) from every other object. Faces other than
+    "upright" need box objects. Overrides the spec pose and the xy/yaw jitter of those objects."""
+
+    objects: tuple[str, ...] = ()
+    regions: tuple[str, ...] = Field(min_length=1)
+    faces: tuple[RestFace, ...] = Field(("upright",), min_length=1)
+    min_dist: float = Field(0.10, ge=0.0)
+    max_yaw: float = Field(3.1416, gt=0.0, le=3.1416, description="radians")
+
+
 class Disturbance(Spec):
     """A perturbation the env applies to objects DURING an episode (someone bumps the table, a
     domino gets nudged after it was placed). Everything about it is drawn from the env seed at
@@ -171,10 +198,13 @@ class Disturbance(Spec):
     - kind "pose": teleport the object, at rest, by an xy offset of magnitude ~ U(xy) in a uniform
       direction, and a yaw about world z of magnitude ~ U(yaw) with a random sign;
     - kind "knock": give it an angular velocity of magnitude ~ U(ang_vel) about a horizontal axis,
-      so its top moves toward `knock_dir` (world xy) or, if None, a uniform random direction.
+      so its top moves toward `knock_dir` (world xy) or, if None, a uniform random direction;
+    - kind "relocate": someone picks it up and puts it down, at rest, on one of `faces` at a
+      yaw ~ U(-max_yaw, max_yaw): in one of `regions` (a free spot at least 0.09 m from everything), or, with
+      no regions, where it is moved by an xy offset of magnitude ~ U(xy).
     The env never disturbs an object the gripper is touching; it waits for it to be let go."""
 
-    kind: Literal["pose", "knock"] = "pose"
+    kind: Literal["pose", "knock", "relocate"] = "pose"
     objects: tuple[str, ...] = ()
     count: int = Field(1, ge=1)
     prob: float = Field(1.0, ge=0.0, le=1.0)
@@ -186,6 +216,9 @@ class Disturbance(Spec):
     yaw: Range = Range.fixed(0.0)  # radians (pose)
     ang_vel: Range = Range.fixed(0.0)  # rad/s (knock)
     knock_dir: tuple[float, float] | None = None
+    regions: tuple[str, ...] = ()  # relocate
+    faces: tuple[RestFace, ...] = ("flat",)  # relocate
+    max_yaw: float = Field(3.1416, gt=0.0, le=3.1416)  # relocate: radians
 
     @model_validator(mode="after")
     def _consistent(self) -> Disturbance:
@@ -197,6 +230,8 @@ class Disturbance(Spec):
             raise ValueError("a 'pose' disturbance needs a non-zero xy or yaw range")
         if self.kind == "knock" and self.ang_vel.hi == 0:
             raise ValueError("a 'knock' disturbance needs a non-zero ang_vel range")
+        if not self.faces:
+            raise ValueError("disturbance faces must not be empty")
         if self.target == "event_object" and not self.after_event:
             raise ValueError("target 'event_object' needs after_event")
         if self.knock_dir is not None and self.knock_dir[0] ** 2 + self.knock_dir[1] ** 2 < 1e-12:
@@ -204,8 +239,37 @@ class Disturbance(Spec):
         return self
 
 
+class TableSpec(Spec):
+    """The table the robot is bolted to. `width` is across the robot (world y, centred on the
+    robot base), `depth` along it (world x, from `back` behind the base). With `shelves`, the
+    table stands between two shelf units: solid side panels `shelf_height` tall just outside the
+    width, which the arm can collide with. Every region of the scene must then lie inside the
+    width, and skills keep the hand inside it."""
+
+    width: float = Field(1.2, gt=0.2, description="metres, world y")
+    depth: float = Field(1.2, gt=0.2, description="metres, world x")
+    back: float = Field(0.25, ge=0.0, description="metres of table behind the robot base")
+    shelves: bool = False
+    shelf_height: float = Field(0.6, gt=0.0, description="metres above the table top")
+    shelf_thickness: float = Field(0.02, gt=0.0)
+
+
+class Fixture(Spec):
+    """A static box in the cell the robot can collide with (shelf boards, frame posts, a camera
+    mount): world-frame centre and half extents, axis-aligned. `ledge`: a shelf board whose edge
+    skills may use (e.g. to lay a domino on with one end overhanging, so it can be pinched there)."""
+
+    name: str
+    center: Vec3
+    half_extents: Vec3
+    ledge: bool = False
+    rgba: tuple[float, float, float, float] = (0.92, 0.92, 0.9, 1.0)
+
+
 class SceneSpec(Spec):
     robot: RobotSpec
+    table: TableSpec = TableSpec()
+    fixtures: tuple[Fixture, ...] = ()
     objects: tuple[ObjectSpec, ...] = ()
     regions: tuple[Region, ...] = ()
     randomization: RandomizationSpec = RandomizationSpec()
@@ -213,18 +277,47 @@ class SceneSpec(Spec):
     obs_cameras: tuple[str, ...] = ()
     # Mid-episode perturbations (see Disturbance). Empty = none, and every existing task is unchanged.
     disturbances: tuple[Disturbance, ...] = ()
+    # Random initial poses (see Scatter). None = objects start where the spec puts them.
+    scatter: Scatter | None = None
 
     @model_validator(mode="after")
     def _unique_names(self) -> SceneSpec:
-        names = [o.name for o in self.objects] + [r.name for r in self.regions]
+        names = [o.name for o in self.objects] + [r.name for r in self.regions] + [f.name for f in self.fixtures]
         dupes = {n for n in names if names.count(n) > 1}
         if dupes:
             raise ValueError(f"duplicate object/region names: {sorted(dupes)}")
         movable = {o.name for o in self.objects if not o.fixed}
+        regions = {r.name for r in self.regions}
+        boxes = {o.name for o in self.objects if o.shape == "box"}
         for i, d in enumerate(self.disturbances):
             bad = [n for n in d.objects if n not in movable]
             if bad:
                 raise ValueError(f"disturbance {i} names objects that are missing or fixed: {bad}")
+            if d.kind == "relocate":
+                if [r for r in d.regions if r not in regions]:
+                    raise ValueError(f"disturbance {i} names unknown regions: {list(d.regions)}")
+                if any(f != "upright" for f in d.faces) and [n for n in (d.objects or movable) if n not in boxes]:
+                    raise ValueError(f"disturbance {i}: faces other than upright need box objects")
+        if self.table.shelves:
+            y0, hw = self.robot.base_pose.pos[1], self.table.width / 2
+            out = [r.name for r in self.regions if abs(r.center[1] - y0) + r.half_extents[1] > hw]
+            if out:
+                raise ValueError(f"regions reach past the shelves (table width {self.table.width} m): {out}")
+        for r in self.regions:  # nothing is to be put where a low fixture would be over it
+            for f in self.fixtures:
+                if f.center[2] - f.half_extents[2] > 0.15:
+                    continue
+                if all(abs(r.center[i] - f.center[i]) < r.half_extents[i] + f.half_extents[i] for i in (0, 1)):
+                    raise ValueError(f"region '{r.name}' lies under fixture '{f.name}'")
+        if self.scatter is not None:
+            sc = self.scatter
+            bad = [n for n in sc.objects if n not in movable]
+            if bad:
+                raise ValueError(f"scatter names objects that are missing or fixed: {bad}")
+            if [r for r in sc.regions if r not in regions]:
+                raise ValueError(f"scatter names unknown regions: {list(sc.regions)}")
+            if any(f != "upright" for f in sc.faces) and [n for n in (sc.objects or movable) if n not in boxes]:
+                raise ValueError("scatter faces other than upright need box objects")
         return self
 
     def object(self, name: str) -> ObjectSpec:
@@ -288,7 +381,10 @@ class ObjectToppled(Spec):
     axis; spawn it upright) is tilted at least `min_tilt` from world up. Optionally:
     - `direction`: it fell that way. The horizontal projection of its z axis (where its top went)
       is within `dir_tol` of this world xy direction;
-    - `region`: its centre lies inside this region (e.g. the lane the chain stands in).
+    - `region`: its centre lies inside this region (e.g. the lane the chain stands in);
+    - `restood`: it must have fallen (tilt >= `min_tilt`) and then stood upright again (tilt
+      <= 0.15 rad) earlier in the episode: for "rebuild the fallen chain and topple it again",
+      where the start already looks toppled. The env tracks it on true poses.
     A domino leaning on the next one counts: a chain rarely ends up flat."""
 
     kind: Literal["object_toppled"] = "object_toppled"
@@ -297,6 +393,7 @@ class ObjectToppled(Spec):
     direction: tuple[float, float] | None = None
     dir_tol: float = Field(0.8, gt=0, le=3.1416, description="radians")
     region: str | None = None
+    restood: bool = False
 
     @model_validator(mode="after")
     def _direction(self) -> ObjectToppled:

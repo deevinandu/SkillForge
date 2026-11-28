@@ -237,3 +237,121 @@ def test_mujoco_existing_task_unchanged_by_disturbance_support(mj):
     env = mj(t)
     env.reset(3)
     assert not any(k.startswith("disturb") for k in env.randomization_sample())
+
+
+# ---------------------------------------------------------------- scatter + relocate
+
+SIDES = [
+    {"name": "side_r", "center": [0.40, -0.21, 0.03], "half_extents": [0.07, 0.06, 0.04]},
+    {"name": "side_l", "center": [0.40, 0.21, 0.03], "half_extents": [0.07, 0.06, 0.04]},
+]
+
+
+def scattered_task(source="stub", faces=("upright", "flat", "side"), disturbances=(), n=4) -> TaskSpec:
+    t = domino_task(source=source, n=n, disturbances=())
+    d = json.loads(t.model_dump_json())
+    d["scene"]["regions"] += SIDES
+    d["scene"]["scatter"] = {"regions": ["side_r", "side_l"], "faces": list(faces)}
+    d["scene"]["disturbances"] = list(disturbances)
+    return TaskSpec.model_validate(d)
+
+
+def test_rest_poses():
+    from skillforge.sim.scatter import rest_axis, rest_height, rest_quat
+
+    o = domino_task().scene.object("d0")  # half extents 0.005, 0.02, 0.04
+    assert [rest_axis(o, f) for f in ("upright", "flat", "side")] == [2, 0, 1]
+    assert [rest_height(o, f) for f in ("upright", "flat", "side")] == [0.04, 0.005, 0.02]
+    from skillforge.skills.grasp import quat_to_mat
+
+    for face, k in (("upright", 2), ("flat", 0), ("side", 1)):
+        for yaw in (0.0, 1.0, -2.5):
+            R = quat_to_mat(rest_quat(o, face, yaw))
+            assert abs(abs(R[2, k]) - 1.0) < 1e-9, (face, yaw)  # that local axis is vertical
+
+
+def test_scatter_is_seeded_spaced_and_in_regions():
+    from skillforge.sim.scatter import draw_scatter
+
+    t = scattered_task()
+    a, sa = draw_scatter(t, 5)
+    b, sb = draw_scatter(t, 5)
+    _, sc = draw_scatter(t, 6)
+    assert sa == sb and sa != sc and set(a) == {"d0", "d1", "d2", "d3"}
+    xy = [p[:2] for p, _ in a.values()]
+    assert min(np.linalg.norm(p - q) for i, p in enumerate(xy) for q in xy[i + 1 :]) >= 0.10 - 1e-12
+    for p, _ in a.values():
+        assert 0.33 - 1e-9 <= p[0] <= 0.47 + 1e-9 and 0.15 - 1e-9 <= abs(p[1]) <= 0.27 + 1e-9
+    faces = {draw_scatter(t, s)[1]["scatter.d0.face"] for s in range(30)}
+    assert faces == {0.0, 1.0, 2.0}  # every face shows up
+
+
+def test_stub_starts_scattered_and_relocates():
+    reloc = {"kind": "relocate", "objects": ["d1"], "at_step": {"lo": 3, "hi": 3}, "regions": ["side_r", "side_l"],
+             "faces": ["side"]}
+    t = scattered_task(faces=("flat",), disturbances=[reloc])
+    env = StubEnv(t)
+    obs = env.reset(2)
+    assert all(tilt_of(o.quat) == pytest.approx(math.pi / 2) for o in obs.objects.values())  # all lying flat
+    assert all(o.pos[2] == pytest.approx(0.005, abs=0.01) for o in obs.objects.values())
+    evs = []
+    for _ in range(4):
+        obs, info = env.step(Action(ee_pos=np.array([0.3, 0.0, 0.3])))
+        evs += info.events
+    assert "disturbance:relocate:d1" in evs
+    from skillforge.skills.grasp import quat_to_mat
+
+    assert abs(quat_to_mat(obs.objects["d1"].quat)[2, 1]) == pytest.approx(1.0)  # now on its side
+    others = [obs.objects[k].pos[:2] for k in ("d0", "d2", "d3")]
+    assert min(np.linalg.norm(obs.objects["d1"].pos[:2] - o) for o in others) >= 0.09 - 0.01
+
+
+def test_mujoco_scattered_dominoes_rest(mj):
+    env = mj(scattered_task(source="menagerie:franka_emika_panda"))
+    for seed in (0, 1, 2):
+        obs0 = env.reset(seed)
+        a = _park(env)
+        for _ in range(30):
+            obs, info = env.step(a)
+            assert not any(e.startswith("object_ejected") or e == "sim_unstable" for e in info.events)
+        for k in obs.objects:  # nothing slid, bounced or tipped
+            assert np.linalg.norm(obs.objects[k].pos - obs0.objects[k].pos) < 0.006, (seed, k)
+            assert abs(tilt_of(obs.objects[k].quat) - tilt_of(obs0.objects[k].quat)) < 0.05, (seed, k)
+
+
+def test_mujoco_relocate(mj):
+    reloc = {"kind": "relocate", "objects": ["d1"], "at_step": {"lo": 5, "hi": 5}, "regions": ["side_r", "side_l"],
+             "faces": ["flat"]}
+    d = json.loads(domino_task(source="menagerie:franka_emika_panda").model_dump_json())
+    d["scene"]["regions"] += SIDES  # the regions first: the relocate names them
+    d["scene"]["disturbances"] = [reloc]
+    env = mj(TaskSpec.model_validate(d))
+    env.reset(0)
+    a = _park(env)
+    evs = []
+    for _ in range(30):
+        obs, info = env.step(a)
+        evs += info.events
+    assert "disturbance:relocate:d1" in evs
+    assert tilt_of(obs.objects["d1"].quat) == pytest.approx(math.pi / 2, abs=0.05)
+    assert abs(obs.objects["d1"].pos[1]) > 0.14 and obs.objects["d1"].pos[2] < 0.01
+
+
+def test_fingertips_default_rigid():
+    assert domino_task().scene.robot.fingertips == "rigid"
+
+
+def test_mujoco_foam_fingertips(mj):
+    d = json.loads(domino_task(source="menagerie:franka_emika_panda").model_dump_json())
+    d["scene"]["robot"]["fingertips"] = "foam"
+    env = mj(TaskSpec.model_validate(d))
+    m = env.model
+    pads = [g for g in range(m.ngeom) if m.geom_bodyid[g] in env._finger_bodies and m.geom_contype[g]
+            and m.geom_type[g] == 6]  # mjGEOM_BOX
+    assert pads and all(m.geom_friction[g][0] == pytest.approx(1.6) and m.geom_priority[g] == 2 for g in pads)
+    assert all(m.geom_condim[g] == 6 for g in pads)
+    env.reset(0)
+    a = _park(env)
+    for _ in range(20):  # still steps fine
+        obs, info = env.step(a)
+    assert "sim_unstable" not in info.events
