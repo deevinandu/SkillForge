@@ -108,7 +108,7 @@ def test_the_first_target_after_a_hold_cannot_jump(server):
         stream_to(robot, SIM_HOME, n=2)
         time.sleep(WATCHDOG + 0.3)
         far = np.array(SIM_HOME) + [0.5, 0, 0, 0, 0, 0, 0]
-        stream_to(robot, far, n=1, dt=0.0)
+        stream_to(robot, far, n=1, dt=0.15)  # the server reaches each target over one period
         moved = robot.read_state().q[0] - SIM_HOME[0]
         assert 0 < moved <= SPEED * 0.05 + 1e-9  # one control period's worth from the measured joints
 
@@ -296,6 +296,56 @@ def test_server_survives_a_process_wide_socket_timeout(tmp_path):
             robot.home()
             time.sleep(0.8)  # a client pausing past the timeout, as at a prompt
             stream_to(robot, SIM_HOME)
+    finally:
+        p.terminate()
+        p.wait(5)
+
+
+def _server_with_log(tmp_path, *extra):
+    log = tmp_path / "bridge.jsonl"
+    p = subprocess.Popen([sys.executable, str(SERVER), "--fake", "--port", "0", "--max-joint-speed", "1.0",
+                          "--log", str(log), *extra], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+    port = int(p.stdout.readline().split(":")[1].split()[0])
+    return p, port, log
+
+
+def _ramp(robot, n=20, step=0.02, dt=0.05):
+    q = np.array(SIM_HOME)
+    for k in range(1, n + 1):
+        robot.send_joint_targets(q + [step * k, 0, 0, 0, 0, 0, 0], 0.0)
+        time.sleep(dt)
+    time.sleep(0.2)
+
+
+def test_targets_are_interpolated_at_the_publish_rate(tmp_path):
+    """2026-11-27, first pyramid trial: the arm jerked. franka-interface jumps to each published
+    target, so 20 Hz targets 0.02 rad apart were 20 Hz steps of 0.02 rad. Now the robot gets
+    points every 4 ms along the way: no step larger than a small fraction of a client step."""
+    p, port, log = _server_with_log(tmp_path)
+    try:
+        with connect(port) as robot:
+            robot.home()
+            _ramp(robot)
+        rows = [json.loads(line) for line in log.read_text().splitlines()]
+        pub = np.array([r[2][0] for r in rows if r[1] == "pub"])
+        steps = np.abs(np.diff(pub))
+        assert len(pub) > 150  # ~250 Hz over ~1.2 s
+        assert steps.max() < 0.02 * 0.3, steps.max()  # each published step well under a client step
+        assert pub[-1] == pytest.approx(SIM_HOME[0] + 0.4, abs=1e-6)  # and it gets there
+    finally:
+        p.terminate()
+        p.wait(5)
+
+
+def test_publish_hz_zero_passes_targets_through(tmp_path):
+    p, port, log = _server_with_log(tmp_path, "--publish-hz", "0")
+    try:
+        with connect(port) as robot:
+            robot.home()
+            _ramp(robot, n=5)
+        rows = [json.loads(line) for line in log.read_text().splitlines()]
+        assert [r[1] for r in rows].count("pub") == 0 and [r[1] for r in rows].count("target") == 5
+        assert robot is not None
     finally:
         p.terminate()
         p.wait(5)

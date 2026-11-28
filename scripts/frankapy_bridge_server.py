@@ -298,9 +298,19 @@ class FrankapyArm:
 
 
 class Bridge:
-    def __init__(self, arm, max_joint_speed, watchdog_s, margin, fake):
+    def __init__(self, arm, max_joint_speed, watchdog_s, margin, fake, publish_hz=250.0, log_path=None):
         self.arm, self.max_speed, self.watchdog_s, self.margin, self.fake = arm, max_joint_speed, watchdog_s, margin, fake
         self.lock = threading.RLock()
+        # Interpolation. franka-interface's PassThroughJointTrajectoryGenerator sets the desired
+        # joints to each message AS IS, and the joint-impedance controller pulls hard toward it:
+        # a client at 20 Hz moving at 0.1 m/s makes 5 mm steps 20 times a second, and the arm
+        # jerks (seen on the arm 2026-11-27, first pyramid trial). So each target starts a
+        # segment from where the command is now to the new target, over one client period, and a
+        # thread publishes points along it at `publish_hz`. 0 = pass targets straight through.
+        self.publish_hz = publish_hz
+        self.seg = None  # (q_from, q_to, t0, duration)
+        self.cmd_q = None  # the last joints published
+        self._log = open(log_path, "a", buffering=1) if log_path else None  # line-buffered: readable while running
         self.streaming = False
         self.last_q = None
         self.last_t = 0.0
@@ -311,11 +321,40 @@ class Bridge:
         self.t0 = time.time()
         self._alive = True
         threading.Thread(target=self._watch, daemon=True).start()
+        if self.publish_hz > 0:
+            threading.Thread(target=self._publisher, daemon=True).start()
+
+    def _record(self, kind, q):
+        if self._log is not None:
+            self._log.write(json.dumps([round(time.time() - self.t0, 4), kind, [round(x, 5) for x in q]]) + "\n")
+
+    def _point(self, now):
+        q0, q1, t0, T = self.seg
+        a = min(max((now - t0) / T, 0.0), 1.0)
+        return [x + a * (y - x) for x, y in zip(q0, q1)], a >= 1.0
+
+    def _publisher(self):
+        period = 1.0 / self.publish_hz
+        nxt = time.time()
+        while self._alive:
+            nxt += period
+            with self.lock:
+                if self.streaming and self.seg is not None:
+                    q, done = self._point(time.time())
+                    self.arm.publish(q, period)
+                    self.cmd_q = q
+                    self._record("pub", q)
+                    if done:
+                        self.seg = None  # the robot keeps the last desired joints
+            time.sleep(max(0.0, nxt - time.time()))
+            if time.time() - nxt > 0.5:  # fell far behind (machine busy): resync rather than burst
+                nxt = time.time()
 
     def _halt(self, event, detail=""):
         """Stop streaming (under the lock). The arm holds where it is until `home`."""
         if self.streaming:
             self.streaming = False
+            self.seg = None
             self.stop_reason = event + (f" ({detail})" if detail else "")
             try:
                 self.arm.stop()
@@ -362,10 +401,17 @@ class Bridge:
                 if self.holding:  # resume from where the arm is, as if the last target were sent just now
                     self.last_q = [float(x) for x in self.arm.state()[0]]
                     self.last_t = now - 0.05
+                    self.cmd_q, self.seg = list(self.last_q), None
                     self.holding = False
                 dt = min(now - self.last_t, 0.1)
                 q, clipped = clamp_targets(q, self.last_q, dt, self.max_speed, self.margin)
-                self.arm.publish(q, dt)
+                self._record("target", q)
+                if self.publish_hz > 0:
+                    start = self._point(now)[0] if self.seg is not None else (self.cmd_q or self.last_q)
+                    self.seg = (start, q, now, min(max(dt, 0.02), 0.1))
+                else:
+                    self.arm.publish(q, dt)
+                    self.cmd_q = q
                 self.last_q, self.last_t = q, now
                 if clipped:
                     self.events.append("bridge:clamped")
@@ -408,6 +454,7 @@ class Bridge:
                 except Exception as e:  # report, don't die: the client decides what to do
                     return {"ok": False, "error": f"home failed: {e}"}
                 self.last_q, self.last_t = [float(x) for x in self.arm.state()[0]], time.time()
+                self.cmd_q, self.seg = list(self.last_q), None
                 self.holding = False
                 self.streaming = True
                 return {"ok": True}
@@ -460,9 +507,12 @@ def main():
     ap.add_argument("--max-joint-speed", type=float, default=0.5, help="rad/s on any joint, relative to the last target")
     ap.add_argument("--watchdog", type=float, default=0.5, help="hold (and report it) if no target arrives for this long (s)")
     ap.add_argument("--margin", type=float, default=0.05, help="rad kept clear of each joint limit")
+    ap.add_argument("--publish-hz", type=float, default=250.0,
+                    help="interpolate between client targets and publish at this rate (0 = pass targets straight through)")
+    ap.add_argument("--log", help="append every target and published point (JSON lines) to this file")
     a = ap.parse_args()
     arm = FakeArm() if a.fake else FrankapyArm()
-    serve(Bridge(arm, a.max_joint_speed, a.watchdog, a.margin, a.fake), a.host, a.port)
+    serve(Bridge(arm, a.max_joint_speed, a.watchdog, a.margin, a.fake, a.publish_hz, a.log), a.host, a.port)
 
 
 if __name__ == "__main__":
