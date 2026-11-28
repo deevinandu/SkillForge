@@ -49,8 +49,9 @@ against the paper's text before citing them.**
 - **Kinova Gen3 + Robotiq 2F-85** (opens 85 mm), at CMU's AI Maker Space; real-hardware work is
   for spring. **Open: 6-DoF or 7-DoF?** The project doc says 6-DoF (no redundant joint, so
   reachable wrist orientations differ, especially near the edge of reach).
-  `docs/tracks/dominoes/T1-sim.md` says 7. mujoco_menagerie's Gen3 is, as far as we know, the
-  7-DoF one, so a 6-DoF sim model would have to be built from Kinova's URDF. Check the real arm.
+  `docs/tracks/dominoes/T1-sim.md` says 7. **Settled 2026-11-28: the lab arm is 6-DoF.**
+  mujoco_menagerie's Gen3 is the 7-DoF one, so the sim model is built from Kinova's 6-DoF URDF
+  (`ros_kortex` `kortex_description/arms/gen3/6dof`).
 - **Fallback second type:** a Franka with one joint locked and tighter limits. A weak substitute;
   label it as such in every result.
 - One external camera with AprilTags is planned for the real robots.
@@ -108,9 +109,9 @@ Measured in sim on the Franka only. **Nothing in this project has run on a real 
 | --- | --- |
 | Mug hanging task, success check, seed skill | done (sim) |
 | One forge round on the mug | done: 82 -> 99/100 gate, 198/200 held-out |
-| Robot profiles; second arm in sim | missing (`MujocoEnv` hardcodes `PandaProfile`) |
+| Robot profiles; second arm in sim | profiles: branch `track/t1-robot-profiles`; second arm: missing. The lab Kinova is the **6-DoF** Gen3 (settled 2026-11-28); Kinova's 6-DoF URDF loads in MuJoCo |
 | Per-robot parameters for skills | missing (contract request in `HANDOVER.md`) |
-| Scoped library: scope labels, cross-robot check, sharing | missing |
+| Scoped library: scope labels, cross-robot check, sharing | built on ASPIRE's design (`docs/LESSONS.md`): lessons, blind verifier, three scope labels, retrieval per condition, grades; tested with fake improvers only, no real agent run yet |
 | Experiment runner for the four conditions | missing |
 | Negative transfer and scope-label error measurements | missing |
 | Naive mug seed skill | missing |

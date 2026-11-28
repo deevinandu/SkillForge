@@ -46,6 +46,8 @@ from pydantic import BaseModel, Field
 from skillforge.contracts import EvalReport, SimEnv, SkillImprover, SkillSource, TaskSpec
 
 from .budget import BudgetExceeded
+from .curate import record_round
+from .lessons import LessonStore, render
 from .library import (
     DEFAULT_ALPHA,
     GATE_RULES,
@@ -81,6 +83,9 @@ class RoundRecord(BaseModel):
     usd_total: float = 0.0
     outcomes: dict[int, bool] | None = None  # gate seed -> success; None if not evaluated this round
     paired: dict | None = None  # PairedComparison.as_dict() + vs_version, vs the best at the time
+    lessons_sha: str | None = None  # the promoted lesson library the improver was shown (None: no store)
+    lessons_shown: list[str] = Field(default_factory=list)  # their ids
+    lesson_proposed: str | None = None  # id of the lesson this round proposed
 
 
 class LoopResult(BaseModel):
@@ -114,14 +119,24 @@ def run_loop(
     meta: dict | None = None,
     gate: str = "paired",
     alpha: float = DEFAULT_ALPHA,
+    lessons: LessonStore | None = None,
+    robot: str | None = None,
+    lesson_policy: str = "scoped",
 ) -> LoopResult:
     """`rounds` counts evaluations, seed included. Every round uses the SAME seeds.
 
     `gate` is 'paired' (default) or 'ci' (legacy); `alpha` is the paired gate's significance level.
+
+    `lessons` (docs/LESSONS.md): before each proposal the improver is shown the promoted lessons
+    for `robot` (default `task.scene.robot.name`) under `lesson_policy` ('scoped', 'share_all',
+    'none'), through its optional `lessons_text` attribute. Afterwards its `lesson_report`
+    (LESSONS.json) is filed: grades of the lessons it saw, and, for an accepted round, a proposed
+    lesson. Proposals still need `curate.verify_lesson` and `curate.admit` to enter the library.
     """
     if gate not in GATE_RULES:
         raise ValueError(f"gate must be one of {GATE_RULES}, got {gate!r}")
     seeds = list(range(rollouts))
+    robot = robot or task.scene.robot.name
     started = datetime.now(timezone.utc).isoformat(timespec="seconds")
     used: set[str] = set()
     history: list[RoundRecord] = []
@@ -163,6 +178,9 @@ def run_loop(
                     "paired": h.paired,
                     "usage": h.usage,
                     "usd_total": h.usd_total,
+                    "lessons_sha": h.lessons_sha,
+                    "lessons_shown": h.lessons_shown,
+                    "lesson_proposed": h.lesson_proposed,
                 }
                 for h in history
             ],
@@ -212,6 +230,7 @@ def run_loop(
         if stopped == "target":
             break
         u0 = _usage(improver)
+        shown, sha = _show_lessons(improver, lessons, robot, lesson_policy)
         try:
             cand = improver.propose(task, current, cur_report)
         except BudgetExceeded as e:
@@ -221,13 +240,14 @@ def run_loop(
         except Exception as e:  # an improver failure costs a round, not the run
             rec = RoundRecord(
                 round=r, source=current, report=cur_report, accepted=False,
-                reason=f"improver error: {type(e).__name__}: {e}"[:2000],
+                reason=f"improver error: {type(e).__name__}: {e}"[:2000], lessons_sha=sha, lessons_shown=shown,
             )
             finish(rec, u0, store=False)
             continue
 
         if cand.code == current.code:
-            finish(RoundRecord(round=r, source=current, report=cur_report, accepted=False, reason="unchanged"), u0, store=False)
+            finish(RoundRecord(round=r, source=current, report=cur_report, accepted=False, reason="unchanged",
+                               lessons_sha=sha, lessons_shown=shown), u0, store=False)
             continue
 
         cand = cand.model_copy(update={"version": fresh(cand.version), "parent_version": current.version})
@@ -253,6 +273,7 @@ def run_loop(
             rec.reason = _paired_reject(cmp, best.source.version, alpha)
         else:
             rec.accepted, rec.reason = True, f"passes paired gate vs {best.source.version}: {cmp.short()} < {alpha:g}"
+        rec.lessons_sha, rec.lessons_shown = sha, shown
         if rec.accepted:
             if review is not None:
                 try:
@@ -265,6 +286,11 @@ def run_loop(
                     stopped = "budget"
                 except Exception as e:
                     rec.critic = f"critic failed, deferring to gate: {type(e).__name__}: {e}"[:2000]
+        if lessons is not None:
+            rec.lesson_proposed = _file_lessons(
+                lessons, improver, task=task, robot=robot, parent=current, cand=cand, rec=rec,
+                cmp=cmp, before=cur_report.success_rate, sha=sha,
+            )
         finish(rec, u0)
 
         if rec.accepted:
@@ -278,6 +304,32 @@ def run_loop(
 
     write(stopped)
     return LoopResult(task_id=task.id, rounds=history, best=best, stopped=stopped)
+
+
+def _show_lessons(improver: Any, store: LessonStore | None, robot: str, policy: str) -> tuple[list[str], str | None]:
+    if store is None:
+        return [], None
+    shown = store.for_robot(robot, policy)  # type: ignore[arg-type]
+    if hasattr(improver, "lessons_text"):
+        improver.lessons_text = render(shown, robot=robot)
+    if hasattr(improver, "lesson_report"):
+        improver.lesson_report = None  # never file last round's report again
+    return [les.id for les in shown], store.sha(shown)
+
+
+def _file_lessons(store: LessonStore, improver: Any, *, task, robot, parent, cand, rec, cmp, before, sha) -> str | None:
+    report = getattr(improver, "lesson_report", None)
+    if report is None:
+        return None
+    try:
+        les = record_round(
+            store, report, task=task, robot=robot, parent=parent, cand=cand, accepted=rec.accepted, cmp=cmp,
+            success_before=before, success_after=rec.report.success_rate, library_sha=sha or "",
+        )
+    except Exception as e:  # a bad report costs the lesson, not the run
+        _note([rec], f"lesson report not filed: {type(e).__name__}: {e}"[:500])
+        return None
+    return les.id if les else None
 
 
 def _paired_reject(cmp: PairedComparison, vs: str, alpha: float) -> str:

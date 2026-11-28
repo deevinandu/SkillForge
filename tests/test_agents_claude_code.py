@@ -146,3 +146,37 @@ def _report(task, seed):
     from skillforge.skills.pick_place_v01 import PickPlaceV01
 
     return evaluate(StubEnv, PickPlaceV01(), task, range(3))[0]
+
+
+def test_lessons_are_shown_and_the_lesson_report_is_read_back(stub_task, tmp_path):
+    report = {"consulted": [{"lesson": "L001-x", "verdict": "useful", "evidence": "seed 3"}],
+              "proposal": {"title": "tighter tolerance", "trigger": "drops short of the bin",
+                           "strategy": "arrive within 4 mm", "params": {"tol": 0.004}, "scope": "robot:stub"}}
+    seen: dict[str, str] = {}
+
+    def edit(code: str) -> str:
+        return _tighter(code)
+
+    class WithReport(Script):
+        def __call__(self, cmd, cwd: Path, timeout_s):
+            seen["prompt"] = cmd[cmd.index("-p") + 1]
+            seen["lessons"] = (cwd / "LESSONS.md").read_text() if (cwd / "LESSONS.md").exists() else ""
+            (cwd / "LESSONS.json").write_text("```json\n" + json.dumps(report) + "\n```")
+            return super().__call__(cmd, cwd, timeout_s)
+
+    imp = _imp(WithReport(edit), tmp_path)
+    imp.lessons_text = "# Lessons\n### L001-x: something\n"
+    imp.directive = "Apply lesson L001-x and nothing else."
+    seed = load_seed_skill("pick_place_v01")
+    cand = imp.propose(stub_task, seed, _report(stub_task, seed))
+    assert cand.code != seed.code
+    assert "L001-x" in seen["lessons"] and "LESSONS.md holds lessons" in seen["prompt"]
+    assert "Apply lesson L001-x and nothing else." in seen["prompt"] and "LESSONS.json" in seen["prompt"]
+    assert imp.lesson_report.consulted[0].verdict == "useful"
+    assert imp.lesson_report.proposal.params == {"tol": 0.004}
+
+
+def _report(task, skill):
+    from skillforge.agents.sandbox import evaluate_source
+
+    return evaluate_source(task, skill, "skillforge.sim:make_env", range(4)).report

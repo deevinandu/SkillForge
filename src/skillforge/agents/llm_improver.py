@@ -182,6 +182,11 @@ class ClaudeImprover:
         self.max_failure_cases = max_failure_cases
         self._ctx: dict[str, str] = {}
         self.notes: list[str] = []  # critic verdicts and past attempts, fed to the next planner
+        # scoped lessons (docs/LESSONS.md), set by run_loop / curate; shown to the planner. This improver
+        # writes no LESSONS.json (lesson_report stays None): proposals come from ClaudeCodeImprover.
+        self.lessons_text: str = ""
+        self.directive: str = ""
+        self.lesson_report = None
         self.transcript: list[dict] = []  # role, prompt, reply text: for debugging, not persisted
 
     # -- API ------------------------------------------------------------------
@@ -219,6 +224,9 @@ class ClaudeImprover:
 
     def plan(self, task: TaskSpec, current: SkillSource, report: EvalReport) -> str:
         history = "\n".join(f"- {n}" for n in self.notes[-6:]) or "(first round)"
+        lessons = f"\n{self.lessons_text}\n" if self.lessons_text else ""
+        if self.directive:
+            lessons += f"\n## Instruction\n{self.directive}\n"
         prompt = f"""ROLE: planner.
 Decide which failure to fix first in the skill below, and why. Prefer the failure mode that costs
 the most rollouts and that the code can plausibly fix; use the randomization values to find the
@@ -238,7 +246,7 @@ list of concrete code changes.
 
 ## Earlier rounds
 {history}
-"""
+{lessons}"""
         return _text(self._call("planner", task, [{"role": "user", "content": prompt}], self.aux_max_tokens, self.aux_effort))
 
     def code(self, task: TaskSpec, current: SkillSource, report: EvalReport, plan: str) -> SkillSource:
