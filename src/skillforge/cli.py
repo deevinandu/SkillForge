@@ -85,6 +85,7 @@ def _fmt_round(rec) -> str:
 
 def cmd_forge(args: argparse.Namespace) -> int:
     from skillforge.agents import MissingCredentials, SkillLibrary, run_loop
+    from skillforge.agents.lessons import LessonStore
 
     task = TaskSpec.model_validate(json.loads(Path(args.task).read_text()))
     seed = load_seed_skill(args.seed_skill)
@@ -113,6 +114,9 @@ def cmd_forge(args: argparse.Namespace) -> int:
         "gate": args.gate,
         "gate_alpha": args.gate_alpha,
         "per_call_budget_usd": args.per_call_budget_usd if args.improver == "claude-code" else None,
+        "lessons": args.lessons,
+        "lesson_policy": args.lesson_policy if args.lessons else None,
+        "robot": args.robot or task.scene.robot.name,
     }
     print(f"forge {task.id}: seed {seed.name}@{seed.version}, improver {args.improver}, -> {out}/history.json")
     result = run_loop(
@@ -130,6 +134,9 @@ def cmd_forge(args: argparse.Namespace) -> int:
         meta=meta,
         gate=args.gate,
         alpha=args.gate_alpha,
+        lessons=LessonStore(args.lessons) if args.lessons else None,
+        robot=args.robot,
+        lesson_policy=args.lesson_policy,
     )
     b = result.best
     print(f"stopped: {result.stopped}; best {b.source.version}: {b.report.summary()}")
@@ -140,6 +147,64 @@ def cmd_forge(args: argparse.Namespace) -> int:
             f"usage: {int(t['calls'])} calls, in {int(t['input_tokens'])} (+cache write {int(t['cache_creation_input_tokens'])}, "
             f"cache read {int(t['cache_read_input_tokens'])}), out {int(t['output_tokens'])}, est ${t['usd']:.4f}"
         )
+    return 0
+
+
+def _seed_range(s: str) -> list[int]:
+    a, _, b = s.partition("-")
+    return list(range(int(a), int(b or a) + 1))
+
+
+def cmd_lessons(args: argparse.Namespace) -> int:
+    from skillforge.agents import SkillLibrary
+    from skillforge.agents.curate import Target, admit, check_scope, verify_lesson
+    from skillforge.agents.lessons import LessonStore
+    from skillforge.agents.scope import label_confusion
+
+    store = LessonStore(args.dir)
+    if args.action == "list":
+        for les in store.all():
+            scope = les.scope.label() if les.scope else "-"
+            agent = les.agent_scope.label() if les.agent_scope else "-"
+            useful = sum(g.verdict == "useful" for g in les.grades)
+            print(f"{les.id:40s} {les.status:9s} scope {scope:22s} agent {agent:22s} "
+                  f"struct {les.structural_scope or '-':14s} checks {len(les.scope_checks)} "
+                  f"grades +{useful}/-{len(les.bad_grades())}  {les.source.robot}/{les.source.task_id}")
+        conf = label_confusion(store.all())
+        if conf:
+            print("scope-label confusion (agent vs checking):", conf)
+        return 0
+    if args.action == "show":
+        print(store.get(args.id).model_dump_json(indent=2))
+        return 0
+    if args.action == "admit":
+        les = admit(store, args.id, args.method)
+        print(f"{les.id}: {les.status}" + (f", scope {les.scope.label()}" if les.scope else ""))
+        return 0 if les.status == "promoted" else 1
+
+    def factory():
+        return make_improver(args.improver, args)
+
+    seeds = _seed_range(args.seeds)
+    les = store.get(args.id)
+    if args.action == "verify":
+        task = TaskSpec.model_validate(json.loads(Path(args.task).read_text()))
+        if task.id != les.source.task_id:
+            print(f"error: lesson came from {les.source.task_id}, task file is {task.id}", file=sys.stderr)
+            return 2
+        parent, _ = SkillLibrary(args.library).load(task.id, les.source.parent_version)
+        les = verify_lesson(store, les.id, task=task, parent=parent, make_env=args.env, improver_factory=factory,
+                            seeds=seeds, attempts=args.attempts, alpha=args.gate_alpha, timeout_s=args.timeout)
+        print(f"{les.id}: {les.status}")
+        return 0
+    targets = []
+    for t in args.target:
+        robot, task_file, skill_ref = t.split("=", 2)
+        targets.append(Target(robot, TaskSpec.model_validate(json.loads(Path(task_file).read_text())), load_seed_skill(skill_ref)))
+    les = check_scope(store, les.id, targets, make_env=args.env, improver_factory=factory, seeds=seeds,
+                      alpha=args.gate_alpha, timeout_s=args.timeout)
+    for c in les.scope_checks:
+        print(f"{c.robot}/{c.task_id}: {c.verdict} (+{c.cand_only}/-{c.best_only}, p_gain {c.p_gain:.3g}, p_loss {c.p_loss:.3g})")
     return 0
 
 
@@ -166,7 +231,43 @@ def build_parser() -> argparse.ArgumentParser:
     f.add_argument("--env", default="skillforge.sim:make_env", help="env factory as module:attr")
     f.add_argument("--library", default="runs/library")
     f.add_argument("--out", default="runs/forge")
+    f.add_argument("--lessons", default=None, help="scoped lesson library dir (docs/LESSONS.md); off when unset")
+    f.add_argument("--lesson-policy", choices=("scoped", "share_all", "none"), default="scoped",
+                   help="which promoted lessons the improver sees: general + this robot's, all, or none")
+    f.add_argument("--robot", default=None, help="robot name for lesson scope (default: the task's robot.name)")
     f.set_defaults(func=cmd_forge)
+
+    lp = sub.add_parser("lessons", help="curate the scoped lesson library: list, show, verify, check, admit")
+    lp.add_argument("--dir", default="runs/lessons", help="lesson library dir")
+    ls = lp.add_subparsers(dest="action", required=True)
+    ls.add_parser("list", help="every lesson with status, scope and grades")
+    sh = ls.add_parser("show", help="one lesson as JSON")
+    sh.add_argument("id")
+    for name, hlp in (("verify", "blind re-derivation by a fresh improver from the parent version"),
+                      ("check", "apply the lesson to other robots' skills, paired score on each")):
+        a = ls.add_parser(name, help=hlp)
+        a.add_argument("id")
+        a.add_argument("--improver", choices=("claude", "claude-code", "fake", "null"), default="claude-code")
+        a.add_argument("--model", default="claude-opus-5-5")
+        a.add_argument("--budget-usd", type=float, default=None)
+        a.add_argument("--per-call-budget-usd", type=float, default=5.0)
+        a.add_argument("--dev-seeds", type=int, default=30)
+        a.add_argument("--seeds", default="1000-1049", help="seed range a-b, never gate or held-out seeds")
+        a.add_argument("--env", default="skillforge.sim:make_env")
+        a.add_argument("--timeout", type=float, default=600.0)
+        a.add_argument("--gate-alpha", type=float, default=0.1)
+        a.add_argument("--out", default="runs/lessons_work/forge", help="claude-code workspaces go next to this")
+        if name == "verify":
+            a.add_argument("--task", required=True, help="the lesson's source TaskSpec JSON")
+            a.add_argument("--library", default="runs/library", help="skill library holding the parent version")
+            a.add_argument("--attempts", type=int, default=2)
+        else:
+            a.add_argument("--target", action="append", required=True, metavar="ROBOT=TASK.json=SKILL",
+                           help="another robot's task file and current skill (module or path.py[:Class]); repeatable")
+    ad = ls.add_parser("admit", help="decide the scope of a verified lesson and promote it")
+    ad.add_argument("id")
+    ad.add_argument("--method", choices=("checking", "structure", "agent"), default="checking")
+    lp.set_defaults(func=cmd_lessons)
     return p
 
 
