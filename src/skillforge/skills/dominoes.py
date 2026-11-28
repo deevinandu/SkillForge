@@ -522,6 +522,11 @@ class StandUp:
     min_clear_relaxed = 0.004
     turn_rate = 0.04  # radians per step (0.8 rad/s) while turning the domino upright
     turn_z = 0.30  # height of the point in front of the robot where the domino is turned upright
+    # With shelves: points on the hand's axis behind the TCP (hand body, flange, forearm) must stay
+    # this far inside the shelves. MuJoCo, 75 cm: hand and links 5-7 hit the shelf when a tilted
+    # hand pointed toward the middle, putting the wrist and forearm out over the shelf side.
+    arm_points = (0.10, 0.21, 0.32)
+    arm_shelf_clear = 0.09
 
     def __init__(self, task: TaskSpec, obj: str, spot: np.ndarray, lane_dir: np.ndarray, variant: int = 0):
         o = task.scene.object(obj)
@@ -532,6 +537,9 @@ class StandUp:
         self.max_width = float(task.scene.robot.max_gripper_width)
         self.base = np.asarray(task.scene.robot.base_pose.pos[:2], dtype=float)
         self.end_offset = min(self.end_offset, self.h - 0.009)  # pads (8.5 mm half-height) stay on the domino
+        tb = task.scene.table
+        self.y0 = float(task.scene.robot.base_pose.pos[1])
+        self.y_lim = tb.width / 2 - self.arm_shelf_clear if tb.shelves else None
         self.ctx = Context(obj=obj, monitor=HandHoldMonitor(dev_tol=0.03, dev_hard=0.05))
         self.runner = Runner(self._build(), self.ctx)
 
@@ -541,6 +549,13 @@ class StandUp:
 
     def act(self, obs: Observation) -> Action:
         return self.runner.act(obs)
+
+    def _arm_clear(self, R_h: np.ndarray, tcp: np.ndarray) -> bool:
+        """Hand body, flange and forearm (points back along the hand axis) inside the shelves."""
+        if self.y_lim is None:
+            return True
+        a = R_h[:, 2]
+        return all(abs(float(tcp[1] - a[1] * d) - self.y0) <= self.y_lim for d in self.arm_points)
 
     def _clear(self, R_h: np.ndarray, tcp_z: float) -> bool:
         """Palm box and wrist above the table for a hand at orientation R_h with its TCP at tcp_z."""
@@ -567,7 +582,8 @@ class StandUp:
                 for flip in (0.0, math.pi):
                     R0 = quat_to_mat(hand_quat(yaw + flip))
                     R_h = _axis_rot(R0[:, 1], sgn * t) @ R0  # tilt about the closing axis
-                    if self._clear(R_h, float(pt[2])) and self.upright_hand(R_h, R_d, pt, pos) is not None:
+                    if (self._clear(R_h, float(pt[2])) and self._arm_clear(R_h, pt)
+                            and self.upright_hand(R_h, R_d, pt, pos) is not None):
                         out.append((pt, R_h, sgn * t))
         return out
 
@@ -596,6 +612,8 @@ class StandUp:
                     continue  # hand level or pointing up: hard for the arm, wrist low
                 if not self._clear(R_hs, self.h + self.drop + tcp_rel[2]):
                     continue  # palm or wrist in the table
+                if not self._arm_clear(R_hs, np.array([self.spot[0], self.spot[1], 0.0]) + tcp_rel):
+                    continue  # wrist or forearm over a shelf
                 face = R_ds[:2, 0]  # the standing domino's face normal
                 turn = math.acos(float(np.clip((np.trace(R_h.T @ R_hs) - 1) / 2, -1, 1)))
                 score = -a[2] + 0.6 * float(a[:2] @ radial) + 0.3 * abs(float(face @ self.lane)) - 0.2 * turn
@@ -678,7 +696,8 @@ class StandUp:
         def turn_point(obs, c):
             # turn in front of the robot, high: the wrist has the most room there
             mid = 0.5 * (np.asarray(c.bb["rise_xy"]) + self.spot[:2])
-            return np.array([float(np.clip(mid[0], 0.40, 0.50)), 0.5 * float(mid[1]), self.turn_z])
+            # (on the robot's centre line, as far from both shelves as it gets)
+            return np.array([float(np.clip(mid[0], 0.40, 0.50)), self.y0, self.turn_z])
 
         def offset(obs, c):
             if c.obj in obs.objects and c.bb.get("offset_step") != c.steps:

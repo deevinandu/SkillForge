@@ -225,10 +225,18 @@ def test_standup_finds_a_clear_grasp_at_any_yaw(face):
     t = load("franka_build_domino_chain_scattered")
     o = t.scene.object("domino_1")
     su = StandUp(t, "domino_1", np.array([0.44, 0.0, 0.0]), np.array([1.0, 0.0, 0.0]))
+    from skillforge.skills.dominoes import Relay
+
     for side in (-1, 1):
         for deg in range(0, 360, 20):
             q = rest_quat(o, face, math.radians(deg))
-            g = su.plan_grasp(np.array([0.40, 0.21 * side, rest_height(o, face)]), q)
+            # out at 0.21 m, near the shelf, a tilted grasp may put the wrist over it: Relay's
+            # straight-down pinch (which ToppleChain falls back to) must still be there
+            far = np.array([0.40, 0.21 * side, rest_height(o, face)])
+            assert su.plan_grasp(far, q) is not None or Relay(t, "domino_1", far, 0.0).grasp(far, q) is not None
+            # nearer the middle (the stand-up grid's inner row) every yaw has one; on the bench at
+            # 0.15 m some do not, and ToppleChain.relay_plan turns the domino to one that does
+            g = su.plan_grasp(np.array([0.40, 0.09 * side, rest_height(o, face)]), q)
             assert g is not None, (face, side, deg)
             pt, R_h, t_ = g
             assert su._clear(R_h, float(pt[2])) and abs(t_) <= max(su.tilts)

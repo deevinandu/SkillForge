@@ -79,8 +79,8 @@ def _gl_unavailable_reason() -> str | None:
     return None
 
 TABLE_TOP_Z = 0.0
-SHELF_CLEAR = 0.11  # metres from a shelf's inner face that arm body origins keep (link radius ~0.06-0.08)
-SHELF_GAIN = 2.0  # null-space push per metre inside that band
+SHELF_CLEAR = 0.13  # metres from a shelf's inner face that arm body origins keep (link radius ~0.06-0.08)
+SHELF_GAIN = 3.0  # null-space push per metre inside that band
 SHELF_WATCH = ("link3", "link4", "link5", "link6", "link7", "hand")
 TABLE_THICKNESS = 0.04
 DROP_Z = TABLE_TOP_Z - 0.05  # an object below this has fallen off the table: episode terminated
