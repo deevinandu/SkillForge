@@ -75,9 +75,16 @@ def main() -> None:
 
             viewer = mujoco.viewer.launch_passive(env.model, env.data)
 
-        clock = {"t": time.time(), "i": 0}
+        clock = {"t": time.time(), "i": 0, "idle": 0}
+
+        class Idle(Exception):
+            pass
 
         def hook(e, i):
+            # ToppleChain idles once it has nothing left to try; the episode would run on to max_steps
+            clock["idle"] = clock["idle"] + 1 if getattr(skill, "phase", "") == "idle" else 0
+            if clock["idle"] > 100:
+                raise Idle
             if a.progress and i and i % a.progress == 0:
                 now = time.time()
                 rate = (i - clock["i"]) / max(now - clock["t"], 1e-9)
@@ -96,6 +103,12 @@ def main() -> None:
         except KeyboardInterrupt:
             print("viewer closed", flush=True)
             os._exit(0)  # skip interpreter teardown: the viewer's GL context hangs or segfaults there
+        except Idle:
+            print(f"\n{task.id} seed {a.seed}: the skill gave up (idle), stopped early. skill log:")
+            for line in skill.log:
+                print("  ", line)
+            sys.stdout.flush()
+            os._exit(0)
         finally:
             if viewer is not None:
                 time.sleep(1.0)  # not closed from here: that segfaults on some GL drivers

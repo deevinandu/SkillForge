@@ -755,6 +755,7 @@ class ToppleChain:
     # near the lane centre it works, so the grid hugs the lane)
     standup_xs = (0.40, 0.46, 0.52)
     standup_ys = (0.09, 0.13)
+    standup_ys_far = (0.17, 0.21)  # used only when no point of the near rows is clear
     standup_clear = 0.08  # metres from every other domino
     standup_off_spot = 0.07  # a grid point this close to any lane spot is not used
     rehome_step = 0.03  # rad per step when returning the joints to their start after a failed job
@@ -955,18 +956,20 @@ class ToppleChain:
             return np.array([own[0], own[1], 0.0])
         best, best_key = None, None
         spots = [self.spots[j][:2] for j in self.order]
-        for x in self.standup_xs:
-            for y0 in self.standup_ys:
-                for y in (y0, -y0):
-                    pt = np.array([x, y])
-                    if any(float(np.linalg.norm(pt - sp)) < self.standup_off_spot for sp in spots):
-                        continue
-                    if not clear(pt):
-                        continue
-                    away = min((float(np.linalg.norm(pt - q)) for q in lying), default=1.0)
-                    key = (-round(away / 0.05), float(np.linalg.norm(pt - pos[k][:2])))  # far from the lying, then near
-                    if best_key is None or key < best_key:
-                        best, best_key = np.array([x, y, 0.0]), key
+        for x, y0 in [(x, y) for x in self.standup_xs for y in self.standup_ys] + [
+                (x, y) for x in self.standup_xs for y in self.standup_ys_far]:
+            if best is not None and y0 in self.standup_ys_far:
+                break  # a near point was found
+            for y in (y0, -y0):
+                pt = np.array([x, y])
+                if any(float(np.linalg.norm(pt - sp)) < self.standup_off_spot for sp in spots):
+                    continue
+                if not clear(pt):
+                    continue
+                away = min((float(np.linalg.norm(pt - q)) for q in lying), default=1.0)
+                key = (-round(away / 0.05), float(np.linalg.norm(pt - pos[k][:2])))  # far from the lying, then near
+                if best_key is None or key < best_key:
+                    best, best_key = np.array([x, y, 0.0]), key
         return best
 
     def _standup(self, obs: Observation) -> Action:
