@@ -93,7 +93,12 @@ class DominoKinematicEnv(StubEnv):
         i = 3 - v - j
         out[:, i] = np.cross(out[:, (i + 1) % 3], out[:, (i + 2) % 3])
         pos = self._obj[k].copy()
-        pos[2] = size[v]
+        floor = 0.0  # or the top of a fixture (shelf board) under it, if it was let go above one
+        for f in self.task.scene.fixtures:
+            c, h = np.asarray(f.center), np.asarray(f.half_extents)
+            if bool(np.all(np.abs(pos[:2] - c[:2]) <= h[:2])) and c[2] + h[2] <= pos[2] + 0.01:
+                floor = max(floor, float(c[2] + h[2]))
+        pos[2] = floor + size[v]
         return pos, mat_to_quat(out)
 
     def _fall(self, k: str, heading: float) -> None:

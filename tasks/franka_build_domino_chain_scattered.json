@@ -11,9 +11,124 @@
       "fingertips": "foam"
     },
     "table": {
-      "width": 0.75,
-      "shelves": true
+      "width": 0.55,
+      "depth": 0.9,
+      "back": 0.0
     },
+    "fixtures": [
+      {
+        "name": "shelf_1",
+        "center": [
+          0.45,
+          -0.24250000000000002,
+          0.0675
+        ],
+        "half_extents": [
+          0.45,
+          0.0325,
+          0.0075
+        ],
+        "ledge": false
+      },
+      {
+        "name": "shelf_2",
+        "center": [
+          0.45,
+          -0.24250000000000002,
+          0.1625
+        ],
+        "half_extents": [
+          0.45,
+          0.0325,
+          0.0075
+        ],
+        "ledge": false
+      },
+      {
+        "name": "shelf_3",
+        "center": [
+          0.45,
+          -0.24250000000000002,
+          0.2575
+        ],
+        "half_extents": [
+          0.45,
+          0.0325,
+          0.0075
+        ],
+        "ledge": true
+      },
+      {
+        "name": "shelf_back",
+        "center": [
+          0.45,
+          -0.28500000000000003,
+          0.2
+        ],
+        "half_extents": [
+          0.45,
+          0.01,
+          0.2
+        ]
+      },
+      {
+        "name": "frame_post_back",
+        "center": [
+          0.03,
+          0.29500000000000004,
+          0.5
+        ],
+        "half_extents": [
+          0.02,
+          0.02,
+          0.5
+        ],
+        "rgba": [
+          0.1,
+          0.18,
+          0.22,
+          1
+        ]
+      },
+      {
+        "name": "frame_post_front",
+        "center": [
+          0.87,
+          0.29500000000000004,
+          0.5
+        ],
+        "half_extents": [
+          0.02,
+          0.02,
+          0.5
+        ],
+        "rgba": [
+          0.1,
+          0.18,
+          0.22,
+          1
+        ]
+      },
+      {
+        "name": "frame_beam",
+        "center": [
+          0.45,
+          0.29500000000000004,
+          1.0
+        ],
+        "half_extents": [
+          0.45,
+          0.02,
+          0.02
+        ],
+        "rgba": [
+          0.1,
+          0.18,
+          0.22,
+          1
+        ]
+      }
+    ],
     "objects": [
       {
         "name": "domino_1",
@@ -191,12 +306,12 @@
         "name": "side_r",
         "center": [
           0.41,
-          -0.19,
+          -0.12,
           0.03
         ],
         "half_extents": [
           0.06,
-          0.04,
+          0.035,
           0.04
         ],
         "visible": false
@@ -205,7 +320,7 @@
         "name": "side_l",
         "center": [
           0.41,
-          0.19,
+          0.17,
           0.03
         ],
         "half_extents": [

@@ -237,6 +237,9 @@ class MujocoEnv:
             name="table", type=mujoco.mjtGeom.mjGEOM_BOX, size=[tb.depth / 2, tb.width / 2, TABLE_THICKNESS / 2],
             pos=[tx, by, TABLE_TOP_Z - TABLE_THICKNESS / 2], rgba=[0.62, 0.5, 0.38, 1],
         )
+        for fx in sc.fixtures:
+            wb.add_geom(name=fx.name, type=mujoco.mjtGeom.mjGEOM_BOX, size=list(fx.half_extents),
+                        pos=list(fx.center), rgba=list(fx.rgba))
         if tb.shelves:  # side panels of the shelf units on both sides of the table
             for side, sgn in (("shelf_l", 1.0), ("shelf_r", -1.0)):
                 wb.add_geom(
@@ -313,10 +316,13 @@ class MujocoEnv:
         }
         self._table_geom = m.geom("table").id
         self._shelf_geoms = {m.geom(n).id: n for n in ("shelf_l", "shelf_r") if self.task.scene.table.shelves}
+        self._shelf_geoms.update({m.geom(f.name).id: f.name for f in self.task.scene.fixtures})
         # With shelves the IK keeps the arm away from them in its null space (the elbow swivel):
         # arm bodies whose origin comes within SHELF_CLEAR of a shelf's inner face are pushed back.
         tb = self.task.scene.table
         self._shelf_y = (self.task.scene.robot.base_pose.pos[1], tb.width / 2) if tb.shelves else None
+        self._fx_boxes = [(np.asarray(f.center, dtype=float), np.asarray(f.half_extents, dtype=float))
+                          for f in self.task.scene.fixtures]
         self._shelf_bodies = [b for b in self._robot_bodies if self._body_name(b) in SHELF_WATCH]
         self._jacb = np.zeros((3, m.nv))
         self._obj_body = {name: b for b, name in self._obj_bodies.items()}
@@ -591,6 +597,16 @@ class MujocoEnv:
             # null-space pull toward home posture, first iteration only: the damped projector leaks
             # a little into the task space, which later iterations then clean up
             v = 0.1 * (self._home - q) if it == 0 else np.zeros_like(q)
+            if it == 0 and self._fx_boxes:
+                for b in self._shelf_bodies:
+                    p = s.xpos[b]
+                    for c, h in self._fx_boxes:
+                        d = p - np.clip(p, c - h, c + h)  # from the box's closest point to the body
+                        n = math.sqrt(d @ d)
+                        if n < SHELF_CLEAR:
+                            u = d / n if n > 1e-6 else np.array([0.0, 0.0, 1.0])
+                            mujoco.mj_jacBody(m, s, self._jacb, None, b)
+                            v += SHELF_GAIN * (SHELF_CLEAR - n) * (u @ self._jacb[:, dofs])
             if it == 0 and self._shelf_y is not None:
                 y0, hw = self._shelf_y
                 for b in self._shelf_bodies:

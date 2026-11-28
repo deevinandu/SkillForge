@@ -227,17 +227,17 @@ def test_standup_finds_a_clear_grasp_at_any_yaw(face):
     su = StandUp(t, "domino_1", np.array([0.44, 0.0, 0.0]), np.array([1.0, 0.0, 0.0]))
     from skillforge.skills.dominoes import Relay
 
-    for side in (-1, 1):
+    # the cell: shelf boards on -y (inner face -0.21), open on +y. On the open side every yaw has
+    # a tilted grasp; elsewhere some yaws would lean the forearm over the shelves, and Relay's
+    # straight-down pinch (ToppleChain's fallback, which also turns the domino) must have one
+    for y_near in (0.06, 0.09, 0.12):
         for deg in range(0, 360, 20):
             q = rest_quat(o, face, math.radians(deg))
-            # out at 0.21 m, near the shelf, a tilted grasp may put the wrist over it: Relay's
-            # straight-down pinch (which ToppleChain falls back to) must still be there
-            far = np.array([0.40, 0.21 * side, rest_height(o, face)])
-            assert su.plan_grasp(far, q) is not None or Relay(t, "domino_1", far, 0.0).grasp(far, q) is not None
-            # nearer the middle (the stand-up grid's inner row) every yaw has one; on the bench at
-            # 0.15 m some do not, and ToppleChain.relay_plan turns the domino to one that does
-            g = su.plan_grasp(np.array([0.40, 0.09 * side, rest_height(o, face)]), q)
-            assert g is not None, (face, side, deg)
+            for y_far in (-0.12, -0.06, 0.0, 0.20):
+                far = np.array([0.40, y_far, rest_height(o, face)])
+                assert su.plan_grasp(far, q) is not None or Relay(t, "domino_1", far, 0.0).grasp(far, q) is not None
+            g = su.plan_grasp(np.array([0.40, y_near, rest_height(o, face)]), q)
+            assert g is not None, (face, y_near, deg)
             pt, R_h, t_ = g
             assert su._clear(R_h, float(pt[2])) and abs(t_) <= max(su.tilts)
 
@@ -261,7 +261,7 @@ def test_retopples_a_knocked_down_chain():
         ep, sk = run(t, seed)
         if ep.success:
             assert sum(e.startswith("restood:") for e in ep.events) == 5
-            assert sum(":standup:" in e for e in sk.log) >= 5
+            assert sum(":standup:" in e or ":ledge:" in e for e in sk.log) >= 5
             assert any(":relay:" in e and "resting on something" in e for e in sk.log)
         wins.append(ep.success)
     assert sum(wins) >= 5, wins
@@ -283,7 +283,7 @@ def test_rebuilds_fallen_dominoes(seed):
     sk.stand_up = True
     ep = run_episode(env, sk, t, seed)
     assert ep.success, (ep.failure_detail, sk.log)
-    stood = {e.split(":")[2].split("#")[0] for e in sk.log if ":standup:" in e}
+    stood = {e.split(":")[2].split("#")[0].split(" ")[0] for e in sk.log if ":standup:" in e or ":ledge:" in e}
     assert stood == set(sk.order)  # every domino started lying
 
 
@@ -329,7 +329,7 @@ def test_stand_up_path_when_switched_on(name):
         sk.stand_up = True
         ep = run_episode(env, sk, t, seed)
         assert ep.success, (seed, ep.failure_detail, sk.log)
-        stood += sum(":standup:" in e for e in sk.log)
+        stood += sum(":standup:" in e or ":ledge:" in e for e in sk.log)
     assert stood > 0
 
 
@@ -353,19 +353,51 @@ def test_stand_turn_tries_the_next_pose_when_stuck():
 # ---------------------------------------------------------------- judging what is feasible (v0.3)
 
 
-def test_hand_stays_between_the_shelves():
+def test_work_points_stay_on_the_table_and_off_the_shelves():
+    """The cell (Sumedha, 2026-11-27): table 55 x 90 cm; on one side three shelf boards reaching
+    6.5 cm over the table (lowest 6 cm up, 8 cm gaps); on the other a frame of posts."""
     t = load("franka_retopple_domino_chain")
-    assert t.scene.table.shelves and t.scene.table.width == 0.75
+    assert t.scene.table.width == 0.55 and any(f.ledge for f in t.scene.fixtures)
     sk = ToppleChain()
     sk.reset(t)
-    assert sk.y_max + 0.105 < 0.375
+    shelf_face = max(f.center[1] + f.half_extents[1] for f in t.scene.fixtures if f.name.startswith("shelf_"))
+    assert sk.y_lo >= shelf_face + 0.09 and sk.y_hi <= 0.275 - 0.04
     pos = {k: np.array([0.45 + 0.03 * i, 0.0, 0.008]) for i, k in enumerate(sk.order)}
     quat = {k: np.array([math.cos(math.pi / 4), 0.0, math.sin(math.pi / 4), 0.0]) for k in sk.order}  # flat
     for k in sk.order:
         spot = sk.standup_spot(k, pos, list(sk.order))
-        assert spot is not None and abs(spot[1]) <= sk.y_max
+        assert spot is not None and sk.y_lo <= spot[1] <= sk.y_hi
         plan = sk.relay_plan(k, pos, quat)
-        assert plan is not None and abs(plan[0][1]) <= sk.y_max
+        assert plan is not None and sk.y_lo <= plan[0][1] <= sk.y_hi
+
+
+def test_ledge_stand_up_is_tried_first_and_works_in_the_kinematic_world():
+    t = load("franka_rebuild_fallen_dominoes")
+    for seed in range(3):
+        ep, sk = run(t, seed)
+        assert ep.success, (seed, ep.failure_detail, sk.log)
+        assert any(":ledge:" in e for e in sk.log)
+
+
+def test_ledge_geometry():
+    from skillforge.skills.dominoes import LedgeStandUp
+
+    t = load("franka_rebuild_fallen_dominoes")
+    ledge = next(f for f in t.scene.fixtures if f.ledge)
+    flat = np.array([math.cos(math.pi / 4), 0.0, math.sin(math.pi / 4), 0.0])  # long axis along +x
+    job = LedgeStandUp(t, "domino_1", ledge, np.array([0.40, 0.09, 0.0]), np.array([1.0, 0.0, 0.0]), flat)
+    edge = ledge.center[1] + ledge.half_extents[1]
+    assert job.sgn == 1.0 and math.isclose(job.edge_y, edge)
+    # centre of mass stays on the board, the +z end overhangs by `overhang`
+    assert job.place_xy[1] < edge and math.isclose(job.place_xy[1] + job.h - edge, job.overhang, abs_tol=1e-9)
+    assert math.isclose(abs(job.turn), math.pi / 2, abs_tol=1e-6)  # +x -> +y
+    from skillforge.skills.grasp import quat_to_mat
+
+    R = quat_to_mat(job.level_quat())
+    assert np.allclose(R[:, 2], [0, -1, 0]) and np.allclose(R[:, 1], [0, 0, 1])  # into the board, closing vertically
+    for q in job.down_quats():
+        R = quat_to_mat(q)
+        assert np.allclose(R[:, 2], [0, 0, -1], atol=1e-9) and abs(R[0, 1]) > 0.999  # down, closing along the lane
 
 
 def _lying_at(t: TaskSpec, name: str, xy) -> TaskSpec:
@@ -380,7 +412,7 @@ def _lying_at(t: TaskSpec, name: str, xy) -> TaskSpec:
 
 
 def test_gives_up_on_a_domino_out_of_reach_and_still_topples_the_rest():
-    t = _lying_at(load("franka_topple_domino_chain"), "domino_3", (0.80, 0.0))
+    t = _lying_at(load("franka_topple_domino_chain"), "domino_3", (0.75, 0.0))
     t = t.model_copy(update={"max_steps": 4000})
     ep, sk = run(t, 0)
     assert any("giving up on domino_3: out of reach" in e for e in sk.log), sk.log
@@ -410,6 +442,7 @@ def test_a_failed_stand_up_sets_the_domino_down_instead_of_dropping_it(monkeypat
     # No upright pose once in the air: every stand-up fails there, holding the domino.
     t = load("franka_rebuild_fallen_dominoes").model_copy(update={"max_steps": 3000})
     env, sk = DominoKinematicEnv(t), ToppleChain()
+    sk.use_ledge = False  # this is about StandUp
     sk.reset(t)
     orig = StandUp.upright_hands
 

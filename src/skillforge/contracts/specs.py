@@ -195,9 +195,22 @@ class TableSpec(Spec):
     shelf_thickness: float = Field(0.02, gt=0.0)
 
 
+class Fixture(Spec):
+    """A static box in the cell the robot can collide with (shelf boards, frame posts, a camera
+    mount): world-frame centre and half extents, axis-aligned. `ledge`: a shelf board whose edge
+    skills may use (e.g. to lay a domino on with one end overhanging, so it can be pinched there)."""
+
+    name: str
+    center: Vec3
+    half_extents: Vec3
+    ledge: bool = False
+    rgba: tuple[float, float, float, float] = (0.92, 0.92, 0.9, 1.0)
+
+
 class SceneSpec(Spec):
     robot: RobotSpec
     table: TableSpec = TableSpec()
+    fixtures: tuple[Fixture, ...] = ()
     objects: tuple[ObjectSpec, ...] = ()
     regions: tuple[Region, ...] = ()
     randomization: RandomizationSpec = RandomizationSpec()
@@ -210,7 +223,7 @@ class SceneSpec(Spec):
 
     @model_validator(mode="after")
     def _unique_names(self) -> SceneSpec:
-        names = [o.name for o in self.objects] + [r.name for r in self.regions]
+        names = [o.name for o in self.objects] + [r.name for r in self.regions] + [f.name for f in self.fixtures]
         dupes = {n for n in names if names.count(n) > 1}
         if dupes:
             raise ValueError(f"duplicate object/region names: {sorted(dupes)}")
@@ -231,6 +244,12 @@ class SceneSpec(Spec):
             out = [r.name for r in self.regions if abs(r.center[1] - y0) + r.half_extents[1] > hw]
             if out:
                 raise ValueError(f"regions reach past the shelves (table width {self.table.width} m): {out}")
+        for r in self.regions:  # nothing is to be put where a low fixture would be over it
+            for f in self.fixtures:
+                if f.center[2] - f.half_extents[2] > 0.15:
+                    continue
+                if all(abs(r.center[i] - f.center[i]) < r.half_extents[i] + f.half_extents[i] for i in (0, 1)):
+                    raise ValueError(f"region '{r.name}' lies under fixture '{f.name}'")
         if self.scatter is not None:
             sc = self.scatter
             bad = [n for n in sc.objects if n not in movable]
