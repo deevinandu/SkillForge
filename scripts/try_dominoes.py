@@ -46,6 +46,8 @@ def main() -> None:
     ap.add_argument("--speed", type=float, default=1.0, help="viewer playback speed")
     ap.add_argument("--gif", default=None)
     ap.add_argument("--no-disturb", action="store_true")
+    ap.add_argument("--progress", type=int, default=100,
+                    help="print step, sim speed and the skill's phase every N steps (0: off)")
     ap.add_argument("--stand-up", action="store_true", help="let ToppleChain stand fallen dominoes up (off by default)")
     a = ap.parse_args()
     task = load(a.task, not a.no_disturb)
@@ -73,7 +75,16 @@ def main() -> None:
 
             viewer = mujoco.viewer.launch_passive(env.model, env.data)
 
+        clock = {"t": time.time(), "i": 0}
+
         def hook(e, i):
+            if a.progress and i and i % a.progress == 0:
+                now = time.time()
+                rate = (i - clock["i"]) / max(now - clock["t"], 1e-9)
+                clock.update(t=now, i=i)
+                last = skill.log[-1] if getattr(skill, "log", None) else ""
+                print(f"  step {i:5d}  {rate:6.1f} steps/s  phase={getattr(skill, 'phase', '?')}  last: {last}",
+                      flush=True)
             if viewer is not None:
                 if not viewer.is_running():
                     raise KeyboardInterrupt
@@ -83,8 +94,8 @@ def main() -> None:
         try:
             ep = run_episode(env, skill, task, a.seed, on_step=hook)
         except KeyboardInterrupt:
-            print("viewer closed")
-            return
+            print("viewer closed", flush=True)
+            os._exit(0)  # skip interpreter teardown: the viewer's GL context hangs or segfaults there
         finally:
             if viewer is not None:
                 time.sleep(1.0)  # not closed from here: that segfaults on some GL drivers
