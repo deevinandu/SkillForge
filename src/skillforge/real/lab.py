@@ -183,12 +183,13 @@ def _caption(img: np.ndarray, lines: list[str], ok: bool) -> np.ndarray:
 def make_lab_env(task: TaskSpec, *, extrinsics: str | Path, port: int = 8765, speed: float = 0.1,
                  serial: str | None = None, picture: str | Path | None = "runs/real/placement.png",
                  free_placement: bool = False, predict=None, layout_dir: str | Path | None = None,
-                 background: bool = True, perception: str = "once", robot=None, frames=None, estimator=None,
+                 background: bool = True, perception: str = "table", robot=None, frames=None, estimator=None,
                  operator=None) -> RealEnv:
     """The lab cell as a `RealEnv`. `speed`: tool speed limit (m/s); 0.1 until 10 clean trials (T7 brief).
 
-    perception: "once" (measure at the start of each trial, then bookkeeping; default), "background"
-    (live, in a thread), or "inline" (live, in the control step).
+    perception: "table" (default: bookkeeping for precision, camera re-measurements whenever the view
+    is clear to catch dropped or knocked cans; see TablePerception), "once" (start of trial only),
+    "background" (live, in a thread), or "inline" (live, in the control step).
     background: for perception="background" (a MuJoCo-rendered camera can only render in its own
     thread, so tests with one pass False).
     free_placement: objects go anywhere in the start area (`FreePlacementOperator`); `predict`
@@ -222,10 +223,12 @@ def make_lab_env(task: TaskSpec, *, extrinsics: str | Path, port: int = 8765, sp
     # real/background.py MeasureOnce: live estimates made the skill let go mid-lift on the arm, and
     # mid-carry on the twin; measure-once built the full pyramid on the twin for all three real
     # trial layouts). "background": live estimates in a thread (half-size frames). "inline": in the step.
-    from .background import BackgroundEstimator, MeasureOnce
+    from .background import BackgroundEstimator, MeasureOnce, TablePerception
 
     if getattr(estimator, "needs_frames", False):
-        if perception == "once":
+        if perception == "table":
+            estimator = TablePerception(estimator, frames, CAMERA)
+        elif perception == "once":
             estimator = MeasureOnce(estimator, frames, CAMERA)
         elif perception == "background" and background:
             estimator = BackgroundEstimator(estimator, frames, CAMERA, decimate=2)

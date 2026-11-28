@@ -145,3 +145,54 @@ def test_the_first_can_is_placed_on_its_spot_with_measure_once_perception():
     finally:
         env.close()
         cam.src.close()
+
+
+def test_a_can_dropped_mid_carry_is_found_and_placed():
+    """The point of watching the table: the can slips mid-carry and lands elsewhere; the perception
+    notices (fingers collapse), finds it on the next clear view, and the skill re-grasps it there."""
+    import mujoco
+
+    from skillforge.real import MujocoController, MujocoTwin, RealEnv, SafetyLimits, Workspace
+    from skillforge.real.background import TablePerception
+    from skillforge.real.cans import IdenticalCylinderEstimator
+    from skillforge.skills import PlaceInOrder
+
+    task = TaskSpec.model_validate(json.loads(TASK.read_text()))
+    if make_env(task).render() is None:
+        pytest.skip("no GL context")
+    limits = SafetyLimits(ee_speed=0.1)
+    twin = MujocoTwin(task)
+    ctl = MujocoController(task, max_ee_speed=0.1, max_ee_ang_speed=limits.ee_ang_speed)
+    cam = SimCamera(twin.env)
+    k = [0]
+    per = TablePerception(IdenticalCylinderEstimator(), cam, CAMERA, sync=True, clock=lambda: k[0] * 0.05)
+    env = RealEnv(task, twin, None, per, controller=ctl, operator=twin, limits=limits,
+                  workspace=Workspace.from_task(task, include=[ctl.fk(ctl.home)[0]]), cameras=(CAMERA,),
+                  report_contact_force=False)
+    skill = PlaceInOrder()
+    events, dropped = [], False
+    try:
+        obs = env.reset(0)
+        skill.reset(task)
+        for k[0] in range(700):
+            obs, info = env.step(skill.act(obs))
+            events += info.events + per.events
+            per.events.clear()
+            carrying = "grasp:cyl_1" in events and "release:cyl_1" not in events
+            if not dropped and carrying and obs.ee_pos[2] > 0.15:
+                m, d = twin.env.model, twin.env.data
+                j = m.joint("cyl_1_free")
+                d.qpos[j.qposadr[0]:j.qposadr[0] + 7] = [0.50, -0.29, 0.0419, 1, 0, 0, 0]  # a free spot
+                d.qvel[j.dofadr[0]:j.dofadr[0] + 6] = 0
+                mujoco.mj_forward(m, d)
+                dropped = True
+            if "release:cyl_1" in events:
+                break
+        m, d = twin.env.model, twin.env.data
+        spot = np.array(task.scene.region("spot_cyl_1").center)
+        assert dropped and "perception:slip:cyl_1" in events and "perception:moved:cyl_1" in events
+        assert events.count("grasp:cyl_1") == 2  # grasped again, where it landed
+        assert np.linalg.norm(d.xpos[m.body("cyl_1").id][:2] - spot[:2]) < 0.01
+    finally:
+        env.close()
+        cam.src.close()

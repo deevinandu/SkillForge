@@ -161,3 +161,102 @@ def test_measure_once_carries_the_held_can_and_leaves_it_where_released():
     out = m.estimate([], obs_w([0.50, 0.0, 0.056], 0.001))  # closed on nothing over can b
     out = m.estimate([], obs_w([0.50, 0.0, 0.30], 0.001))
     assert np.allclose(out["b"].pos, [0.50, 0.0, 0.042])  # not picked up by an empty grip
+
+
+# ---------------------------------------------------------------- TablePerception
+
+class ScriptedCans:
+    """detect() returns whatever `scene` holds: a list of (x, y, z, layer)."""
+
+    needs_frames = True
+    radius, half_height = 0.0254, 0.0419
+
+    def __init__(self, scene):
+        self.scene = scene
+        self.last_detections = []
+
+    def reset(self, task):
+        pass
+
+    def detect(self, frames):
+        from skillforge.real.cans import Detection
+
+        self.last_detections = [Detection(np.array([x, y]), z, layer, 100.0, 500, 0.8) for x, y, z, layer in self.scene]
+        return self.last_detections
+
+    def estimate(self, frames, obs=None):
+        self.detect(frames)
+        names = ["a", "b"]
+        return {n: Estimate(np.array(d[:3]), yaw_quat(0.0), True, confidence=0.8) for n, d in zip(names, self.scene, strict=False)}
+
+
+def table(scene):
+    from skillforge.real.background import TablePerception
+
+    tick = iter(range(10**6))  # each call is a second later: every clear view measures
+    t = TablePerception(ScriptedCans(scene), Frames(), "fixed", sync=True, period=0.5, clock=lambda: float(next(tick)))
+    t.reset(None)
+    return t
+
+
+HIGH_OPEN = ([0.45, 0.0, 0.35], 0.075)  # the view is clear: fingers open, hand high
+
+
+def test_a_slipped_can_is_found_where_it_landed():
+    scene = [(0.40, 0.0, 0.042, 0), (0.50, 0.0, 0.042, 0)]
+    t = table(scene)
+    t.estimate([], obs_w([0.40, 0.0, 0.30], 0.075))
+    t.estimate([], obs_w([0.40, 0.0, 0.056], 0.049))  # holding a
+    t.estimate([], obs_w([0.40, 0.0, 0.20], 0.049))  # lifted
+    scene[0] = (0.30, -0.20, 0.042, 0)  # it slips out and lands here
+    t.estimate([], obs_w([0.40, 0.0, 0.20], 0.001))  # fingers collapse
+    assert "perception:slip:a" in t.events
+    out = t.estimate([], obs_w(*HIGH_OPEN))  # first clear view
+    assert np.allclose(out["a"].pos, [0.30, -0.20, 0.042]) and "perception:moved:a" in t.events
+
+
+def test_a_hidden_can_keeps_its_record_and_a_ghost_does_not_take_it():
+    scene = [(0.40, 0.0, 0.042, 0), (0.50, 0.0, 0.042, 0)]
+    t = table(scene)
+    t.estimate([], obs_w(*HIGH_OPEN))
+    scene[:] = [(0.50, 0.0, 0.042, 0), (0.42, 0.04, 0.042, 0)]  # a hidden; something 4.5 cm off, once
+    out = t.estimate([], obs_w(*HIGH_OPEN))
+    assert np.allclose(out["a"].pos, [0.40, 0.0, 0.042])  # one sighting is not enough
+    scene[:] = [(0.50, 0.0, 0.042, 0), (0.40, 0.0, 0.042, 0)]  # back in view
+    out = t.estimate([], obs_w(*HIGH_OPEN))
+    assert np.allclose(out["a"].pos, [0.40, 0.0, 0.042])
+
+
+def test_a_knocked_can_moves_after_two_consistent_measurements():
+    scene = [(0.40, 0.0, 0.042, 0), (0.50, 0.0, 0.042, 0)]
+    t = table(scene)
+    t.estimate([], obs_w(*HIGH_OPEN))
+    scene[0] = (0.40, -0.12, 0.042, 0)  # knocked 12 cm
+    out = t.estimate([], obs_w(*HIGH_OPEN))
+    assert np.allclose(out["a"].pos, [0.40, 0.0, 0.042])
+    out = t.estimate([], obs_w(*HIGH_OPEN))
+    assert np.allclose(out["a"].pos, [0.40, -0.12, 0.042]) and "perception:moved:a" in t.events
+
+
+def test_floating_detections_are_not_cans():
+    scene = [(0.40, 0.0, 0.042, 0), (0.50, 0.0, 0.042, 0)]
+    t = table(scene)
+    t.estimate([], obs_w(*HIGH_OPEN))
+    scene[0] = (0.40, -0.12, 0.042, 0)  # a moves away for real ...
+    scene.append((0.42, 0.30, 0.21, 2))  # ... and the arm makes a 'can' at 21 cm with nothing under it
+    t.estimate([], obs_w(*HIGH_OPEN))
+    out = t.estimate([], obs_w(*HIGH_OPEN))
+    assert np.allclose(out["a"].pos, [0.40, -0.12, 0.042])  # the real one, never the floating one
+    assert all(p[2] < 0.1 for p in (e.pos for e in out.values()))
+
+
+def test_a_measurement_from_before_a_grasp_is_not_applied():
+    from skillforge.real.background import TablePerception
+
+    t = TablePerception(ScriptedCans([(0.40, 0.0, 0.042, 0), (0.50, 0.0, 0.042, 0)]), Frames(), "fixed")
+    t.reset(None)
+    t.estimate([], obs_w(*HIGH_OPEN))
+    t._pending = (t.version, [np.array([0.30, -0.3, 0.042]), np.array([0.5, 0.0, 0.042])])  # captured ...
+    t.version += 1  # ... then a grasp or release happened
+    t.estimate([], obs_w([0.45, 0.0, 0.10], 0.075))  # (view not clear: no new measurement)
+    assert np.allclose(t.pos["a"], [0.40, 0.0, 0.042])
