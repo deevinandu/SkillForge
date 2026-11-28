@@ -704,9 +704,13 @@ class ToppleChain:
     stand_up = False
     # where a fallen domino is stood up before it is carried to its spot: a grid on both sides of
     # the lane, close to the robot (picks from far out slipped in MuJoCo)
-    standup_xs = (0.34, 0.40, 0.46)
-    standup_ys = (0.16, 0.22, 0.28)
-    standup_clear = 0.11  # metres from every other domino
+    # (MuJoCo: standing up at (0.40, 0.22) or (0.34, -0.16) failed while carrying or lowering;
+    # near the lane centre it works, so the grid hugs the lane)
+    standup_xs = (0.40, 0.46, 0.52)
+    standup_ys = (0.09, 0.13)
+    standup_clear = 0.08  # metres from every other domino
+    standup_off_spot = 0.07  # a grid point this close to any lane spot is not used
+    rehome_step = 0.03  # rad per step when returning the joints to their start after a failed job
     abort_xy = 0.008  # metres a smoothed domino position may drift from the survey before a push is called off
     abort_yaw = 0.08  # radians
     abort_alpha = 0.3
@@ -724,6 +728,7 @@ class ToppleChain:
         self.yaw = wrap_half_pi(math.atan2(self.d[1], self.d[0]))  # a domino's face normal along the lane
         self.task = task
         self.lane = {c.object: c.region for c in conds}
+        self.home_q: np.ndarray | None = None  # joint posture at the first step
         self.spots: dict[str, np.ndarray] = {}
         for c in conds:
             o = task.scene.object(c.object)
@@ -756,6 +761,8 @@ class ToppleChain:
     # -- dispatch --------------------------------------------------------------
 
     def act(self, obs: Observation) -> Action:
+        if self.home_q is None:
+            self.home_q = np.asarray(obs.qpos, dtype=float).copy()
         self.steps += 1
         self.n_phase += 1
         return getattr(self, f"_{self.phase}")(obs)
@@ -868,9 +875,8 @@ class ToppleChain:
 
     def standup_spot(self, k: str, pos: dict[str, np.ndarray]) -> np.ndarray | None:
         """Where to stand domino `k` up: its own spot in the lane if that is clear, else the clear
-        grid point nearest to it outside the lane. Clear: `standup_clear` from every other domino,
+        grid point nearest to it beside the lane (not within `standup_off_spot` of a lane spot). Clear: `standup_clear` from every other domino,
         and room behind it (toward the robot) for the hand."""
-        lane = [self.task.scene.region(r) for r in set(self.lane.values()) if r]
         base = np.asarray(self.task.scene.robot.base_pose.pos[:2], dtype=float)
         others = [pos[j][:2] for j in self.order if j != k]
 
@@ -883,11 +889,12 @@ class ToppleChain:
         if clear(own):
             return np.array([own[0], own[1], 0.0])
         best, best_d = None, np.inf
+        spots = [self.spots[j][:2] for j in self.order]
         for x in self.standup_xs:
             for y0 in self.standup_ys:
                 for y in (y0, -y0):
                     pt = np.array([x, y])
-                    if any(np.all(np.abs(pt - np.asarray(r.center[:2])) <= np.asarray(r.half_extents[:2]) + 0.05) for r in lane):
+                    if any(float(np.linalg.norm(pt - sp)) < self.standup_off_spot for sp in spots):
                         continue
                     if not clear(pt):
                         continue
@@ -900,15 +907,31 @@ class ToppleChain:
         a = self.job.act(obs)
         st = self.job.status
         if not st.running:
-            self._go("park", f"standup {'failed: ' + st.reason if st.failed else 'done'}")
+            self._after_job(obs, f"standup {'failed: ' + st.reason if st.failed else 'done'}", st.failed)
         return a
 
     def _repair(self, obs: Observation) -> Action:
         a = self.job.act(obs)
         st = self.job.status
         if not st.running:
-            self._go("park", f"repair {'failed: ' + st.reason if st.failed else 'done'}")
+            self._after_job(obs, f"repair {'failed: ' + st.reason if st.failed else 'done'}", st.failed)
         return a
+
+    def _after_job(self, obs: Observation, why: str, failed: bool) -> None:
+        # A failed job can leave the arm in a posture from which the IK cannot reach the next
+        # targets (MuJoCo: every later move failed). So after a failure, rehome the joints first.
+        if failed and self.home_q is not None:
+            self.q_cmd = np.asarray(obs.qpos, dtype=float).copy()
+            self._go("rehome", why)
+        else:
+            self._go("park", why)
+
+    def _rehome(self, obs: Observation) -> Action:
+        d = self.home_q - self.q_cmd
+        self.q_cmd = self.q_cmd + np.clip(d, -self.rehome_step, self.rehome_step)
+        if float(np.max(np.abs(np.asarray(obs.qpos) - self.home_q))) < 0.05 or self.n_phase > 250:
+            self._go("park", "rehomed")
+        return Action(mode="joint", joint_targets=self.q_cmd.copy(), gripper=0.0)
 
     # -- push and watch -----------------------------------------------------------
 
