@@ -361,3 +361,39 @@ def test_a_second_server_fails_on_the_port_and_leaves_the_first_alone(server):
     with connect(server) as robot:  # the first server still works
         robot.home()
         stream_to(robot, SIM_HOME)
+
+
+TRIAL4_GAPS_MS = [36, 41, 22, 46, 32, 19, 32, 89, 23, 61, 34, 50, 19, 17, 49, 39, 30, 41, 29, 45, 29, 18, 76, 34, 77,
+                  18, 108, 34, 60, 19, 45, 40, 50, 37, 113, 35, 30, 19, 123, 33]  # wall-clock target gaps, trial 4
+
+
+def test_bursty_targets_neither_lag_nor_lurch(tmp_path):
+    """Lab, 2026-11-27, trial 4: targets arrived 17-146 ms apart; the bridge capped each against the
+    previous target over the measured gap, so bursts were clipped hard, the arm fell 4-5 cm behind
+    and then lurched ~4.7 cm in 60 ms into a can. Now: a ramp at 0.4 rad/s (under the 0.5 cap),
+    sent with trial 4's gaps, is followed closely and never faster than the cap."""
+    p, port, log = _server_with_log(tmp_path)  # --max-joint-speed 1.0 in this helper
+    try:
+        with connect(port) as robot:
+            robot.home()
+            q = np.array(SIM_HOME)
+            for k, gap in enumerate(TRIAL4_GAPS_MS, 1):
+                robot.send_joint_targets(q + [0.4 * 0.05 * k, 0, 0, 0, 0, 0, 0], 0.0)  # 0.02 rad a step, as at 20 Hz
+                time.sleep(gap / 1000)
+            time.sleep(0.2)
+        rows = [json.loads(line) for line in log.read_text().splitlines()]
+        pub = [(r[0], r[2][0]) for r in rows if r[1] == "pub"]
+        tg = [(r[0], r[2][0]) for r in rows if r[1] == "target"]
+        t = np.array([a for a, _ in pub])
+        x = np.array([b for _, b in pub])
+        speed = np.abs(np.diff(x)) / np.maximum(np.diff(t), 1e-3)
+        assert speed.max() < 1.0 * 1.3, speed.max()  # never beyond the cap (jitter allowance)
+        lags = [b - np.interp(a, t, x) for a, b in tg]  # how far the command trails each new target
+        half = len(lags) // 2
+        assert max(lags) < 3 * 0.02, max(lags)  # bounded: within three steps of 0.02 rad ...
+        assert max(lags[half:]) <= max(lags[:half]) + 0.005  # ... and not growing (no backlog)
+        # (The old rule, emulated on these gaps, output up to 4x the speed cap: the lurch.)
+        assert x[-1] == pytest.approx(SIM_HOME[0] + 0.4 * 0.05 * len(TRIAL4_GAPS_MS), abs=1e-6)
+    finally:
+        p.terminate()
+        p.wait(5)

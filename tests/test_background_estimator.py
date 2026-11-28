@@ -99,3 +99,65 @@ def test_decimated_frames_keep_geometry():
     assert len(half) == len(full) // 4
     np.testing.assert_allclose(half.mean(axis=0), full.mean(axis=0), atol=1e-3)
     np.testing.assert_allclose(half.min(axis=0), full.min(axis=0), atol=2e-3)
+
+
+# ---------------------------------------------------------------- MeasureOnce
+
+class Cans:
+    """Two cans of radius 2.54 cm on the table; counts calls."""
+
+    needs_frames = True
+    radius = 0.0254
+
+    def __init__(self):
+        self.calls = 0
+
+    def reset(self, task):
+        pass
+
+    def estimate(self, frames, obs=None):
+        self.calls += 1
+        return {"a": Estimate(np.array([0.40, 0.00, 0.042]), yaw_quat(0.0), True, confidence=0.8),
+                "b": Estimate(np.array([0.50, 0.00, 0.042]), yaw_quat(0.0), True, confidence=0.8)}
+
+
+def obs_w(ee, width):
+    o = obs_at(ee)
+    o.gripper_width = width
+    return o
+
+
+def test_measure_once_measures_once_per_trial():
+    from skillforge.real.background import MeasureOnce
+
+    inner, frames = Cans(), Frames()
+    m = MeasureOnce(inner, frames, "fixed")
+    m.reset(None)
+    for _ in range(5):
+        out = m.estimate([], obs_w([0.4, 0.0, 0.3], 0.08))
+    assert inner.calls == 1 and frames.n == 1 and out["a"].found and out["a"].confidence == 1.0
+    m.reset(None)
+    m.estimate([], obs_w([0.4, 0.0, 0.3], 0.08))
+    assert inner.calls == 2  # a new trial measures again
+
+
+def test_measure_once_carries_the_held_can_and_leaves_it_where_released():
+    """Lab 2026-11-27: the sim skill's partial release (6.3 cm) and the arm's full opening (7.5 cm)
+    must both count as released; closed on a can (4.9 cm) as held; closed on nothing (0.1 cm) not."""
+    from skillforge.real.background import MeasureOnce
+
+    m = MeasureOnce(Cans(), Frames(), "fixed")
+    m.reset(None)
+    m.estimate([], obs_w([0.40, 0.0, 0.30], 0.075))
+    m.estimate([], obs_w([0.40, 0.0, 0.056], 0.075))  # down over can a, open
+    out = m.estimate([], obs_w([0.40, 0.0, 0.056], 0.049))  # closed on it
+    assert np.allclose(out["a"].pos, [0.40, 0.0, 0.042])
+    out = m.estimate([], obs_w([0.45, 0.10, 0.30], 0.049))  # carried
+    assert np.allclose(out["a"].pos, [0.45, 0.10, 0.286]) and np.allclose(out["b"].pos, [0.50, 0.0, 0.042])
+    out = m.estimate([], obs_w([0.45, 0.10, 0.056], 0.049))  # put down
+    out = m.estimate([], obs_w([0.45, 0.10, 0.056], 0.063))  # partial release (sim)
+    out = m.estimate([], obs_w([0.45, 0.10, 0.30], 0.063))  # hand leaves, fingers still part-open
+    assert np.allclose(out["a"].pos, [0.45, 0.10, 0.042])  # stayed where it was put
+    out = m.estimate([], obs_w([0.50, 0.0, 0.056], 0.001))  # closed on nothing over can b
+    out = m.estimate([], obs_w([0.50, 0.0, 0.30], 0.001))
+    assert np.allclose(out["b"].pos, [0.50, 0.0, 0.042])  # not picked up by an empty grip

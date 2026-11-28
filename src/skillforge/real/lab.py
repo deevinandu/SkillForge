@@ -183,11 +183,14 @@ def _caption(img: np.ndarray, lines: list[str], ok: bool) -> np.ndarray:
 def make_lab_env(task: TaskSpec, *, extrinsics: str | Path, port: int = 8765, speed: float = 0.1,
                  serial: str | None = None, picture: str | Path | None = "runs/real/placement.png",
                  free_placement: bool = False, predict=None, layout_dir: str | Path | None = None,
-                 background: bool = True, robot=None, frames=None, estimator=None, operator=None) -> RealEnv:
+                 background: bool = True, perception: str = "once", robot=None, frames=None, estimator=None,
+                 operator=None) -> RealEnv:
     """The lab cell as a `RealEnv`. `speed`: tool speed limit (m/s); 0.1 until 10 clean trials (T7 brief).
 
-    background: run the estimator in its own thread (real camera; a MuJoCo-rendered camera can only
-    render in its own thread, so tests with one pass False).
+    perception: "once" (measure at the start of each trial, then bookkeeping; default), "background"
+    (live, in a thread), or "inline" (live, in the control step).
+    background: for perception="background" (a MuJoCo-rendered camera can only render in its own
+    thread, so tests with one pass False).
     free_placement: objects go anywhere in the start area (`FreePlacementOperator`); `predict`
     (pinned task -> Prediction) is the per-layout sim prediction, `layout_dir` where layouts are saved."""
     if estimator is None:
@@ -215,12 +218,17 @@ def make_lab_env(task: TaskSpec, *, extrinsics: str | Path, port: int = 8765, sp
     if robot is None:
         robot = FrankaBridgeRobotIO(port=port)
     limits = SafetyLimits(ee_speed=speed)
-    # The trial's estimator runs in its own thread (see real/background.py): a control step must
-    # not wait ~0.1-0.3 s for the camera. Placement still measures synchronously (first call after reset).
-    from .background import BackgroundEstimator
+    # perception="once" (default): measure the table once per trial, then bookkeeping (see
+    # real/background.py MeasureOnce: live estimates made the skill let go mid-lift on the arm, and
+    # mid-carry on the twin; measure-once built the full pyramid on the twin for all three real
+    # trial layouts). "background": live estimates in a thread (half-size frames). "inline": in the step.
+    from .background import BackgroundEstimator, MeasureOnce
 
-    if background and not isinstance(estimator, BackgroundEstimator) and getattr(estimator, "needs_frames", False):
-        estimator = BackgroundEstimator(estimator, frames, CAMERA, decimate=2)  # ~110 ms per estimate
+    if getattr(estimator, "needs_frames", False):
+        if perception == "once":
+            estimator = MeasureOnce(estimator, frames, CAMERA)
+        elif perception == "background" and background:
+            estimator = BackgroundEstimator(estimator, frames, CAMERA, decimate=2)
     # report_contact_force=False: the Franka's force estimate is not a contact sensor (see RealEnv).
     return RealEnv(task, robot, frames, estimator, controller=MujocoController(task, max_ee_speed=speed),
                    operator=operator, limits=limits, cameras=(CAMERA,), realtime=True, report_contact_force=False)

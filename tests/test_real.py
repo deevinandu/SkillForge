@@ -816,3 +816,26 @@ def test_late_steps_do_not_chase_the_measured_arm(stub_task):
     now[0] += 2.0
     obs, info = env.step(go(goal))
     assert np.linalg.norm(env._arm._q_cmd - cell.q) < 0.006  # restarted from where the arm is
+
+
+def test_a_late_step_is_not_followed_by_a_burst(stub_task):
+    """Lab, 2026-11-27, trial 4: after a late step RealEnv sent the next steps back to back to
+    catch up with its schedule. It now re-anchors and keeps the normal period."""
+    now = [0.0]
+    slept = []
+
+    def sleep(s):
+        slept.append(s)
+        now[0] += s
+
+    env, cell = cell_env(stub_task, realtime=True, clock=lambda: now[0], sleep=sleep)
+    obs = env.reset(0)
+    goal = obs.ee_pos + [0.0, 0.05, 0.0]
+    obs, _ = env.step(go(goal))
+    now[0] += 0.4  # one step runs 0.4 s late (a slow read, say)
+    obs, _ = env.step(go(goal))
+    slept.clear()
+    for _ in range(5):
+        now[0] += 0.005  # the work of a step
+        obs, _ = env.step(go(goal))
+    assert len(slept) == 5 and min(slept) > 0.04, slept  # paced at ~50 ms, no zero-wait burst

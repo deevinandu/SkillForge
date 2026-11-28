@@ -250,6 +250,11 @@ class _Arm:
             wait = self._t0 + self._k * self.dt - self.clock()
             if wait > 0:
                 self.sleep(wait)
+            elif wait < -self.dt:
+                # More than a period behind: re-anchor the schedule here instead of sending the
+                # next steps back to back to catch up. Bursts of targets made the arm lag and then
+                # lurch (lab, 2026-11-27, trial 4).
+                self._t0 = self.clock() - self._k * self.dt
         state = self.robot.read_state()
         events += state.events
         if self.safety.force_exceeded(state.ee_force):

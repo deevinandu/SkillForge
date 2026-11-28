@@ -58,6 +58,8 @@ class IdenticalCylinderEstimator:
     min_votes: float = 40.0
     rel_votes: float = 0.25  # of the strongest peak in the same layer
     min_fit: float = 0.3  # cylinder-fit confidence a weak peak needs to count as a can
+    hold_radius: float = 0.05  # m: a can this close to the tool point, fingers closed, is in the hand
+    max_width: float = 0.08  # m: the gripper's full opening (set from the task in reset)
     max_match: float = 0.08  # m: farther than this from its previous estimate, a name is not re-assigned
     needs_frames: bool = True
     names: list[str] = field(default_factory=list)
@@ -65,6 +67,7 @@ class IdenticalCylinderEstimator:
     half_height: float = 0.0
     _last: dict[str, np.ndarray] = field(default_factory=dict)
     _prior: dict[str, np.ndarray] = field(default_factory=dict)  # the task's start poses
+    _held: dict[str, np.ndarray] = field(default_factory=dict)  # name -> pose minus tool point when grasped
     last_detections: list[Detection] = field(default_factory=list)
     last_table: tuple[float, float, float] | None = None  # plane z = c0 + c1 x + c2 y
 
@@ -76,8 +79,10 @@ class IdenticalCylinderEstimator:
         if len(sizes) != 1:
             raise ValueError(f"identical cylinders expected, got sizes {sizes}")
         self.names = sorted(o.name for o in cyl)
+        self.max_width = float(task.scene.robot.max_gripper_width)
         self.radius, self.half_height = float(cyl[0].size[0]), float(cyl[0].size[1])
         self._last = {}
+        self._held = {}
         self._prior = {o.name: np.array(o.pose.pos, dtype=float) for o in cyl}
 
     # -- the pipeline --------------------------------------------------------
@@ -176,14 +181,43 @@ class IdenticalCylinderEstimator:
 
     # -- PoseEstimator ---------------------------------------------------------
 
+    def held_names(self, obs: Observation | None) -> set[str]:
+        """Names of cans that are in the closed gripper: last estimated within `hold_radius` of the
+        tool point while the fingers are closed on something. Their camera estimate is withheld:
+        this estimator models cans resting on the table or on cans, so for a can lifted in the hand
+        its height stops rising (the hand hides the top) and drifts below the hand. On the arm
+        (2026-11-27, trial 5) that drift passed the skill's 3 cm lost-grasp threshold 2.6 cm into
+        the lift and it let go, twice. `PerceivedEnv` moves an unseen held object with the hand."""
+        if obs is None or not self._last:
+            return set()
+        w = float(obs.gripper_width)
+        ee = np.asarray(obs.ee_pos, dtype=float)
+        if not (0.004 < w < 0.92 * self.max_width):
+            self._held = {}  # fingers open (or shut on nothing): whatever was held is where the hand left it
+            return set()
+        # A held can stays held while the fingers stay closed, and its last pose moves with the hand.
+        # (Deciding "held" afresh from a pose frozen at the pick spot lost the can once the hand had
+        # carried it 5 cm, and its name then attached to a stray detection at the old spot: the
+        # skill saw a slip and let go mid-carry. Twin, lagged half-size estimates, 2026-11-27.)
+        for n, off in self._held.items():
+            self._last[n] = ee + off
+        for n, p in self._last.items():
+            if n not in self._held and np.linalg.norm(p - ee) < self.hold_radius:
+                self._held[n] = p - ee
+        return set(self._held)
+
     def estimate(self, frames: list[CameraFrame], obs: Observation | None = None) -> dict[str, Estimate]:
+        held = self.held_names(obs)
         dets = self.detect(frames)
+        if held and obs is not None:  # the held can's (and the hand's) points: nobody else's detection
+            ee = np.asarray(obs.ee_pos, dtype=float)
+            dets = [d for d in dets if np.linalg.norm(d.xy - ee[:2]) > self.radius]
         pos = [np.array([d.xy[0], d.xy[1], d.z]) for d in dets]
         # Where each name is expected: its last estimate once seen, else the task's start pose,
         # so the can an operator puts at cyl_1's start is the one called cyl_1.
         expect = {n: self._last.get(n, self._prior.get(n)) for n in self.names}
         pairs = sorted((float(np.linalg.norm(pos[k] - expect[n])), n, k)
-                       for n in self.names if expect[n] is not None for k in range(len(dets)))
+                       for n in self.names if expect[n] is not None and n not in held for k in range(len(dets)))
         assigned: dict[str, int] = {}
         used: set[int] = set()
         for d, n, k in pairs:
@@ -196,12 +230,12 @@ class IdenticalCylinderEstimator:
         free = sorted((k for k in range(len(dets)) if k not in used),
                       key=lambda k: (dets[k].layer, round(dets[k].xy[0], 2), dets[k].xy[1]))
         for n in self.names:
-            if n not in assigned and n not in self._last and free:
+            if n not in assigned and n not in self._last and n not in held and free:
                 assigned[n] = free.pop(0)
         out = {}
         for n in self.names:
             k = assigned.get(n)
-            if k is None:
+            if k is None or n in held:
                 out[n] = Estimate(np.zeros(3), yaw_quat(0.0), found=False)
                 continue
             d = dets[k]

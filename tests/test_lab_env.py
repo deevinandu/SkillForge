@@ -107,3 +107,41 @@ def test_a_dry_run_of_the_lab_pyramid_through_the_cli(tmp_path):
     assert rep["n_success"] == 1
     z = np.load(out / "arrays" / "episode_0.npz")
     assert "joint.command" in z.files and "joint.measured" in z.files and "observation.state_missing" in z.files
+
+
+def test_the_first_can_is_placed_on_its_spot_with_measure_once_perception():
+    """The lab pipeline on the twin: lab camera pose, can estimator measured once, bookkeeping after.
+    (Live estimates let the skill drop the can mid-lift on the arm, 2026-11-27, trial 5.)"""
+    from skillforge.real import MujocoController, MujocoTwin, RealEnv, SafetyLimits, Workspace
+    from skillforge.real.background import MeasureOnce
+    from skillforge.real.cans import IdenticalCylinderEstimator
+    from skillforge.skills import PlaceInOrder
+
+    task = TaskSpec.model_validate(json.loads(TASK.read_text()))
+    if make_env(task).render() is None:
+        pytest.skip("no GL context")
+    limits = SafetyLimits(ee_speed=0.1)
+    twin = MujocoTwin(task)
+    ctl = MujocoController(task, max_ee_speed=0.1, max_ee_ang_speed=limits.ee_ang_speed)
+    cam = SimCamera(twin.env)
+    env = RealEnv(task, twin, None, MeasureOnce(IdenticalCylinderEstimator(), cam, CAMERA), controller=ctl,
+                  operator=twin, limits=limits, workspace=Workspace.from_task(task, include=[ctl.fk(ctl.home)[0]]),
+                  cameras=(CAMERA,), report_contact_force=False)
+    skill = PlaceInOrder()
+    try:
+        obs = env.reset(0)
+        skill.reset(task)
+        events = []
+        for _ in range(420):
+            obs, info = env.step(skill.act(obs))
+            events += info.events
+            if "release:cyl_1" in events:
+                break
+        m, d = twin.env.model, twin.env.data
+        spot = np.array(task.scene.region("spot_cyl_1").center)
+        assert "grasp:cyl_1" in events and "release:cyl_1" in events
+        assert not any(e.startswith(("grasp_slip", "grasp_miss")) for e in events), events
+        assert np.linalg.norm(d.xpos[m.body("cyl_1").id][:2] - spot[:2]) < 0.01
+    finally:
+        env.close()
+        cam.src.close()

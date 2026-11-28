@@ -179,7 +179,8 @@ class FakeArm:
 class FrankapyArm:
     """The real arm through frankapy. Every call happens under the server's lock."""
 
-    def __init__(self, k_gains=None, session_s=3600.0, robot_state_topic="/robot_state_publisher_node_1/robot_state"):
+    def __init__(self, k_gains=None, session_s=3600.0, robot_state_topic="/robot_state_publisher_node_1/robot_state",
+                 gripper_topic="/franka_gripper_1/joint_states"):
         import rospy
         from franka_interface_msgs.msg import SensorDataGroup
         from frankapy import FrankaArm, SensorDataMessageType
@@ -205,6 +206,12 @@ class FrankapyArm:
         # "not ready" while the robot carries on with the skill (seen 2026-11-27, skill 12).
         self.mode, self.mode_t, self._not_moving = None, 0.0, 0
         rospy.Subscriber(robot_state_topic, RobotState, self._on_state, queue_size=1)
+        # robot_state's gripper_width is not filled in on this setup (reads 0.0 with the gripper
+        # open); the gripper node publishes its finger positions, whose sum is the opening.
+        from sensor_msgs.msg import JointState
+
+        self._width, self._width_t = None, 0.0
+        rospy.Subscriber(gripper_topic, JointState, self._on_gripper, queue_size=1)
         self.last_done_reason = ""
 
     def ros_down(self):
@@ -212,6 +219,11 @@ class FrankapyArm:
 
     def _on_state(self, msg):
         self.mode, self.mode_t = int(msg.robot_mode), time.time()
+        self._state = (list(msg.q), list(msg.dq), float(msg.gripper_width), list(msg.O_F_ext_hat_K[:3]))
+
+    def _on_gripper(self, msg):
+        if len(msg.position) >= 2:
+            self._width, self._width_t = float(msg.position[0] + msg.position[1]), time.time()
 
     def robot_busy(self):
         """True while the robot executes a skill (mode 2, from a fresh state message)."""
@@ -293,6 +305,18 @@ class FrankapyArm:
         return False
 
     def state(self):
+        """From the robot_state topic (~100 Hz, already subscribed): no service calls. On the arm
+        (2026-11-27, trial 4) four frankapy service calls per read took 17 ms median, 95 ms at the
+        95th percentile and up to 140 ms, which made RealEnv's steps late and uneven. Falls back to
+        the service calls only if the topic has gone quiet."""
+        st = getattr(self, "_state", None)
+        if st is not None and time.time() - self.mode_t < 0.2:
+            q, dq, _, f = st
+            if self._width is not None and time.time() - self._width_t < 1.0:
+                width = self._width
+            else:
+                width = float(self.fa.get_gripper_width())
+            return [float(x) for x in q], [float(x) for x in dq], width, [float(x) for x in f]
         q = [float(x) for x in self.fa.get_joints()]
         qvel = [float(x) for x in self.fa.get_joint_velocities()]
         width = float(self.fa.get_gripper_width())
@@ -301,7 +325,7 @@ class FrankapyArm:
 
 
 class Bridge:
-    def __init__(self, arm, max_joint_speed, watchdog_s, margin, fake, publish_hz=250.0, log_path=None):
+    def __init__(self, arm, max_joint_speed, watchdog_s, margin, fake, publish_hz=250.0, log_path=None, period=0.05):
         self.arm, self.max_speed, self.watchdog_s, self.margin, self.fake = arm, max_joint_speed, watchdog_s, margin, fake
         self.lock = threading.RLock()
         # Interpolation. franka-interface's PassThroughJointTrajectoryGenerator sets the desired
@@ -311,6 +335,7 @@ class Bridge:
         # segment from where the command is now to the new target, over one client period, and a
         # thread publishes points along it at `publish_hz`. 0 = pass targets straight through.
         self.publish_hz = publish_hz
+        self.period = period  # the client's nominal control period (s): each target's segment lasts this long
         self.seg = None  # (q_from, q_to, t0, duration)
         self.cmd_q = None  # the last joints published
         self._log = open(log_path, "a", buffering=1) if log_path else None  # line-buffered: readable while running
@@ -414,12 +439,19 @@ class Bridge:
                     self.cmd_q, self.seg = list(self.last_q), None
                     self.holding = False
                 dt = min(now - self.last_t, 0.1)
-                q, clipped = clamp_targets(q, self.last_q, dt, self.max_speed, self.margin)
-                self._record("target", q)
                 if self.publish_hz > 0:
+                    # Each target starts a segment of one NOMINAL period from where the command is
+                    # now, and the speed cap is measured from that point over that period. (Before:
+                    # from the previous target over the measured gap. Targets arriving in bursts were
+                    # clipped hard, the arm fell 4-5 cm behind, then lurched to catch up at ~0.8 m/s
+                    # and hit a can: lab, 2026-11-27, trial 4.)
                     start = self._point(now)[0] if self.seg is not None else (self.cmd_q or self.last_q)
-                    self.seg = (start, q, now, min(max(dt, 0.02), 0.1))
+                    q, clipped = clamp_targets(q, start, self.period, self.max_speed, self.margin)
+                    self._record("target", q)
+                    self.seg = (start, q, now, self.period)
                 else:
+                    q, clipped = clamp_targets(q, self.last_q, dt, self.max_speed, self.margin)
+                    self._record("target", q)
                     self.arm.publish(q, dt)
                     self.cmd_q = q
                 self.last_q, self.last_t = q, now
@@ -531,10 +563,11 @@ def main():
     ap.add_argument("--publish-hz", type=float, default=250.0,
                     help="interpolate between client targets and publish at this rate (0 = pass targets straight through)")
     ap.add_argument("--log", help="append every target and published point (JSON lines) to this file")
+    ap.add_argument("--period", type=float, default=0.05, help="the client's control period (s); 0.05 = RealEnv at 20 Hz")
     a = ap.parse_args()
     srv = listen(a.host, a.port)
     arm = FakeArm() if a.fake else FrankapyArm()
-    serve(Bridge(arm, a.max_joint_speed, a.watchdog, a.margin, a.fake, a.publish_hz, a.log), a.host, a.port, srv=srv)
+    serve(Bridge(arm, a.max_joint_speed, a.watchdog, a.margin, a.fake, a.publish_hz, a.log, a.period), a.host, a.port, srv=srv)
 
 
 if __name__ == "__main__":
