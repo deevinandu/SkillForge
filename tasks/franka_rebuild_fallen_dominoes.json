@@ -187,12 +187,12 @@
         "name": "fallen_r",
         "center": [
           0.41,
-          -0.2,
+          -0.195,
           0.03
         ],
         "half_extents": [
-          0.09,
-          0.06,
+          0.08,
+          0.045,
           0.04
         ],
         "visible": false
@@ -201,12 +201,12 @@
         "name": "fallen_l",
         "center": [
           0.41,
-          0.2,
+          0.195,
           0.03
         ],
         "half_extents": [
-          0.09,
-          0.06,
+          0.08,
+          0.045,
           0.04
         ],
         "visible": false
