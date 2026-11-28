@@ -282,7 +282,10 @@ class ObjectToppled(Spec):
     axis; spawn it upright) is tilted at least `min_tilt` from world up. Optionally:
     - `direction`: it fell that way. The horizontal projection of its z axis (where its top went)
       is within `dir_tol` of this world xy direction;
-    - `region`: its centre lies inside this region (e.g. the lane the chain stands in).
+    - `region`: its centre lies inside this region (e.g. the lane the chain stands in);
+    - `restood`: it must have fallen (tilt >= `min_tilt`) and then stood upright again (tilt
+      <= 0.15 rad) earlier in the episode: for "rebuild the fallen chain and topple it again",
+      where the start already looks toppled. The env tracks it on true poses.
     A domino leaning on the next one counts: a chain rarely ends up flat."""
 
     kind: Literal["object_toppled"] = "object_toppled"
@@ -291,6 +294,7 @@ class ObjectToppled(Spec):
     direction: tuple[float, float] | None = None
     dir_tol: float = Field(0.8, gt=0, le=3.1416, description="radians")
     region: str | None = None
+    restood: bool = False
 
     @model_validator(mode="after")
     def _direction(self) -> ObjectToppled:

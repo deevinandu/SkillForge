@@ -62,7 +62,7 @@ from .disturbances import (  # noqa: E402
     yaw_quat,
 )
 from .scatter import draw_scatter, free_spot, rest_height, rest_quat  # noqa: E402
-from .success import is_success, resting_half_height, tilt_of  # noqa: E402
+from .success import RestandTracker, is_success, resting_half_height, tilt_of  # noqa: E402
 
 # Process-wide: once creating a GL context has failed, never try again. MuJoCo can abort the
 # whole process (not raise) on a second attempt without a working context.
@@ -409,6 +409,7 @@ class MujocoEnv:
         self._ejected: set[str] = set()
         self._step_i = 0
         self._toppled_seen: set[str] = set()
+        self._restand = RestandTracker(self.task)
         self._n_warn = self._warnings()
         self._rec = self._robot_env_contacts()
         self._start = self._true_obj_pos()
@@ -438,9 +439,11 @@ class MujocoEnv:
         events += self._topple_events()
         pos = self._true_obj_pos()
         quats = self._true_obj_quat()
+        events += self._restand.update(quats)
         info = StepInfo(
             success=not self._unstable_seen
-            and is_success(self.task, pos, self._start, colors=self._colors, quats=quats),
+            and is_success(self.task, pos, self._start, colors=self._colors, quats=quats,
+                           restood=self._restand.restood),
             terminated=self._unstable_seen or any(p[2] < DROP_Z for p in pos.values()),
             events=events,
         )

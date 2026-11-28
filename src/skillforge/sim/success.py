@@ -48,8 +48,41 @@ def tilt_of(quat: np.ndarray) -> float:
     return float(np.arccos(np.clip(up_axis(quat)[2], -1.0, 1.0)))
 
 
-def toppled(s: ObjectToppled, task: TaskSpec, pos: np.ndarray, quat: np.ndarray) -> bool:
-    """The `object_toppled` leaf on one object's TRUE pose."""
+STOOD_TILT = 0.15  # radians: "upright again" for object_toppled(restood=True)
+
+
+class RestandTracker:
+    """For `object_toppled` leaves with `restood`: which objects have fallen (tilt >= the leaf's
+    min_tilt) and afterwards stood upright again (tilt <= STOOD_TILT). Envs call `update` with
+    TRUE orientations every step; it returns 'fell:<obj>' / 'restood:<obj>' events, once each."""
+
+    def __init__(self, task: TaskSpec):
+        self.leaves = {c.object: c for c in success_conditions(task.success)
+                       if isinstance(c, ObjectToppled) and c.restood}
+        self.fell: set[str] = set()
+        self.restood: set[str] = set()
+
+    def update(self, quats: dict[str, np.ndarray]) -> list[str]:
+        out = []
+        for name, leaf in self.leaves.items():
+            t = tilt_of(quats[name])
+            if name not in self.fell and t >= leaf.min_tilt:
+                self.fell.add(name)
+                out.append(f"fell:{name}")
+            elif name in self.fell and name not in self.restood and t <= STOOD_TILT:
+                self.restood.add(name)
+                out.append(f"restood:{name}")
+        return out
+
+
+def toppled(s: ObjectToppled, task: TaskSpec, pos: np.ndarray, quat: np.ndarray,
+            restood: set[str] | None = None) -> bool:
+    """The `object_toppled` leaf on one object's TRUE pose (and, with `restood`, its history)."""
+    if s.restood:
+        if restood is None:
+            raise ValueError("object_toppled(restood=True) needs the env's restood set: pass restood= to is_success")
+        if s.object not in restood:
+            return False
     z = up_axis(quat)
     if float(np.arccos(np.clip(z[2], -1.0, 1.0))) < s.min_tilt:
         return False
@@ -76,6 +109,7 @@ def _leaf(
     start: dict[str, np.ndarray],
     colors: dict[str, str],
     quats: dict[str, np.ndarray] | None,
+    restood: set[str] | None = None,
 ) -> bool:
     if isinstance(s, ColorInRegion):
         return all(_in_region(task, s.region, pos[n]) for n, c in colors.items() if c == s.color)
@@ -83,7 +117,7 @@ def _leaf(
     if isinstance(s, ObjectToppled):
         if quats is None:
             raise ValueError("object_toppled needs true object orientations: pass quats= to is_success")
-        return toppled(s, task, p, quats[s.object])
+        return toppled(s, task, p, quats[s.object], restood)
     if isinstance(s, ObjectInRegion):
         r = task.scene.region(s.region)
         return bool(np.all(np.abs(p - np.asarray(r.center)) <= np.asarray(r.half_extents)))
@@ -105,6 +139,7 @@ def is_success(
     start_obj_pos: dict[str, np.ndarray],
     colors: dict[str, str] | None = None,
     quats: dict[str, np.ndarray] | None = None,
+    restood: set[str] | None = None,
 ) -> bool:
     """Evaluate on TRUE object positions (not noisy observations). AllOf: every leaf at once.
 
@@ -114,5 +149,6 @@ def is_success(
     if colors is None:
         colors = {o.name: o.color for o in task.scene.objects if o.color and not o.fixed}
     return all(
-        _leaf(task, s, true_obj_pos, start_obj_pos, colors, quats) for s in success_conditions(task.success)
+        _leaf(task, s, true_obj_pos, start_obj_pos, colors, quats, restood)
+        for s in success_conditions(task.success)
     )

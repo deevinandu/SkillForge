@@ -745,12 +745,10 @@ class ToppleChain:
     quiet_tol = 0.01  # radians of tilt change per step that counts as still
     max_nudges = 4
     max_standups = 4  # per domino (each with a different grasp option)
-    # Stand a fallen domino back up (StandUp): OFF. MuJoCo, diag_standup.py, 3 seeds per cell:
-    # round 2 (8 cm domino) 3/24 face-down, 6/24 on its side; round 3 (real 5 cm domino, touch-down
-    # at 10-40 N, grasp tilted 0.5 rad, slow turn) 0/24 face-down, 4/24 on its side, and 0/10 on
-    # franka_rebuild_fallen_dominoes. The fingers close fully (`width_collapsed`): the domino is
-    # squeezed out of the pinch. Off, a lying domino is reported and left. True to try it.
-    stand_up = False
+    # Stand a fallen domino back up (StandUp). Taped 15.7 mm dominoes, foam pads, MuJoCo: the
+    # all-fallen task went 0/10 -> 4/10 over rounds 4-6 (see HANDOVER). On by default: it only acts
+    # on dominoes that are otherwise unrecoverable. False only reports them.
+    stand_up = True
     # where a fallen domino is stood up before it is carried to its spot: a grid on both sides of
     # the lane, close to the robot (picks from far out slipped in MuJoCo)
     # (MuJoCo: standing up at (0.40, 0.22) or (0.34, -0.16) failed while carrying or lowering;
@@ -777,6 +775,11 @@ class ToppleChain:
         self.yaw = wrap_half_pi(math.atan2(self.d[1], self.d[0]))  # a domino's face normal along the lane
         self.task = task
         self.lane = {c.object: c.region for c in conds}
+        # object_toppled(restood=True): a domino must stand again after it fell before its fall
+        # counts, so until then a fallen one is down_bad (to be stood up), whichever way it lies
+        self.restand = {c.object for c in conds if c.restood}
+        self.fell_seen: set[str] = set()
+        self.restood_seen: set[str] = set()
         self.home_q: np.ndarray | None = None  # joint posture at the first step
         self.spots: dict[str, np.ndarray] = {}
         for c in conds:
@@ -812,6 +815,12 @@ class ToppleChain:
     def act(self, obs: Observation) -> Action:
         if self.home_q is None:
             self.home_q = np.asarray(obs.qpos, dtype=float).copy()
+        for k in self.restand:  # the same history the env keeps, from what the robot sees
+            t = tilt(obs.objects[k].quat)
+            if t >= 0.6:
+                self.fell_seen.add(k)
+            elif t <= 0.15 and k in self.fell_seen:
+                self.restood_seen.add(k)
         self.steps += 1
         self.n_phase += 1
         return getattr(self, f"_{self.phase}")(obs)
@@ -858,7 +867,8 @@ class ToppleChain:
                 inside = lane is None or bool(np.all(
                     np.abs(p - np.asarray(self.task.scene.region(lane).center))
                     <= np.asarray(self.task.scene.region(lane).half_extents)))
-                self.fell_right[k] = ang <= self.down_dir_tol and inside
+                self.fell_right[k] = ang <= self.down_dir_tol and inside and (
+                    k not in self.restand or k in self.restood_seen)
             if t > self.down_tilt:
                 out[k] = "down" if self.fell_right[k] else "down_bad"
             elif t > self.standing_tilt:

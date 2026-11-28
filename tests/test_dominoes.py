@@ -20,7 +20,8 @@ from skillforge.skills.grasp import DOWN, quat_angle
 
 TASKS = Path(__file__).resolve().parents[1] / "tasks"
 DOMINO_TASKS = ("franka_topple_domino_chain", "franka_topple_domino_chain_knock", "franka_setup_domino_chain",
-                "franka_build_domino_chain_scattered", "franka_rebuild_domino_chain", "franka_rebuild_fallen_dominoes")
+                "franka_build_domino_chain_scattered", "franka_rebuild_domino_chain", "franka_rebuild_fallen_dominoes",
+                "franka_retopple_domino_chain")
 
 
 def load(name: str) -> TaskSpec:
@@ -242,6 +243,31 @@ def test_builds_the_chain_from_scattered_dominoes(seed):
     assert not any(":standup:" in e for e in sk.log)
 
 
+def test_retopples_a_knocked_down_chain():
+    """Start: the chain is knocked over at step 1. It only counts once every domino stood again.
+    The kinematic world lays the knocked dominoes flat on their own spots, overlapping, so its
+    grasp sometimes takes the neighbour: about half the seeds work there (the decisions are what
+    this checks; MuJoCo is the real test)."""
+    t = load("franka_retopple_domino_chain")
+    wins = []
+    for seed in range(6):
+        ep, sk = run(t, seed)
+        if ep.success:
+            assert sum(e.startswith("restood:") for e in ep.events) == 5
+            assert sum(":standup:" in e for e in sk.log) >= 5
+        wins.append(ep.success)
+    assert sum(wins) >= 2, wins
+
+
+def test_retopple_does_not_count_the_first_fall():
+    """Without standing them up, the knocked-down chain is not a success."""
+    t = load("franka_retopple_domino_chain")
+    env, sk = DominoKinematicEnv(t), ToppleChain()
+    sk.stand_up = False
+    ep = run_episode(env, sk, t, 0)
+    assert not ep.success and any(e.startswith("fell:") for e in ep.events)
+
+
 @pytest.mark.parametrize("seed", range(4))
 def test_rebuilds_fallen_dominoes(seed):
     t = load("franka_rebuild_fallen_dominoes")
@@ -276,7 +302,9 @@ def lying_variant(name: str) -> TaskSpec:
 
 def test_lying_domino_is_reported_when_stand_up_is_off():
     t = lying_variant("franka_rebuild_domino_chain")
-    ep, sk = run(t, 0)  # off by default
+    env, sk = DominoKinematicEnv(t), ToppleChain()
+    sk.stand_up = False
+    ep = run_episode(env, sk, t, 0)
     assert not ep.success
     assert any("cannot stand" in e and "stand_up is off" in e for e in sk.log)
     assert ep.failure == "unrecovered_disturbance"
