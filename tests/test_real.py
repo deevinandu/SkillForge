@@ -350,9 +350,13 @@ def test_a_dry_run_at_sim_speed_matches_the_sim_run(cube_task):
     for a, b in zip(sim, dry, strict=True):
         assert a.success and b.success
         # not step-identical: the sim reports the tool pose one physics substep stale, the
-        # real env computes it from the measured joints
-        assert abs(a.n_steps - b.n_steps) <= 2
-        assert sorted(a.events) == sorted(b.events)
+        # real env computes it from the measured joints; and the real env also waits for the
+        # hand to let go and rise clear of the objects (RealEnv._hand_clear), the sim does not
+        assert 0 <= b.n_steps - a.n_steps <= 30
+        extra = list(b.events)
+        for e in a.events:
+            extra.remove(e)
+        assert all(e.startswith("release:") for e in extra)  # the extra steps are the let-go
         assert b.randomization["real.dry_run"] == 1.0
         assert {k: v for k, v in b.randomization.items() if k in a.randomization} == a.randomization
 
@@ -510,7 +514,7 @@ def test_only_an_accepted_version_approved_by_name_may_run_on_hardware(stub_task
         ap.require_approved(stub_task.id, tampered)
 
 
-def test_cli_refuses_hardware_and_unapproved_skills(stub_task, tmp_path):
+def test_cli_refuses_unapproved_skills_and_uncalibrated_hardware_runs(stub_task, tmp_path):
     from skillforge.agents.library import SkillLibrary
     from skillforge.eval.regression import source_of
     from skillforge.real import cli
@@ -524,7 +528,7 @@ def test_cli_refuses_hardware_and_unapproved_skills(stub_task, tmp_path):
     with pytest.raises(NotApproved):
         cli.main(["run", stub_task.id, "--skill", src.version, *common])
     cli.main(["approve", stub_task.id, src.version, "--by", "Sam", *common])
-    with pytest.raises(SystemExit, match="no hardware layer"):
+    with pytest.raises(SystemExit, match="needs --extrinsics"):  # approved, but no camera calibration given
         cli.main(["run", stub_task.id, "--skill", src.version, *common])
     with pytest.raises(SystemExit, match="dry runs only"):
         cli.main(["run", stub_task.id, "--skill-file", "x.py", *common])
@@ -776,3 +780,66 @@ def test_overlay_draws_the_target_in_green_and_the_estimate_in_red(stub_task):
     assert abs(red[:, 1].mean() - (80 - 20.8)) < 1.5 and abs(red[:, 0].mean() - (60 - 10.4)) < 1.5
     hidden = Estimate(pos=est.pos, quat=est.quat, found=False, confidence=0.0)
     assert not (placement_overlay(frame, spec, target, hidden) == RED).all(axis=2).any()
+
+
+def test_hiding_contact_force_from_the_skill_keeps_the_safety_limit(stub_task):
+    """Lab, 2026-11-27: the Franka's force estimate read > 5 N while moving with nothing touching,
+    and the skill's descend-until-contact closed the gripper in mid-air. With
+    report_contact_force=False the skill sees None, while the safety limit still reads it."""
+    env, cell = cell_env(stub_task, report_contact_force=False)
+    obs = env.reset(0)
+    cell.force = np.array([0.0, 0.0, -6.0])
+    obs, info = env.step(go(obs.ee_pos))
+    assert obs.contact_force is None and not info.terminated
+    cell.force = np.array([0.0, 0.0, -50.0])  # above SafetyLimits.force
+    obs, info = env.step(go(obs.ee_pos))
+    assert info.terminated and "safety:force" in info.events
+
+
+def test_late_steps_do_not_chase_the_measured_arm(stub_task):
+    """Lab, 2026-11-27, third pyramid trial (bridge log): steps took ~270 ms, the watchdog fired on
+    each and reset the reference to the MEASURED joints; the arm, moving in stop-go bursts,
+    overshot, the command chased it a step late, and the arm swung +-5 cm at ~2 Hz, growing.
+    A late step must not follow a displaced arm; only a long stall (arm settled elsewhere) may."""
+    now = [0.0]
+    env, cell = cell_env(stub_task, realtime=True, clock=lambda: now[0], sleep=lambda s: None)
+    obs = env.reset(0)
+    goal = obs.ee_pos + [0.0, 0.08, 0.0]
+    for _ in range(3):
+        now[0] += 0.05
+        obs, _ = env.step(go(goal))
+    for _ in range(5):  # late steps while the arm overshoots by 3 cm
+        cmd_before = env._arm._q_cmd.copy()
+        cell.q = cmd_before + [0.0, 0.03, 0.0]
+        now[0] += 0.27
+        obs, info = env.step(go(goal))
+        assert "safety:watchdog" in info.events
+        step = env._arm._q_cmd - cmd_before
+        assert np.linalg.norm(step) < 0.006, step  # one ordinary step on, not a jump to the arm
+    cell.q = env._arm._q_cmd + [0.0, 0.0, 0.05]  # now a long stall with the arm really elsewhere
+    now[0] += 2.0
+    obs, info = env.step(go(goal))
+    assert np.linalg.norm(env._arm._q_cmd - cell.q) < 0.006  # restarted from where the arm is
+
+
+def test_a_late_step_is_not_followed_by_a_burst(stub_task):
+    """Lab, 2026-11-27, trial 4: after a late step RealEnv sent the next steps back to back to
+    catch up with its schedule. It now re-anchors and keeps the normal period."""
+    now = [0.0]
+    slept = []
+
+    def sleep(s):
+        slept.append(s)
+        now[0] += s
+
+    env, cell = cell_env(stub_task, realtime=True, clock=lambda: now[0], sleep=sleep)
+    obs = env.reset(0)
+    goal = obs.ee_pos + [0.0, 0.05, 0.0]
+    obs, _ = env.step(go(goal))
+    now[0] += 0.4  # one step runs 0.4 s late (a slow read, say)
+    obs, _ = env.step(go(goal))
+    slept.clear()
+    for _ in range(5):
+        now[0] += 0.005  # the work of a step
+        obs, _ = env.step(go(goal))
+    assert len(slept) == 5 and min(slept) > 0.04, slept  # paced at ~50 ms, no zero-wait burst

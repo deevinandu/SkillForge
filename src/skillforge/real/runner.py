@@ -137,14 +137,19 @@ class TerminalOperator:
     Enter = placed, measure it. 'f' = accept it as it is. 'a' = abort the trial.
     """
 
-    def __init__(self, tolerance: float = 0.01, ask: Callable[[str], str] = input, say: Callable[[str], None] = print):
-        self.tolerance, self.ask, self.say = tolerance, ask, say
+    def __init__(self, tolerance: float = 0.01, ask: Callable[[str], str] = input, say: Callable[[str], None] = print,
+                 show: Callable[[int, dict[str, Placement]], None] | None = None):
+        """`show(seed, targets)`, if given, is called before each prompt (e.g. to save a picture of
+        the targets against the camera's current estimates)."""
+        self.tolerance, self.ask, self.say, self.show = tolerance, ask, say, show
 
     def place(self, seed: int, targets: dict[str, Placement], measure: Measure) -> None:
         for name, t in targets.items():
             self.say(f"seed {seed}: place '{name}' at x={t.pos[0]:.3f} y={t.pos[1]:.3f} m, "
                      f"turned {np.degrees(t.yaw_offset):+.0f} deg")
             while True:
+                if self.show is not None:
+                    self.show(seed, targets)
                 ans = self.ask("Enter when placed, f to accept as is, a to abort: ").strip().lower()
                 if ans == "a":
                     raise PlacementAborted(f"operator aborted placing '{name}' for seed {seed}")
@@ -190,8 +195,17 @@ def _arrays(task: TaskSpec, obs_list, act_list, cmd_list, grip_list) -> dict[str
     for i, a in enumerate(act_list):
         if a.mode == "ee":
             acts[i] = action_vector(a)
+    extra: dict[str, np.ndarray] = {}
+    try:
+        extra["observation.state"] = np.array([state_vector(o, task) for o in obs_list[:T]],
+                                              dtype=np.float32).reshape(T, -1)
+    except AttributeError as e:
+        # T5's features know single-object goals only (`goal_of` reads `success.object`); a
+        # multi-object task (an AllOf, e.g. the can pyramid) has none. Keep everything else:
+        # the commanded/measured arrays are what system ID needs.
+        extra["observation.state_missing"] = np.array(f"T5 features do not support this task's success spec: {e}")
     return {
-        "observation.state": np.array([state_vector(o, task) for o in obs_list[:T]], dtype=np.float32).reshape(T, -1),
+        **extra,
         "action": acts,
         "action.executed": acts.copy(),
         "label_valid": ~np.isnan(acts).any(axis=1),
