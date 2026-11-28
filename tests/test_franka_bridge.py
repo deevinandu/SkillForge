@@ -261,3 +261,41 @@ def test_real_env_runs_over_the_bridge(server):
         assert obs.ee_pos[2] < start[2] - 0.01  # moved down through IK -> bridge -> fake arm
     finally:
         env.close()
+
+
+def test_one_status_flicker_does_not_end_streaming():
+    """2026-11-27, skill 12: franka-interface's status flickered, the ROS action was aborted and the
+    old check ended streaming while the robot kept executing. Now only the robot's own mode counts,
+    and it must be out of 'executing' for 3 checks in a row."""
+    srv = _server_module()
+    arm = object.__new__(srv.FrankapyArm)  # no ROS: drive the state by hand
+    arm._not_moving, arm.last_done_reason = 0, ""
+
+    def at(mode):
+        arm.mode, arm.mode_t = mode, time.time()
+        return arm.skill_done()
+
+    assert not at(2) and not at(1) and not at(2)  # a one-sample blip
+    assert not at(1) and not at(1)
+    assert at(1) and "robot_mode 1" in arm.last_done_reason  # third in a row: really idle
+    arm._not_moving = 0
+    arm.mode, arm.mode_t = 2, time.time() - 2.0  # state messages stopped
+    assert arm.skill_done() and "no robot_state" in arm.last_done_reason
+
+
+def test_server_survives_a_process_wide_socket_timeout(tmp_path):
+    """rospy sets socket.setdefaulttimeout(); the idle server died in accept() after it."""
+    code = ("import socket, runpy, sys; socket.setdefaulttimeout(0.3); "
+            f"sys.argv = ['srv', '--fake', '--port', '0']; runpy.run_path({str(SERVER)!r}, run_name='__main__')")
+    p = subprocess.Popen([sys.executable, "-c", code], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+    try:
+        port = int(p.stdout.readline().split(":")[1].split()[0])
+        time.sleep(1.0)  # idle well past the default timeout
+        assert p.poll() is None, "server died while idle"
+        with connect(port) as robot:
+            robot.home()
+            time.sleep(0.8)  # a client pausing past the timeout, as at a prompt
+            stream_to(robot, SIM_HOME)
+    finally:
+        p.terminate()
+        p.wait(5)

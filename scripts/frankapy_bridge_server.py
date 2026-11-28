@@ -50,6 +50,7 @@ import time
 Q_MIN = [-2.8973, -1.7628, -2.8973, -3.0718, -2.8973, -0.0175, -2.8973]
 Q_MAX = [2.8973, 1.7628, 2.8973, -0.0698, 2.8973, 3.7525, 2.8973]
 MAX_WIDTH = 0.08
+MODE_MOVE = 2  # libfranka RobotMode kMove: executing a motion (a skill)
 
 
 # franka-interface's virtual walls (control PC, termination_handler.h): plane normal, point on
@@ -178,7 +179,7 @@ class FakeArm:
 class FrankapyArm:
     """The real arm through frankapy. Every call happens under the server's lock."""
 
-    def __init__(self, k_gains=None, session_s=3600.0):
+    def __init__(self, k_gains=None, session_s=3600.0, robot_state_topic="/robot_state_publisher_node_1/robot_state"):
         import rospy
         from franka_interface_msgs.msg import SensorDataGroup
         from frankapy import FrankaArm, SensorDataMessageType
@@ -188,14 +189,44 @@ class FrankapyArm:
 
         self._rospy, self._FC, self._SDT = rospy, FC, SensorDataMessageType
         self._JPSM, self._make, self._p2r = JointPositionSensorMessage, make_sensor_group_msg, sensor_proto2ros_msg
+        from franka_interface_msgs.msg import RobotState
+        from frankapy.proto import ShouldTerminateSensorMessage
+
+        self._STSM = ShouldTerminateSensorMessage
         self.fa = FrankaArm()  # calls rospy.init_node
         self.pub = rospy.Publisher(FC.DEFAULT_SENSOR_PUBLISHER_TOPIC, SensorDataGroup, queue_size=10)
         self.k_gains = k_gains
         self.session_s = session_s
         self._id = 0
         self._t0 = time.time()
+        # The robot's own mode, straight from franka-interface's state publisher: 2 = executing a
+        # skill (libfranka kMove), 1 = idle. This, not the ROS action's result, says whether the
+        # skill runs: the action server aborts a goal when franka-interface's status flickers to
+        # "not ready" while the robot carries on with the skill (seen 2026-11-27, skill 12).
+        self.mode, self.mode_t, self._not_moving = None, 0.0, 0
+        rospy.Subscriber(robot_state_topic, RobotState, self._on_state, queue_size=1)
+        self.last_done_reason = ""
+
+    def _on_state(self, msg):
+        self.mode, self.mode_t = int(msg.robot_mode), time.time()
+
+    def robot_busy(self):
+        """True while the robot executes a skill (mode 2, from a fresh state message)."""
+        return self.mode == MODE_MOVE and time.time() - self.mode_t < 0.5
+
+    def _wait_mode(self, busy, timeout):
+        t_end = time.time() + timeout
+        while time.time() < t_end:
+            if self.robot_busy() == busy:
+                return True
+            time.sleep(0.02)
+        return False
 
     def goto_joints_blocking(self, q):
+        if self.robot_busy():  # a skill still runs on the robot (e.g. a stream whose action was aborted)
+            self.stop()
+            if not self._wait_mode(False, 3.0):
+                raise RuntimeError("the robot is still executing a skill and did not stop; e-stop and restart")
         now = self.fa.get_joints()
         dist = max(abs(a - b) for a, b in zip(q, now))
         q, duration = frankapy_joints_args(q, max(4.0, dist / 0.3))  # at most 0.3 rad/s on any joint
@@ -219,6 +250,9 @@ class FrankapyArm:
         self.fa.goto_joints(q, duration=duration, dynamic=True, buffer_time=10,
                             ignore_virtual_walls=False, **kw)
         self._id, self._t0 = 0, time.time()
+        self._not_moving = 0
+        if not self._wait_mode(True, 3.0):
+            raise RuntimeError("the streaming skill did not start on the robot within 3 s")
 
     def publish(self, q, dt):
         self._id += 1
@@ -226,21 +260,34 @@ class FrankapyArm:
         self.pub.publish(self._make(trajectory_generator_sensor_msg=self._p2r(msg, self._SDT.JOINT_POSITION)))
 
     def stop(self):
-        self.fa.stop_skill()
+        """End the skill on the robot. The skill reads a ShouldTerminate sensor message every
+        control step, which works even when the ROS action was already aborted (cancelling the
+        action alone does not reach the robot then). Then tidy frankapy's own bookkeeping."""
+        for _ in range(5):
+            msg = self._STSM(timestamp=time.time() - self._t0, should_terminate=True)
+            self.pub.publish(self._make(termination_handler_sensor_msg=self._p2r(msg, self._SDT.SHOULD_TERMINATE)))
+            time.sleep(0.02)
+        stopped = self._wait_mode(False, 2.0)
+        if self.fa._in_skill:
+            try:
+                self.fa._client.cancel_goal()  # non-blocking: stop_skill() would wait on the action
+            except Exception as e:
+                print("cancel_goal:", e, flush=True)
+            self.fa._in_skill = False
+        if not stopped:
+            print("warning: robot still in a skill 2 s after the terminate message", flush=True)
 
     def skill_done(self):
-        # ignore_errors=False: the default waits (blocks) until franka-interface recovers from an
-        # error, which would freeze the watchdog. Any error means the skill is over.
-        self.last_done_reason = ""
-        try:
-            done = self.fa.is_skill_done(ignore_errors=False)
-            if done:
-                self.last_done_reason = "frankapy is_skill_done() returned True"
-            return done
-        except Exception as e:
-            self.last_done_reason = f"frankapy is_skill_done raised {type(e).__name__}: {e}"
-            print("skill ended with error:", e, flush=True)
+        """True once the robot has left mode 2 for 3 checks in a row (0.3 s at the server's 10 Hz),
+        or its state messages stopped. One flicker does not end streaming."""
+        if time.time() - self.mode_t > 1.0:
+            self.last_done_reason = "no robot_state message for 1 s"
             return True
+        self._not_moving = 0 if self.mode == MODE_MOVE else self._not_moving + 1
+        if self._not_moving >= 3:
+            self.last_done_reason = f"robot_mode {self.mode} (not executing a skill) for 0.3 s"
+            return True
+        return False
 
     def state(self):
         q = [float(x) for x in self.fa.get_joints()]
@@ -378,6 +425,7 @@ class Bridge:
 def serve(bridge, host, port, ready=None):
     srv = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     srv.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    srv.settimeout(None)  # rospy sets a process-wide socket timeout; an idle server must not die of it
     srv.bind((host, port))
     srv.listen(1)
     print("bridge listening on {}:{} ({})".format(host, srv.getsockname()[1], "fake" if bridge.fake else "frankapy"), flush=True)
@@ -386,6 +434,7 @@ def serve(bridge, host, port, ready=None):
     try:
         while True:
             conn, addr = srv.accept()
+            conn.settimeout(None)  # a client may pause for minutes at an operator prompt
             print("client connected", addr, flush=True)
             with conn, conn.makefile("rwb") as f:
                 for line in f:
