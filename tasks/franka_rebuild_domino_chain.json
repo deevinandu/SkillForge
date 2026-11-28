@@ -1,0 +1,505 @@
+{
+  "id": "franka_rebuild_domino_chain",
+  "instruction": "Five dominoes stand in a row. Someone takes one out and stands it somewhere at the side of the table, and may do it again to one you just put back: rebuild the row, then knock the first one over so the whole row falls away from you.",
+  "scene": {
+    "robot": {
+      "name": "franka_panda",
+      "source": "menagerie:franka_emika_panda",
+      "ee_site": "tcp",
+      "gripper": "parallel",
+      "max_gripper_width": 0.08,
+      "fingertips": "foam"
+    },
+    "table": {
+      "width": 0.55,
+      "depth": 0.9,
+      "back": 0.0
+    },
+    "fixtures": [
+      {
+        "name": "shelf_1",
+        "center": [
+          0.45,
+          -0.24250000000000002,
+          0.0675
+        ],
+        "half_extents": [
+          0.45,
+          0.0325,
+          0.0075
+        ],
+        "ledge": false
+      },
+      {
+        "name": "shelf_2",
+        "center": [
+          0.45,
+          -0.24250000000000002,
+          0.1625
+        ],
+        "half_extents": [
+          0.45,
+          0.0325,
+          0.0075
+        ],
+        "ledge": false
+      },
+      {
+        "name": "shelf_3",
+        "center": [
+          0.45,
+          -0.24250000000000002,
+          0.2575
+        ],
+        "half_extents": [
+          0.45,
+          0.0325,
+          0.0075
+        ],
+        "ledge": true
+      },
+      {
+        "name": "shelf_back",
+        "center": [
+          0.45,
+          -0.28500000000000003,
+          0.2
+        ],
+        "half_extents": [
+          0.45,
+          0.01,
+          0.2
+        ]
+      },
+      {
+        "name": "frame_post_back",
+        "center": [
+          0.03,
+          0.29500000000000004,
+          0.5
+        ],
+        "half_extents": [
+          0.02,
+          0.02,
+          0.5
+        ],
+        "rgba": [
+          0.1,
+          0.18,
+          0.22,
+          1
+        ]
+      },
+      {
+        "name": "frame_post_front",
+        "center": [
+          0.87,
+          0.29500000000000004,
+          0.5
+        ],
+        "half_extents": [
+          0.02,
+          0.02,
+          0.5
+        ],
+        "rgba": [
+          0.1,
+          0.18,
+          0.22,
+          1
+        ]
+      },
+      {
+        "name": "frame_beam",
+        "center": [
+          0.45,
+          0.29500000000000004,
+          1.0
+        ],
+        "half_extents": [
+          0.45,
+          0.02,
+          0.02
+        ],
+        "rgba": [
+          0.1,
+          0.18,
+          0.22,
+          1
+        ]
+      }
+    ],
+    "objects": [
+      {
+        "name": "domino_1",
+        "shape": "box",
+        "size": [
+          0.007861,
+          0.012554,
+          0.025368
+        ],
+        "mass": 0.024,
+        "friction": 0.8,
+        "pose": {
+          "pos": [
+            0.42,
+            0.0,
+            0.025368
+          ],
+          "quat": [
+            1.0,
+            0.0,
+            0.0,
+            0.0
+          ]
+        },
+        "color": "red"
+      },
+      {
+        "name": "domino_2",
+        "shape": "box",
+        "size": [
+          0.007861,
+          0.012554,
+          0.025368
+        ],
+        "mass": 0.024,
+        "friction": 0.8,
+        "pose": {
+          "pos": [
+            0.454,
+            0.0,
+            0.025368
+          ],
+          "quat": [
+            1.0,
+            0.0,
+            0.0,
+            0.0
+          ]
+        },
+        "color": "blue"
+      },
+      {
+        "name": "domino_3",
+        "shape": "box",
+        "size": [
+          0.007861,
+          0.012554,
+          0.025368
+        ],
+        "mass": 0.024,
+        "friction": 0.8,
+        "pose": {
+          "pos": [
+            0.488,
+            0.0,
+            0.025368
+          ],
+          "quat": [
+            1.0,
+            0.0,
+            0.0,
+            0.0
+          ]
+        },
+        "color": "yellow"
+      },
+      {
+        "name": "domino_4",
+        "shape": "box",
+        "size": [
+          0.007861,
+          0.012554,
+          0.025368
+        ],
+        "mass": 0.024,
+        "friction": 0.8,
+        "pose": {
+          "pos": [
+            0.522,
+            0.0,
+            0.025368
+          ],
+          "quat": [
+            1.0,
+            0.0,
+            0.0,
+            0.0
+          ]
+        },
+        "color": "orange"
+      },
+      {
+        "name": "domino_5",
+        "shape": "box",
+        "size": [
+          0.007861,
+          0.012554,
+          0.025368
+        ],
+        "mass": 0.024,
+        "friction": 0.8,
+        "pose": {
+          "pos": [
+            0.556,
+            0.0,
+            0.025368
+          ],
+          "quat": [
+            1.0,
+            0.0,
+            0.0,
+            0.0
+          ]
+        },
+        "color": "purple"
+      }
+    ],
+    "regions": [
+      {
+        "name": "lane",
+        "center": [
+          0.4984,
+          0.0,
+          0.02
+        ],
+        "half_extents": [
+          0.1284,
+          0.07,
+          0.04
+        ],
+        "visible": false
+      },
+      {
+        "name": "spot_domino_1",
+        "center": [
+          0.42,
+          0.0,
+          0.025368
+        ],
+        "half_extents": [
+          0.004,
+          0.004,
+          0.004
+        ],
+        "visible": false
+      },
+      {
+        "name": "spot_domino_2",
+        "center": [
+          0.454,
+          0.0,
+          0.025368
+        ],
+        "half_extents": [
+          0.004,
+          0.004,
+          0.004
+        ],
+        "visible": false
+      },
+      {
+        "name": "spot_domino_3",
+        "center": [
+          0.488,
+          0.0,
+          0.025368
+        ],
+        "half_extents": [
+          0.004,
+          0.004,
+          0.004
+        ],
+        "visible": false
+      },
+      {
+        "name": "spot_domino_4",
+        "center": [
+          0.522,
+          0.0,
+          0.025368
+        ],
+        "half_extents": [
+          0.004,
+          0.004,
+          0.004
+        ],
+        "visible": false
+      },
+      {
+        "name": "spot_domino_5",
+        "center": [
+          0.556,
+          0.0,
+          0.025368
+        ],
+        "half_extents": [
+          0.004,
+          0.004,
+          0.004
+        ],
+        "visible": false
+      },
+      {
+        "name": "side_r",
+        "center": [
+          0.41,
+          -0.105,
+          0.03
+        ],
+        "half_extents": [
+          0.06,
+          0.025,
+          0.04
+        ],
+        "visible": false
+      },
+      {
+        "name": "side_l",
+        "center": [
+          0.41,
+          0.17,
+          0.03
+        ],
+        "half_extents": [
+          0.06,
+          0.04,
+          0.04
+        ],
+        "visible": false
+      }
+    ],
+    "randomization": {
+      "object_xy_jitter": {
+        "lo": 0.0,
+        "hi": 0.003
+      },
+      "object_yaw_jitter": {
+        "lo": 0.0,
+        "hi": 0.05
+      },
+      "friction_scale": {
+        "lo": 0.7,
+        "hi": 1.2
+      },
+      "mass_scale": {
+        "lo": 0.8,
+        "hi": 1.25
+      },
+      "actuator_gain_scale": {
+        "lo": 0.8,
+        "hi": 1.2
+      },
+      "obs_noise_std": {
+        "lo": 0.0,
+        "hi": 0.002
+      },
+      "action_latency_steps": {
+        "lo": 0,
+        "hi": 2
+      }
+    },
+    "disturbances": [
+      {
+        "kind": "relocate",
+        "objects": [],
+        "count": 1,
+        "at_step": {
+          "lo": 1,
+          "hi": 40
+        },
+        "regions": [
+          "side_r",
+          "side_l"
+        ],
+        "faces": [
+          "upright"
+        ],
+        "before_event": "toppled:",
+        "max_yaw": 0.4
+      },
+      {
+        "kind": "relocate",
+        "after_event": "release:",
+        "target": "event_object",
+        "prob": 0.5,
+        "at_step": {
+          "lo": 3,
+          "hi": 15
+        },
+        "regions": [
+          "side_r",
+          "side_l"
+        ],
+        "faces": [
+          "upright"
+        ],
+        "before_event": "toppled:",
+        "max_yaw": 0.4
+      }
+    ]
+  },
+  "success": {
+    "kind": "all_of",
+    "conditions": [
+      {
+        "kind": "object_toppled",
+        "object": "domino_1",
+        "min_tilt": 0.6,
+        "direction": [
+          1.0,
+          0.0
+        ],
+        "dir_tol": 0.8,
+        "region": "lane"
+      },
+      {
+        "kind": "object_toppled",
+        "object": "domino_2",
+        "min_tilt": 0.6,
+        "direction": [
+          1.0,
+          0.0
+        ],
+        "dir_tol": 0.8,
+        "region": "lane"
+      },
+      {
+        "kind": "object_toppled",
+        "object": "domino_3",
+        "min_tilt": 0.6,
+        "direction": [
+          1.0,
+          0.0
+        ],
+        "dir_tol": 0.8,
+        "region": "lane"
+      },
+      {
+        "kind": "object_toppled",
+        "object": "domino_4",
+        "min_tilt": 0.6,
+        "direction": [
+          1.0,
+          0.0
+        ],
+        "dir_tol": 0.8,
+        "region": "lane"
+      },
+      {
+        "kind": "object_toppled",
+        "object": "domino_5",
+        "min_tilt": 0.6,
+        "direction": [
+          1.0,
+          0.0
+        ],
+        "dir_tol": 0.8,
+        "region": "lane"
+      }
+    ]
+  },
+  "max_steps": 5000,
+  "control_hz": 20
+}

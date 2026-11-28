@@ -6,6 +6,9 @@
     python scripts/try_dominoes.py --task franka_topple_domino_chain_knock --seed 3
     python scripts/try_dominoes.py --no-disturb                      # same task, disturbances off
     python scripts/try_dominoes.py --seeds 20                        # success rate over seeds 0..19
+    python scripts/try_dominoes.py --seeds 10 --task franka_rebuild_fallen_dominoes --stand-up
+    python scripts/try_dominoes.py --view --task franka_build_domino_chain_scattered   # random starts
+    python scripts/try_dominoes.py --view --task franka_rebuild_domino_chain           # laid-down dominoes
 
 On macOS the viewer needs `mjpython scripts/try_dominoes.py --view` (comes with the mujoco package).
 """
@@ -13,11 +16,13 @@ On macOS the viewer needs `mjpython scripts/try_dominoes.py --view` (comes with 
 from __future__ import annotations
 
 import argparse
+import os
+import sys
 import time
 from pathlib import Path
 
 from skillforge.contracts import TaskSpec
-from skillforge.eval import evaluate, run_episode
+from skillforge.eval import run_episode
 from skillforge.sim import make_env
 from skillforge.skills import ToppleChain
 
@@ -41,15 +46,38 @@ def main() -> None:
     ap.add_argument("--speed", type=float, default=1.0, help="viewer playback speed")
     ap.add_argument("--gif", default=None)
     ap.add_argument("--no-disturb", action="store_true")
+    ap.add_argument("--no-shelves", action="store_true", help="the old open 1.2 m table, to compare")
+    ap.add_argument("--progress", type=int, default=100,
+                    help="print step, sim speed and the skill's phase every N steps (0: off)")
+    ap.add_argument("--stand-up", action="store_true", help="let ToppleChain stand fallen dominoes up (off by default)")
     a = ap.parse_args()
     task = load(a.task, not a.no_disturb)
+    if a.no_shelves:
+        sc = task.scene
+        sc = sc.model_copy(update={"table": sc.table.model_copy(update={"shelves": False, "width": 1.2})})
+        task = task.model_copy(update={"scene": sc})
+    ToppleChain.stand_up = a.stand_up or ToppleChain.stand_up
 
     if a.seeds:
-        report, eps = evaluate(make_env, ToppleChain(), task, range(a.seeds))
-        print(report.summary())
-        for e in eps:
-            if not e.success:
-                print(f"  seed {e.seed}: {e.failure} {e.failure_detail}")
+        env, wins = make_env(task), 0
+        keys = ("relay:", "standup:", "setdown:", "repair:", "pushed:")
+        for seed in range(a.seeds):
+            skill = ToppleChain()
+            ep = run_episode(env, skill, task, seed)
+            wins += ep.success
+            n = {k[:-1]: sum(f":{k}" in line for line in skill.log) for k in keys}
+            shelf = sum(e.startswith("collision:") and "shelf" in e for e in ep.events)
+            fails = [line.split(":", 2)[2] for line in skill.log if " failed: " in line]
+            reasons = {}
+            for f in fails:
+                r = f.split("failed: ", 1)[1].split("(")[0]
+                reasons[r] = reasons.get(r, 0) + 1
+            print(f"seed {seed}: {'OK  ' if ep.success else 'FAIL'} {ep.n_steps:5d} steps  {n}  shelf hits {shelf}"
+                  f"  failures {reasons}", flush=True)
+            for line in skill.log:
+                if ":giving up" in line or ":out of time" in line or ":report:" in line:
+                    print("     ", line)
+        print(f"\n{task.id}: {wins}/{a.seeds} succeeded{' (no shelves)' if a.no_shelves else ''}")
         return
 
     env, skill = make_env(task), ToppleChain()
@@ -66,7 +94,23 @@ def main() -> None:
 
             viewer = mujoco.viewer.launch_passive(env.model, env.data)
 
+        clock = {"t": time.time(), "i": 0, "idle": 0}
+
+        class Idle(Exception):
+            pass
+
         def hook(e, i):
+            # ToppleChain idles once it has nothing left to try; the episode would run on to max_steps
+            clock["idle"] = clock["idle"] + 1 if getattr(skill, "phase", "") == "idle" else 0
+            if clock["idle"] > 100:
+                raise Idle
+            if a.progress and i and i % a.progress == 0:
+                now = time.time()
+                rate = (i - clock["i"]) / max(now - clock["t"], 1e-9)
+                clock.update(t=now, i=i)
+                last = skill.log[-1] if getattr(skill, "log", None) else ""
+                print(f"  step {i:5d}  {rate:6.1f} steps/s  phase={getattr(skill, 'phase', '?')}  last: {last}",
+                      flush=True)
             if viewer is not None:
                 if not viewer.is_running():
                     raise KeyboardInterrupt
@@ -76,18 +120,26 @@ def main() -> None:
         try:
             ep = run_episode(env, skill, task, a.seed, on_step=hook)
         except KeyboardInterrupt:
-            print("viewer closed")
-            return
+            print("viewer closed", flush=True)
+            os._exit(0)  # skip interpreter teardown: the viewer's GL context hangs or segfaults there
+        except Idle:
+            print(f"\n{task.id} seed {a.seed}: the skill gave up (idle), stopped early. skill log:")
+            for line in skill.log:
+                print("  ", line)
+            sys.stdout.flush()
+            os._exit(0)
         finally:
             if viewer is not None:
-                time.sleep(1.0)
-                viewer.close()
+                time.sleep(1.0)  # not closed from here: that segfaults on some GL drivers
 
     print(f"\n{task.id} seed {a.seed}: success={ep.success} steps={ep.n_steps} failure={ep.failure} {ep.failure_detail}")
     print("events:", [e for e in ep.events if e.startswith(SHOW)])
     print("skill log:")
     for line in skill.log:
         print("  ", line)
+    if a.view:  # skip interpreter teardown: the viewer's GL context segfaults there on some drivers
+        sys.stdout.flush()
+        os._exit(0)
 
 
 if __name__ == "__main__":

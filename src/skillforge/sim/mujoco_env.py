@@ -12,11 +12,13 @@ targets through. Arm bodies are gravity-compensated, as the real Panda's control
 
 Randomness: all of it is drawn from `np.random.default_rng(seed)` at reset (scene draws),
 `np.random.default_rng([seed, 1])` (observation noise stream) and `np.random.default_rng([seed, 2])`
-(mid-episode disturbances, `sim/disturbances.py`), nothing else.
+(mid-episode disturbances, `sim/disturbances.py`) and `np.random.default_rng([seed, 3])` (random
+initial resting poses, `SceneSpec.scatter`, `sim/scatter.py`), nothing else.
 
 Disturbances (`SceneSpec.disturbances`) are applied after the physics step they are due on:
 'pose' teleports the object at rest (shrinking the offset if it would interpenetrate a neighbour,
-skipping it if even a quarter would), 'knock' sets an angular velocity about a horizontal axis.
+skipping it if even a quarter would), 'knock' sets an angular velocity about a horizontal axis,
+'relocate' puts it down at rest on a drawn face and yaw at the first drawn free spot (or offset).
 An object the fingers touch is not disturbed until it is let go. Objects named in an
 `object_toppled` leaf emit `toppled:<obj>` the first time they tilt past `TOPPLE_EVENT_TILT`.
 """
@@ -51,9 +53,24 @@ from skillforge.contracts import (  # noqa: E402
 )
 
 from .assets import resolve_robot_source  # noqa: E402
-from .disturbances import DisturbanceSchedule, Planned, knock_axis, quat_mul, yaw_quat  # noqa: E402
+from .disturbances import (  # noqa: E402
+    RELOCATE_CLEARANCE,
+    DisturbanceSchedule,
+    Planned,
+    knock_axis,
+    quat_mul,
+    yaw_quat,
+)
 from .mug import mug_parts  # noqa: E402
-from .success import ContactState, hold_steps, is_success, resting_half_height, tilt_of  # noqa: E402
+from .scatter import draw_scatter, free_spot, rest_height, rest_quat  # noqa: E402
+from .success import (  # noqa: E402
+    ContactState,
+    RestandTracker,
+    hold_steps,
+    is_success,
+    resting_half_height,
+    tilt_of,
+)
 
 # Process-wide: once creating a GL context has failed, never try again. MuJoCo can abort the
 # whole process (not raise) on a second attempt without a working context.
@@ -70,9 +87,18 @@ def _gl_unavailable_reason() -> str | None:
     return None
 
 TABLE_TOP_Z = 0.0
+SHELF_CLEAR = 0.13  # metres from a shelf's inner face that arm body origins keep (link radius ~0.06-0.08)
+SHELF_GAIN = 3.0  # null-space push per metre inside that band
+SHELF_WATCH = ("link3", "link4", "link5", "link6", "link7", "hand")
 TABLE_THICKNESS = 0.04
 DROP_Z = TABLE_TOP_Z - 0.05  # an object below this has fallen off the table: episode terminated
 EJECT_SPEED = 3.0  # m/s; a tabletop object moving faster than this was flung by the solver
+# Foam fingertips (RobotSpec.fingertips = "foam"): sliding, torsional, rolling friction; a slower,
+# softer contact (time constant 15 ms instead of MuJoCo's 20 ms default but with a lower impedance
+# floor, so the pad gives a few mm under load).
+FOAM_FRICTION = (1.6, 0.02, 0.001)
+FOAM_SOLREF = (0.015, 1.0)
+FOAM_SOLIMP = (0.6, 0.95, 0.004, 0.5, 2.0)
 TOPPLE_EVENT_TILT = 0.5  # radians: an object_toppled object past this tilt emits 'toppled:<obj>' once
 PENETRATION_TOL = 0.002  # metres: a teleported object may overlap a neighbour by at most this
 TCP_OFFSET = 0.1034  # metres from the hand frame to the fingertip pad centre, along hand z
@@ -193,6 +219,15 @@ class MujocoEnv:
                     g.contype = g.conaffinity = 0
                 elif g.type == mujoco.mjtGeom.mjGEOM_BOX and g.contype:  # the pad
                     g.pos[1] = g.size[1] + self.closed_pad_gap / 2
+        if rs.fingertips == "foam":  # foam on the pads: grippy, soft, resists twisting in the grasp
+            for fb in p.finger_bodies:
+                for g in spec.body(fb).geoms:
+                    if g.type == mujoco.mjtGeom.mjGEOM_BOX and g.contype:  # the pad (knobs are off above)
+                        g.friction = list(FOAM_FRICTION)
+                        g.condim = 6
+                        g.priority = 2  # above objects (1): the pad's friction and softness govern
+                        g.solref = list(FOAM_SOLREF)
+                        g.solimp = list(FOAM_SOLIMP)
         grip = spec.actuator(p.gripper_actuator)
         lo, hi = grip.ctrlrange  # menagerie: 0..255 -> tendon length 0..0.04 m
         grip.gainprm[0] = 0.04 * GRIP_KP / (hi - lo)
@@ -212,10 +247,23 @@ class MujocoEnv:
             name="floor", type=mujoco.mjtGeom.mjGEOM_PLANE, size=[3, 3, 0.05],
             pos=[0, 0, TABLE_TOP_Z - 0.75], rgba=[0.3, 0.33, 0.36, 1],
         )
+        tb = sc.table
+        tx = bx - tb.back + tb.depth / 2  # table centre (x)
         wb.add_geom(
-            name="table", type=mujoco.mjtGeom.mjGEOM_BOX, size=[0.6, 0.6, TABLE_THICKNESS / 2],
-            pos=[bx + 0.35, by, TABLE_TOP_Z - TABLE_THICKNESS / 2], rgba=[0.62, 0.5, 0.38, 1],
+            name="table", type=mujoco.mjtGeom.mjGEOM_BOX, size=[tb.depth / 2, tb.width / 2, TABLE_THICKNESS / 2],
+            pos=[tx, by, TABLE_TOP_Z - TABLE_THICKNESS / 2], rgba=[0.62, 0.5, 0.38, 1],
         )
+        for fx in sc.fixtures:
+            wb.add_geom(name=fx.name, type=mujoco.mjtGeom.mjGEOM_BOX, size=list(fx.half_extents),
+                        pos=list(fx.center), rgba=list(fx.rgba))
+        if tb.shelves:  # side panels of the shelf units on both sides of the table
+            for side, sgn in (("shelf_l", 1.0), ("shelf_r", -1.0)):
+                wb.add_geom(
+                    name=side, type=mujoco.mjtGeom.mjGEOM_BOX,
+                    size=[tb.depth / 2, tb.shelf_thickness / 2, tb.shelf_height / 2],
+                    pos=[tx, by + sgn * (tb.width / 2 + tb.shelf_thickness / 2), TABLE_TOP_Z + tb.shelf_height / 2],
+                    rgba=[0.55, 0.56, 0.6, 1],
+                )
         front = wb.add_camera(name="front", pos=[bx + 1.9, by, 0.95], fovy=50)
         front.alt.type = mujoco.mjtOrientation.mjORIENTATION_XYAXES
         front.alt.xyaxes = [0, 1, 0, -0.42, 0, 0.91]  # looking back at the robot, tilted down
@@ -253,10 +301,11 @@ class MujocoEnv:
                 mesh_name = f"{o.name}_mesh"
                 spec.add_mesh(name=mesh_name, file=str(os.path.abspath(o.mesh)), scale=list(o.size))
                 body.add_geom(type=mujoco.mjtGeom.mjGEOM_MESH, meshname=mesh_name, **g)
-        for r in sc.regions:
+        for r in sc.regions:  # invisible ones keep their site (code finds regions by name), not drawn
             wb.add_site(
                 name=r.name, type=mujoco.mjtGeom.mjGEOM_BOX, pos=list(r.center),
-                size=list(r.half_extents), rgba=[0.1, 0.8, 0.2, 0.25], group=0,
+                size=list(r.half_extents), rgba=[0.1, 0.8, 0.2, 0.25 if r.visible else 0.0],
+                group=0 if r.visible else 5,
             )
         return spec.compile()
 
@@ -303,6 +352,16 @@ class MujocoEnv:
             o.name: m.joint(f"{o.name}_free").dofadr[0] for o in self.task.scene.objects if not o.fixed
         }
         self._table_geom = m.geom("table").id
+        self._shelf_geoms = {m.geom(n).id: n for n in ("shelf_l", "shelf_r") if self.task.scene.table.shelves}
+        self._shelf_geoms.update({m.geom(f.name).id: f.name for f in self.task.scene.fixtures})
+        # With shelves the IK keeps the arm away from them in its null space (the elbow swivel):
+        # arm bodies whose origin comes within SHELF_CLEAR of a shelf's inner face are pushed back.
+        tb = self.task.scene.table
+        self._shelf_y = (self.task.scene.robot.base_pose.pos[1], tb.width / 2) if tb.shelves else None
+        self._fx_boxes = [(np.asarray(f.center, dtype=float), np.asarray(f.half_extents, dtype=float))
+                          for f in self.task.scene.fixtures]
+        self._shelf_bodies = [b for b in self._robot_bodies if self._body_name(b) in SHELF_WATCH]
+        self._jacb = np.zeros((3, m.nv))
         self._obj_body = {name: b for b, name in self._obj_bodies.items()}
         self._topple_watch = sorted(
             {c.object for c in success_conditions(self.task.success) if isinstance(c, ObjectToppled)}
@@ -364,6 +423,8 @@ class MujocoEnv:
         # mid-episode disturbances: their own stream, so no draw above changes
         self._disturb = DisturbanceSchedule(self.task, seed)
         s.update(self._disturb.sample)
+        self._scatter, scat = draw_scatter(self.task, seed)  # random initial resting poses
+        s.update(scat)
         self._sample = s
 
         # physical parameters, re-applied from nominal every reset
@@ -401,6 +462,8 @@ class MujocoEnv:
             q = np.zeros(4)
             mujoco.mju_mulQuat(q, qz, np.asarray(o.pose.quat, dtype=float))
             d.qpos[a + 3 : a + 7] = q
+            if o.name in self._scatter:
+                d.qpos[a : a + 3], d.qpos[a + 3 : a + 7] = self._scatter[o.name]
         self._q_des = self._home.copy()
         self._grip_cmd = 0.0
         self._apply_ctrl()
@@ -418,6 +481,7 @@ class MujocoEnv:
         self._unstable_seen = False
         self._ejected: set[str] = set()
         self._toppled_seen: set[str] = set()
+        self._restand = RestandTracker(self.task)
         self._n_warn = self._warnings()
         self._rec = self._robot_env_contacts()
         self._start = self._true_obj_pos()
@@ -451,8 +515,9 @@ class MujocoEnv:
         events += self._topple_events()
         pos = self._true_obj_pos()
         quats = self._true_obj_quat()
+        events += self._restand.update(quats)
         now = not self._unstable_seen and is_success(
-            self.task, pos, self._start, colors=self._colors, quats=quats,
+            self.task, pos, self._start, colors=self._colors, quats=quats, restood=self._restand.restood,
             contacts=self._contact_state() if self._need_contacts else None,
         )
         self._streak = self._streak + 1 if now else 0
@@ -585,6 +650,24 @@ class MujocoEnv:
             # null-space pull toward home posture, first iteration only: the damped projector leaks
             # a little into the task space, which later iterations then clean up
             v = 0.1 * (self._home - q) if it == 0 else np.zeros_like(q)
+            if it == 0 and self._fx_boxes:
+                for b in self._shelf_bodies:
+                    p = s.xpos[b]
+                    for c, h in self._fx_boxes:
+                        d = p - np.clip(p, c - h, c + h)  # from the box's closest point to the body
+                        n = math.sqrt(d @ d)
+                        if n < SHELF_CLEAR:
+                            u = d / n if n > 1e-6 else np.array([0.0, 0.0, 1.0])
+                            mujoco.mj_jacBody(m, s, self._jacb, None, b)
+                            v += SHELF_GAIN * (SHELF_CLEAR - n) * (u @ self._jacb[:, dofs])
+            if it == 0 and self._shelf_y is not None:
+                y0, hw = self._shelf_y
+                for b in self._shelf_bodies:
+                    dy = float(s.xpos[b][1]) - y0
+                    over = abs(dy) - (hw - SHELF_CLEAR)
+                    if over > 0:
+                        mujoco.mj_jacBody(m, s, self._jacb, None, b)
+                        v -= SHELF_GAIN * over * math.copysign(1.0, dy) * self._jacb[1, dofs]
             rhs[:, 0], rhs[:, 1] = e, J @ v
             y = np.linalg.solve(J @ J.T + lam2, rhs)
             # DLS step J^T (JJ^T + l^2 I)^-1 e, plus v projected onto the (damped) null space
@@ -725,6 +808,8 @@ class MujocoEnv:
                 continue
             if p.kind == "pose":
                 ok = self._teleport(name, p)
+            elif p.kind == "relocate":
+                ok = self._relocate(name, p)
             else:
                 self._knock(name, p)
                 ok = True
@@ -742,6 +827,30 @@ class MujocoEnv:
             d.qpos[a : a + 2] = saved[:2] + scale * np.array([p.dx, p.dy])
             q = quat_mul(yaw_quat(scale * p.dyaw), saved[3:7])
             d.qpos[a + 3 : a + 7] = q / np.linalg.norm(q)
+            d.qvel[v : v + 6] = 0.0
+            mujoco.mj_forward(m, d)
+            if self._penetration(name) <= PENETRATION_TOL:
+                return True
+        d.qpos[a : a + 7] = saved
+        mujoco.mj_forward(m, d)
+        return False
+
+    def _relocate(self, name: str, p: Planned) -> bool:
+        """Put `name` down at rest on `p.face` at `p.yaw_abs`: at the first drawn spot that is free,
+        or (no regions) where it is plus (dx, dy)."""
+        m, d = self.model, self.data
+        o = self.task.scene.object(name)
+        a, v = self._obj_free[name], self._obj_dof[name]
+        saved = d.qpos[a : a + 7].copy()
+        if p.cands:
+            others = [self.data.xpos[b][:2].copy() for b, n in self._obj_bodies.items() if n != name]
+            spots = free_spot(p.cands, others, RELOCATE_CLEARANCE)
+        else:
+            spots = [saved[:2] + np.array([p.dx, p.dy])]
+        q = rest_quat(o, p.face, p.yaw_abs)
+        for xy in spots:
+            d.qpos[a : a + 3] = [xy[0], xy[1], rest_height(o, p.face) + 0.001]
+            d.qpos[a + 3 : a + 7] = q
             d.qvel[v : v + 6] = 0.0
             mujoco.mj_forward(m, d)
             if self._penetration(name) <= PENETRATION_TOL:
@@ -816,6 +925,8 @@ class MujocoEnv:
                 pairs.add((self._body_name(rb), self._obj_bodies[ob]))
             elif og == self._table_geom:
                 pairs.add((self._body_name(rb), "table"))
+            elif og in self._shelf_geoms:
+                pairs.add((self._body_name(rb), self._shelf_geoms[og]))
         for a, b in sorted(pairs - self._contacts):
             events.append(f"collision:{a}-{b}")
         self._contacts = pairs
