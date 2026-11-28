@@ -4,6 +4,7 @@ The full loop runs here on a kinematic domino world (`tests/domino_kinematic.py`
 skill's decisions, not physics. The MuJoCo tests at the end are the real check.
 """
 
+import json
 import math
 from pathlib import Path
 
@@ -189,9 +190,10 @@ def test_mujoco_undisturbed_chain(mj):
     assert ep.success, (ep.failure, ep.failure_detail)
 
 
-# Measured on MuJoCo (20 seeds, 2026-11-27): 19, 19, 20, 16, 20 /20. A majority of 5 seeds keeps
-# CI honest without tripping on the odd failing seed (seed 0 of the scattered task fails).
-MEASURED = DOMINO_TASKS[:5]
+# Measured on MuJoCo (2026-11-28, the 55 cm cell, ToppleChain 0.4, before merging main):
+# build_scattered 17/20, rebuild_domino_chain 19/20, rebuild_fallen 23/30, retopple 29/30.
+# A majority of 5 seeds keeps CI honest without tripping on the odd failing seed.
+MEASURED = DOMINO_TASKS
 
 
 @pytest.mark.parametrize("name", MEASURED)
@@ -201,17 +203,32 @@ def test_mujoco_domino_tasks_mostly_succeed(mj, name):
     assert ok >= 3, [(e.seed, e.failure, e.failure_detail) for e in eps if not e.success]
 
 
-@pytest.mark.xfail(reason="StandUp fails in MuJoCo (0/10, round 3): see ToppleChain.stand_up", strict=False)
-def test_mujoco_rebuild_fallen_dominoes(mj):
-    from skillforge.eval import evaluate
+def test_mujoco_ledge_stand_up(mj):
+    """LedgeStandUp alone, one flat domino (diag_ledge: 16/16 in MuJoCo)."""
     from skillforge.sim import make_env
+    from skillforge.sim.scatter import rest_height, rest_quat
+    from skillforge.skills.dominoes import LedgeStandUp, tilt
 
-    class On(ToppleChain):
-        stand_up = True
-
-    pytest.importorskip("mujoco")
-    _, eps = evaluate(make_env, On(), load("franka_rebuild_fallen_dominoes"), range(3))
-    assert sum(e.success for e in eps) >= 2, [(e.seed, e.failure, e.failure_detail) for e in eps if not e.success]
+    d = json.loads(load("franka_rebuild_fallen_dominoes").model_dump_json())
+    sc = d["scene"]
+    sc["objects"], sc["disturbances"], sc["scatter"] = sc["objects"][:1], [], None
+    d["success"]["conditions"] = d["success"]["conditions"][:1]
+    sc["regions"] = [r for r in sc["regions"] if r["name"] in ("lane", "spot_domino_1")]
+    o = TaskSpec.model_validate(d).scene.object("domino_1")
+    sc["objects"][0]["pose"] = {"pos": [0.42, 0.10, rest_height(o, "flat")], "quat": [float(v) for v in rest_quat(o, "flat", 0.0)]}
+    t = TaskSpec.model_validate(d)
+    env = make_env(t)
+    obs = env.reset(0)
+    spot = np.array([0.44, 0.09, 0.0])
+    job = LedgeStandUp(t, "domino_1", next(f for f in t.scene.fixtures if f.ledge), spot, np.array([1.0, 0, 0]),
+                       obs.objects["domino_1"].quat)
+    for _ in range(1200):
+        obs, _ = env.step(job.act(obs))
+        if not job.status.running:
+            break
+    assert not job.status.failed, job.status.reason
+    o = obs.objects["domino_1"]
+    assert tilt(o.quat) < 0.15 and np.linalg.norm(o.pos[:2] - spot[:2]) < 0.03
 
 
 # ---------------------------------------------------------------- standing fallen dominoes up
