@@ -34,6 +34,13 @@ from typing import Any
 from skillforge.contracts import EvalReport, SimEnv, SkillSource, TaskSpec
 
 from .budget import BudgetExceeded, CallUsage, UsageMeter
+from .lessons import (
+    LESSON_REPORT_FILE,
+    LESSON_REPORT_INSTRUCTIONS,
+    TOPICS,
+    LessonReport,
+    parse_lesson_report,
+)
 from .library import bump_version
 from .llm_improver import (
     DEFAULT_MODEL,
@@ -96,7 +103,7 @@ attribute to "{new_version}".
 Rules for skill code: one self-contained file; it may import numpy, the standard library,
 skillforge.contracts and skillforge.skills; no network, files, subprocesses or randomness; it must
 not special-case seeds or randomization values (it only sees observations, so it cannot anyway).
-{notes}
+{notes}{lessons}
 When done, write RATIONALE.md: at most five sentences on what you changed, which failure it
 targets, and the dev success rate before and after. Then stop.
 """
@@ -207,6 +214,10 @@ class ClaudeCodeImprover:
         self.claude_bin = claude_bin
         self.runner = runner
         self.notes: list[str] = []
+        # scoped lessons (docs/LESSONS.md): set by run_loop / curate before each propose()
+        self.lessons_text: str = ""  # promoted lessons for this robot, rendered; written to LESSONS.md
+        self.directive: str = ""  # an extra instruction (the verifier's "reproduce", the checker's "apply only")
+        self.lesson_report: LessonReport | None = None  # LESSONS.json from the last propose()
         self.calls: list[dict] = []  # per CLI call: workspace, cost, turns, duration, session
 
     # -- workspace -------------------------------------------------------------
@@ -245,6 +256,13 @@ class ClaudeCodeImprover:
         script = ws / "dev_eval"
         script.write_text(DEV_EVAL.format(python=self.python))
         script.chmod(0o755)
+        lessons = ""
+        if self.lessons_text:
+            (ws / "LESSONS.md").write_text(self.lessons_text)
+            lessons += "\nLESSONS.md holds lessons from earlier repairs (other tasks and robots); read it before changing anything.\n"
+        if self.directive:
+            lessons += f"\n{self.directive}\n"
+        lessons += "\n" + LESSON_REPORT_INSTRUCTIONS.format(topics="|".join(TOPICS), robot=task.scene.robot.name)
         notes = ""
         if self.notes:
             notes = "\nEarlier attempts in this run (learn from them):\n" + "\n".join(f"- {n}" for n in self.notes[-10:]) + "\n"
@@ -256,6 +274,7 @@ class ClaudeCodeImprover:
             max_dev=self.max_dev_seeds,
             new_version=new_version,
             notes=notes,
+            lessons=lessons,
         )
 
     # -- CLI -------------------------------------------------------------------
@@ -312,6 +331,7 @@ class ClaudeCodeImprover:
         new_version = bump_version(current.version)
         ws = self._workspace(task, current)
         prompt = self._write_workspace(ws, task, current, report, new_version)
+        self.lesson_report = None
         res = self._call(ws, prompt)
         session = res.session_id
         last_err = res.error
@@ -333,6 +353,7 @@ class ClaudeCodeImprover:
                     )
                     chk = check_source(task, cand, self.make_env, timeout_s=self.check_timeout_s)
                     if chk.ok:
+                        self.lesson_report = _read_lesson_report(ws)
                         self.notes.append(f"{new_version} (from {current.version} at {report.success_rate:.0%}): {cand.rationale[:300]}")
                         return cand
                     last_err = f"sandbox {chk.stage} failed:\n{chk.error}"
@@ -352,3 +373,14 @@ class ClaudeCodeImprover:
 
 def dev_seed_list(n: int) -> Sequence[int]:
     return range(DEV_SEED_BASE, DEV_SEED_BASE + n)
+
+
+def _read_lesson_report(ws: Path) -> LessonReport | None:
+    """LESSONS.json from the workspace, or None if missing or malformed (a lesson is optional)."""
+    f = ws / LESSON_REPORT_FILE
+    if not f.exists():
+        return None
+    try:
+        return parse_lesson_report(f.read_text())
+    except Exception:
+        return None
