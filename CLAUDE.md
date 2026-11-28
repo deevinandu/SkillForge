@@ -5,7 +5,7 @@ domain randomization, turn it into training data and a learned policy, then depl
 robot. Real failures feed back into the twin and the tests. Roadmap: docs/ROADMAP.md.
 
 ## Read first, write last
-1. Read this file, `HANDOVER.md`, and your track brief in `docs/tracks/`.
+1. Read this file, `HANDOVER.md`, `docs/PROJECT.md` (the research question), and your track brief in `docs/tracks/`.
 2. Do the work on your track branch (`track/tN-name`).
 3. Before you stop, append a progress entry to `HANDOVER.md`: date, track, what was done, what's next, gotchas.
 

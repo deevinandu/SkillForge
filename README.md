@@ -11,6 +11,13 @@ for a learned policy, and (later) validates it on a real arm.
 > **Nothing has run on a real arm yet**, and the VLM success judge has never made a real API
 > call. `HANDOVER.md` has the measurements and what each one does and does not show.
 
+## This fork's research question
+Team Echo (CMU Robot Autonomy) uses SkillForge to study a **skill library shared across robot
+arms with scoped repairs** (general vs robot-specific fixes), building on ASPIRE
+(arXiv 2607.00272). See [`docs/PROJECT.md`](docs/PROJECT.md) and the brief
+[`docs/tracks/scoped-library.md`](docs/tracks/scoped-library.md). Cross-robot work has not
+started: the sim supports only the Franka Panda.
+
 ## The loop
 ```
 TaskSpec ──▶ skill (agent-written) ──▶ randomized rollouts ──▶ EvalReport
