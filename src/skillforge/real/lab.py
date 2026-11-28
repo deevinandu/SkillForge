@@ -66,8 +66,12 @@ class PlacementPicture:
 
 def make_lab_env(task: TaskSpec, *, extrinsics: str | Path, port: int = 8765, speed: float = 0.1,
                  serial: str | None = None, picture: str | Path | None = "runs/real/placement.png",
+                 free_placement: bool = False, predict=None, layout_dir: str | Path | None = None,
                  robot=None, frames=None, estimator=None, operator=None) -> RealEnv:
-    """The lab cell as a `RealEnv`. `speed`: tool speed limit (m/s); 0.1 until 10 clean trials (T7 brief)."""
+    """The lab cell as a `RealEnv`. `speed`: tool speed limit (m/s); 0.1 until 10 clean trials (T7 brief).
+
+    free_placement: objects go anywhere in the start area (`FreePlacementOperator`); `predict`
+    (pinned task -> Prediction) is the per-layout sim prediction, `layout_dir` where layouts are saved."""
     if estimator is None:
         if not identical_cylinders(task):
             raise ValueError(f"{task.id}: only tasks whose movable objects are identical cylinders are wired "
@@ -78,8 +82,14 @@ def make_lab_env(task: TaskSpec, *, extrinsics: str | Path, port: int = 8765, sp
         frames = RealSenseFrameSource([RealSenseCamera(CAMERA, load_extrinsics(extrinsics), serial=serial,
                                                        width=1280, height=720)])
     if operator is None:
-        show = PlacementPicture(task, frames, estimator, picture) if picture else None
-        operator = TerminalOperator(show=show)
+        pic = PlacementPicture(task, frames, estimator, picture) if picture else None
+        if free_placement:
+            from .free_placement import FreePlacementOperator
+
+            operator = FreePlacementOperator(task, predict=predict, show=(lambda: pic(0, {})) if pic else None,
+                                             out=Path(layout_dir) if layout_dir else None)
+        else:
+            operator = TerminalOperator(show=pic)
     if robot is None:
         robot = FrankaBridgeRobotIO(port=port)
     limits = SafetyLimits(ee_speed=speed)

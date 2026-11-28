@@ -75,7 +75,17 @@ def cmd_run(a: argparse.Namespace) -> None:
         out = Path(a.out) if a.out else RUNS / "real" / f"{datetime.now():%Y%m%d-%H%M%S}-hw-{task.id}"
         print(f"{src.name}@{src.version} approved for hardware by {entry['by']} at {entry['at']}")
         print(f"tool speed limit {a.speed} m/s; a person must be at the e-stop. Placement picture: {out}/placement.png")
-        env = make_lab_env(task, extrinsics=a.extrinsics, port=a.port, speed=a.speed, picture=out / "placement.png")
+        predict = None
+        if a.free_placement and a.predict > 0:
+            from .free_placement import sim_prediction
+
+            def predict(pinned, src=src, n=a.predict):
+                return sim_prediction(pinned, src, n)
+        if a.free_placement:
+            print("free placement: put the objects anywhere in the start area; the sim predicts each layout "
+                  f"({a.predict} runs). Layouts and predictions: {out}/layouts/")
+        env = make_lab_env(task, extrinsics=a.extrinsics, port=a.port, speed=a.speed, picture=out / "placement.png",
+                           free_placement=a.free_placement, predict=predict, layout_dir=out / "layouts")
         try:
             run_session(env, load_skill(src), task, _seeds(a.seeds), TerminalLabeller(), out, mode="hardware")
         finally:
@@ -231,6 +241,10 @@ def main(argv: list[str] | None = None) -> int:
             p.add_argument("--speed", type=float, default=0.1, help="tool speed limit, m/s")
             p.add_argument("--extrinsics", help="camera calibration (hardware runs): T_world_cam .json or .npy")
             p.add_argument("--port", type=int, default=8765, help="frankapy bridge server port (hardware runs)")
+            p.add_argument("--free-placement", action="store_true",
+                           help="hardware: objects anywhere in the start area, measured and checked, instead of drawn spots")
+            p.add_argument("--predict", type=int, default=50,
+                           help="with --free-placement: sim runs on each measured layout (0 = skip the prediction)")
             p.add_argument("--out")
         p.set_defaults(fn=fn)
     p = sub.add_parser("register", help="evaluate a hand-written skill in sim and add it to the library")
