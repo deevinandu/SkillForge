@@ -894,6 +894,12 @@ class ToppleChain:
         # way is rebuilt: stood up in a clear spot (then repaired onto its spot like any other).
         # Top of a pile first, so nothing is resting on the one being picked.
         bad = [k for k in self.order if st[k] == "down_bad" and self.standups[k] < self.max_standups]
+        if bad and self.pushed and not any(st[k] in ("ok", "misplaced", "leaning") for k in self.order) and any(
+                k in self.restand and k not in self.restood_seen for k in bad):
+            # the robot's own push toppled dominoes that still had to be stood back up first
+            # (e.g. the knock did not bring the row down): the row is still, so rebuild it again
+            self.pushed = False
+            self.log.append(f"{self.steps}:rebuild again: fell before being stood back up [{summary}]")
         if bad and not self.pushed and not self.stand_up:
             new = [k for k in bad if self.standups[k] == 0]
             for k in new:
