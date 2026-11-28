@@ -30,6 +30,7 @@ from typing import Protocol, runtime_checkable
 import numpy as np
 
 from skillforge.contracts import Action, Observation, StepInfo, TaskSpec
+from skillforge.contracts.specs import success_objects
 from skillforge.perception import Estimate, FrameSource, PerceivedEnv, PoseEstimator
 from skillforge.perception.estimators import quat_yaw, wrap
 from skillforge.sim import is_success
@@ -351,10 +352,11 @@ class RealEnv:
             self._arm.safety_log.append((self._arm._k, f"safety:exception:{name}"))
             return self._obs, StepInfo(success=False, terminated=True, events=[f"safety:exception:{name}"])
         self._obs = obs
-        target = self.task.success.object
+        # every object the success spec names must be seen (a multi-object spec has no `.object`)
+        needed = success_objects(self.task.success)
         success = (
             self._arm.stopped is None
-            and target in obs.objects
+            and all(n in obs.objects for n in needed)
             and is_success(self.task, {n: s.pos for n, s in obs.objects.items()}, self._start)
         )
         return obs, StepInfo(success=bool(success), terminated=info.terminated, events=info.events)

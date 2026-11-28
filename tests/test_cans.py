@@ -160,3 +160,29 @@ def test_mixed_sizes_are_refused():
     data["scene"]["objects"][0]["size"] = [0.03, 0.0419, 0.0]
     with pytest.raises(ValueError, match="identical"):
         IdenticalCylinderEstimator().reset(TaskSpec.model_validate(data))
+
+
+def test_names_match_the_task_start_poses_at_a_trial_start():
+    """The operator places the can for cyl_k at cyl_k's start: that can must be called cyl_k."""
+    task = TaskSpec.model_validate(json.loads((TASK.parent / "franka_stack_can_pyramid_lab.json").read_text()))
+    env = make_env(task)
+    env.reset(0)
+    if env.render() is None:
+        env.close()
+        pytest.skip("no GL context for rendering")
+    src = SimFrameSource(env, virtual=(lab_camera(),), size=(480, 640), depth_noise=0.002)
+    try:
+        rng = np.random.default_rng(3)
+        placed = {}
+        for o in task.scene.objects:
+            p = np.array(o.pose.pos) + [*rng.uniform(-0.012, 0.012, 2), 0.0]  # a person is ~1 cm off
+            set_pose(env, o.name, p)
+            placed[o.name] = p
+        est = IdenticalCylinderEstimator()
+        est.reset(task)
+        out = est.estimate([src.capture("lab")])
+        for n, p in placed.items():
+            assert out[n].found and np.linalg.norm(out[n].pos[:2] - p[:2]) < 0.006, (n, out[n].pos, p)
+    finally:
+        src.close()
+        env.close()

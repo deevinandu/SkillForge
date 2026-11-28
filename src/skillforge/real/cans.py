@@ -16,9 +16,10 @@ and the cans are the only things standing on it.
    are the cans. Votes work with partial arcs and split cans that touch, which grouping by
    gaps cannot (cans in a 3-2-1 pyramid touch).
 4. Each detection is refined with T6's `fit_cylinder` on its own points (top disc included).
-5. Names: the cans are interchangeable, so the first frame assigns names in a fixed order
-   (layer, then x, then y); later frames give each name the nearest detection to its
-   previous estimate, so identities stay put while the skill moves cans one at a time.
+5. Names: the cans are interchangeable, but a name must stay on one can. Each name is matched
+   to the nearest detection to where it is expected: its previous estimate, or at the start
+   of a trial the task's start pose for it (so the can placed at cyl_1's start is cyl_1).
+   Names with nothing near take the remaining detections in a fixed order (layer, x, y).
 
 Upright cans only (a can on its side is not detected). Tested on rendered sim frames of the
 cylinder pyramid task and on one real frame of the six cans (2026-11-27).
@@ -63,6 +64,7 @@ class IdenticalCylinderEstimator:
     radius: float = 0.0
     half_height: float = 0.0
     _last: dict[str, np.ndarray] = field(default_factory=dict)
+    _prior: dict[str, np.ndarray] = field(default_factory=dict)  # the task's start poses
     last_detections: list[Detection] = field(default_factory=list)
     last_table: tuple[float, float, float] | None = None  # plane z = c0 + c1 x + c2 y
 
@@ -76,6 +78,7 @@ class IdenticalCylinderEstimator:
         self.names = sorted(o.name for o in cyl)
         self.radius, self.half_height = float(cyl[0].size[0]), float(cyl[0].size[1])
         self._last = {}
+        self._prior = {o.name: np.array(o.pose.pos, dtype=float) for o in cyl}
 
     # -- the pipeline --------------------------------------------------------
 
@@ -176,22 +179,25 @@ class IdenticalCylinderEstimator:
     def estimate(self, frames: list[CameraFrame], obs: Observation | None = None) -> dict[str, Estimate]:
         dets = self.detect(frames)
         pos = [np.array([d.xy[0], d.xy[1], d.z]) for d in dets]
+        # Where each name is expected: its last estimate once seen, else the task's start pose,
+        # so the can an operator puts at cyl_1's start is the one called cyl_1.
+        expect = {n: self._last.get(n, self._prior.get(n)) for n in self.names}
+        pairs = sorted((float(np.linalg.norm(pos[k] - expect[n])), n, k)
+                       for n in self.names if expect[n] is not None for k in range(len(dets)))
         assigned: dict[str, int] = {}
-        if not self._last:
-            order = sorted(range(len(dets)), key=lambda k: (dets[k].layer, round(dets[k].xy[0], 2), dets[k].xy[1]))
-            assigned = {n: k for n, k in zip(self.names, order, strict=False)}
-        else:
-            pairs = sorted((float(np.linalg.norm(pos[k] - self._last[n])), n, k)
-                           for n in self.names if n in self._last for k in range(len(dets)))
-            used: set[int] = set()
-            for d, n, k in pairs:
-                if n in assigned or k in used or d > self.max_match:
-                    continue
-                assigned[n], _ = k, used.add(k)
-            free = [k for k in range(len(dets)) if k not in used]
-            for n in self.names:  # names never seen, or lost: take what is left, in order
-                if n not in assigned and free and n not in self._last:
-                    assigned[n] = free.pop(0)
+        used: set[int] = set()
+        for d, n, k in pairs:
+            if n in assigned or k in used or d > self.max_match:
+                continue
+            assigned[n] = k
+            used.add(k)
+        # Names never seen yet take what is left, in a fixed order (layer, x, y). A name that was
+        # seen and is now lost stays unfound rather than jumping to some other can.
+        free = sorted((k for k in range(len(dets)) if k not in used),
+                      key=lambda k: (dets[k].layer, round(dets[k].xy[0], 2), dets[k].xy[1]))
+        for n in self.names:
+            if n not in assigned and n not in self._last and free:
+                assigned[n] = free.pop(0)
         out = {}
         for n in self.names:
             k = assigned.get(n)

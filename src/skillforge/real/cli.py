@@ -1,7 +1,8 @@
 """`python -m skillforge.real <command>`. Output goes under runs/real/ (gitignored).
 
   approve  record that a person approves a library version for hardware
-  run      a session of trials. Only --dry-run works: there is no ROS layer yet.
+  register evaluate a hand-written skill in sim and add it to the library (accepted if good enough)
+  run      a session of trials: --dry-run on the sim twin, or on the lab arm (bridge + camera)
   sysid    fit latency, tracking gain and gripper timing from a session -> calibration.json
   scoreboard  sim prediction against session results -> scoreboard.json and .html
   close-loop  turn a session's failed trials into pinned sim tasks and regression baselines
@@ -64,8 +65,23 @@ def cmd_run(a: argparse.Namespace) -> None:
             raise SystemExit("give --skill <library version> (or --skill-file with --dry-run)")
         src, _ = SkillLibrary(a.library).load(task.id, a.skill)
     if not a.dry_run:
-        Approvals(a.approvals).require_approved(task.id, src)  # raises NotApproved
-        raise SystemExit("approved, but there is no hardware layer yet (real/ros is not built): use --dry-run")
+        entry = Approvals(a.approvals).require_approved(task.id, src)  # raises NotApproved
+        if not a.extrinsics:
+            raise SystemExit("a hardware run needs --extrinsics (the camera calibration, e.g. "
+                             "runs/real/handeye/<date>/T_world_cam.json)")
+        from .lab import make_lab_env
+        from .runner import TerminalLabeller
+
+        out = Path(a.out) if a.out else RUNS / "real" / f"{datetime.now():%Y%m%d-%H%M%S}-hw-{task.id}"
+        print(f"{src.name}@{src.version} approved for hardware by {entry['by']} at {entry['at']}")
+        print(f"tool speed limit {a.speed} m/s; a person must be at the e-stop. Placement picture: {out}/placement.png")
+        env = make_lab_env(task, extrinsics=a.extrinsics, port=a.port, speed=a.speed, picture=out / "placement.png")
+        try:
+            run_session(env, load_skill(src), task, _seeds(a.seeds), TerminalLabeller(), out, mode="hardware")
+        finally:
+            env.close()
+        print(f"wrote {out}")
+        return
     env = make_twin_env(task, limits=SafetyLimits(ee_speed=a.speed))
     out = Path(a.out) if a.out else RUNS / "real" / f"{datetime.now():%Y%m%d-%H%M%S}-dry-{task.id}"
     try:
@@ -73,6 +89,39 @@ def cmd_run(a: argparse.Namespace) -> None:
     finally:
         env.close()
     print(f"wrote {out}")
+
+
+def cmd_register(a: argparse.Namespace) -> None:
+    """Evaluate a hand-written skill class in sim and add it to the library, accepted only if
+    the Wilson 95% lower bound of its success rate reaches --min-lower."""
+    import importlib
+
+    from skillforge.agents.library import SkillLibrary
+    from skillforge.eval import evaluate_parallel
+    from skillforge.eval.harness import wilson
+    from skillforge.eval.regression import source_of
+    from skillforge.sim import make_env
+
+    task = _task(a.task)
+    mod, _, cls_name = a.skill_class.partition(":")
+    cls = getattr(importlib.import_module(mod), cls_name)
+    src = source_of(cls)
+    lib = SkillLibrary(a.library)
+    if lib.has(task.id, src.version):
+        raise SystemExit(f"{task.id}@{src.version} is already in the library at {lib.root}; versions are immutable")
+    seeds = _seeds(a.seeds)
+    print(f"evaluating {src.name}@{src.version} on {task.id}, seeds {a.seeds} ({len(seeds)} episodes, sim)...")
+    report, _ = evaluate_parallel(make_env, src, task, seeds)
+    lo, hi = wilson(report.n_success, report.n_rollouts)
+    accepted = lo >= a.min_lower
+    note = (f"registered from {a.skill_class}; sim {report.n_success}/{report.n_rollouts}, "
+            f"Wilson 95% [{lo:.3f}, {hi:.3f}], bar {a.min_lower}")
+    lib.add(src, report, accepted, note=note)
+    print(note)
+    if not accepted:
+        raise SystemExit(f"NOT accepted: the lower bound {lo:.3f} is below {a.min_lower}. It is stored, but cannot be approved.")
+    print(f"accepted into {lib.root}/{task.id}/{src.version}. To approve it for hardware:\n"
+          f"  python -m skillforge.real approve {a.task} {src.version} --by \"<your name>\"")
 
 
 def cmd_sysid(a: argparse.Namespace) -> None:
@@ -180,8 +229,17 @@ def main(argv: list[str] | None = None) -> int:
             p.add_argument("--seeds", default="0-19", help="lo-hi, inclusive")
             p.add_argument("--dry-run", action="store_true", help="drive a simulated twin instead of the arm")
             p.add_argument("--speed", type=float, default=0.1, help="tool speed limit, m/s")
+            p.add_argument("--extrinsics", help="camera calibration (hardware runs): T_world_cam .json or .npy")
+            p.add_argument("--port", type=int, default=8765, help="frankapy bridge server port (hardware runs)")
             p.add_argument("--out")
         p.set_defaults(fn=fn)
+    p = sub.add_parser("register", help="evaluate a hand-written skill in sim and add it to the library")
+    p.add_argument("task", help="task id or path to a TaskSpec json")
+    p.add_argument("--skill-class", default="skillforge.skills:PlaceInOrder", help="module:Class")
+    p.add_argument("--seeds", default="0-199", help="lo-hi, inclusive")
+    p.add_argument("--min-lower", type=float, default=0.9, help="accept only if the Wilson 95%% lower bound reaches this")
+    p.add_argument("--library", default=str(RUNS / "library"))
+    p.set_defaults(fn=cmd_register)
     p = sub.add_parser("sysid")
     p.add_argument("session", help="a session directory written by `run`")
     p.add_argument("--out")

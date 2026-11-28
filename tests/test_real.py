@@ -510,7 +510,7 @@ def test_only_an_accepted_version_approved_by_name_may_run_on_hardware(stub_task
         ap.require_approved(stub_task.id, tampered)
 
 
-def test_cli_refuses_hardware_and_unapproved_skills(stub_task, tmp_path):
+def test_cli_refuses_unapproved_skills_and_uncalibrated_hardware_runs(stub_task, tmp_path):
     from skillforge.agents.library import SkillLibrary
     from skillforge.eval.regression import source_of
     from skillforge.real import cli
@@ -524,7 +524,7 @@ def test_cli_refuses_hardware_and_unapproved_skills(stub_task, tmp_path):
     with pytest.raises(NotApproved):
         cli.main(["run", stub_task.id, "--skill", src.version, *common])
     cli.main(["approve", stub_task.id, src.version, "--by", "Sam", *common])
-    with pytest.raises(SystemExit, match="no hardware layer"):
+    with pytest.raises(SystemExit, match="needs --extrinsics"):  # approved, but no camera calibration given
         cli.main(["run", stub_task.id, "--skill", src.version, *common])
     with pytest.raises(SystemExit, match="dry runs only"):
         cli.main(["run", stub_task.id, "--skill-file", "x.py", *common])
