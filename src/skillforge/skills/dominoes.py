@@ -892,7 +892,8 @@ class ToppleChain:
         if bad and not self.pushed:
             pos = {k: np.mean([s.objects[k].pos for s in self.samples], axis=0) for k in self.order}
             for k in sorted(bad, key=lambda j: -float(pos[j][2])):
-                spot = self.standup_spot(k, pos)
+                fallen = [j for j in self.order if st[j] in ("down", "down_bad")]
+                spot = self.standup_spot(k, pos, fallen)
                 if spot is None:
                     self.log.append(f"{self.steps}:no clear spot to stand {k} up")
                     continue
@@ -923,12 +924,16 @@ class ToppleChain:
         self._start_push(obs, k)
         self._go("push", f"{k} [{summary}]")
 
-    def standup_spot(self, k: str, pos: dict[str, np.ndarray]) -> np.ndarray | None:
-        """Where to stand domino `k` up: its own spot in the lane if that is clear, else the clear
-        grid point nearest to it beside the lane (not within `standup_off_spot` of a lane spot). Clear: `standup_clear` from every other domino,
-        and room behind it (toward the robot) for the hand."""
+    def standup_spot(self, k: str, pos: dict[str, np.ndarray], fallen: list[str] | None = None) -> np.ndarray | None:
+        """Where to stand domino `k` up. While other dominoes are still lying (`fallen`), on a
+        parking grid beside the lane, not on the lane: the lane stays empty, so nothing stands
+        between the arm and the next fallen domino; the side away from the ones still lying is
+        preferred, then the point nearest to `k`. They are carried into the lane (repairs) once
+        all stand. The last fallen domino goes to its own spot if that is clear. Clear:
+        `standup_clear` from every other domino, room behind it (toward the robot) for the hand."""
         base = np.asarray(self.task.scene.robot.base_pose.pos[:2], dtype=float)
         others = [pos[j][:2] for j in self.order if j != k]
+        lying = [pos[j][:2] for j in (fallen or []) if j != k]
 
         def clear(pt: np.ndarray) -> bool:
             back = pt - 0.10 * (pt - base) / max(float(np.linalg.norm(pt - base)), 1e-9)
@@ -936,9 +941,9 @@ class ToppleChain:
                            for o in others)
 
         own = self.spots[k][:2]
-        if clear(own):
+        if not lying and clear(own):
             return np.array([own[0], own[1], 0.0])
-        best, best_d = None, np.inf
+        best, best_key = None, None
         spots = [self.spots[j][:2] for j in self.order]
         for x in self.standup_xs:
             for y0 in self.standup_ys:
@@ -948,9 +953,10 @@ class ToppleChain:
                         continue
                     if not clear(pt):
                         continue
-                    dist = float(np.linalg.norm(pt - pos[k][:2]))
-                    if dist < best_d:
-                        best, best_d = np.array([x, y, 0.0]), dist
+                    away = min((float(np.linalg.norm(pt - q)) for q in lying), default=1.0)
+                    key = (-round(away / 0.05), float(np.linalg.norm(pt - pos[k][:2])))  # far from the lying, then near
+                    if best_key is None or key < best_key:
+                        best, best_key = np.array([x, y, 0.0]), key
         return best
 
     def _standup(self, obs: Observation) -> Action:
