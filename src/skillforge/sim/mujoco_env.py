@@ -1,8 +1,10 @@
-"""MuJoCo backend: any SceneSpec with a Franka-Panda-structured robot -> a physics SimEnv.
+"""MuJoCo backend: any SceneSpec whose robot has a profile (`sim/robots.py`) -> a physics SimEnv.
 
 Scene: robot from `RobotSpec.source` (menagerie / mjcf / urdf), a table whose top is the
 z = 0 plane, free-jointed objects from `ObjectSpec`, regions as visual-only sites, a `tcp`
-site between the fingertip pads, a `wrist` camera on the hand.
+site between the fingertip pads, a `wrist` camera on the hand. Which bodies, joints and
+actuators are the arm and gripper, the home posture, the TCP and the gripper's command and
+width all come from the robot profile, looked up by `RobotSpec.source`.
 
 Control: `Action(mode="ee")` goes through a damped-least-squares differential IK on the
 `tcp` site (6-DoF when `ee_quat` is given, else holding the last commanded orientation),
@@ -28,7 +30,6 @@ import os
 import sys
 import warnings
 from collections import deque
-from dataclasses import dataclass
 from typing import get_args
 
 import numpy as np
@@ -53,6 +54,7 @@ from skillforge.contracts import (  # noqa: E402
 from .assets import resolve_robot_source  # noqa: E402
 from .disturbances import DisturbanceSchedule, Planned, knock_axis, quat_mul, yaw_quat  # noqa: E402
 from .mug import mug_parts  # noqa: E402
+from .robots import GRIP_KP, GRIP_KV, PandaProfile, RobotProfile, profile_for  # noqa: E402,F401
 from .success import ContactState, hold_steps, is_success, resting_half_height, tilt_of  # noqa: E402
 
 # Process-wide: once creating a GL context has failed, never try again. MuJoCo can abort the
@@ -73,15 +75,10 @@ TABLE_TOP_Z = 0.0
 TABLE_THICKNESS = 0.04
 DROP_Z = TABLE_TOP_Z - 0.05  # an object below this has fallen off the table: episode terminated
 EJECT_SPEED = 3.0  # m/s; a tabletop object moving faster than this was flung by the solver
+TCP_OFFSET = PandaProfile.tcp_offset  # kept for importers; the profile's value is what is used
 TOPPLE_EVENT_TILT = 0.5  # radians: an object_toppled object past this tilt emits 'toppled:<obj>' once
 PENETRATION_TOL = 0.002  # metres: a teleported object may overlap a neighbour by at most this
-TCP_OFFSET = 0.1034  # metres from the hand frame to the fingertip pad centre, along hand z
 MAX_TIMESTEP = 0.0035  # s; physics step is the largest dt / n <= this (20 Hz control: 15 x 3.33 ms)
-# Gripper servo on the finger tendon (menagerie: kp 100, kv 10, i.e. ~1 N per finger on a 4 cm
-# cube, which let a 50-75 g cube slip out under transport accelerations). kp 1000 gives ~10 N
-# per finger on a 4 cm object, still well under the real Franka Hand's 70 N continuous force.
-GRIP_KP = 1000.0
-GRIP_KV = 20.0
 OBJECT_COLORS = [(0.85, 0.15, 0.15, 1), (0.15, 0.35, 0.85, 1), (0.95, 0.75, 0.1, 1), (0.2, 0.7, 0.3, 1)]
 COLOR_NAMES: tuple[str, ...] = get_args(ColorName)
 COLOR_RGBA: dict[str, tuple[float, float, float, float]] = {
@@ -90,22 +87,6 @@ COLOR_RGBA: dict[str, tuple[float, float, float, float]] = {
     "white": (0.92, 0.92, 0.92, 1), "grey": (0.55, 0.55, 0.55, 1), "black": (0.08, 0.08, 0.08, 1),
 }
 assert set(COLOR_RGBA) == set(COLOR_NAMES)
-
-
-@dataclass(frozen=True)
-class PandaProfile:
-    """Names in the menagerie Panda that the controller and event detection rely on."""
-
-    arm_joints: tuple[str, ...] = tuple(f"joint{i}" for i in range(1, 8))
-    arm_actuators: tuple[str, ...] = tuple(f"actuator{i}" for i in range(1, 8))
-    gripper_actuator: str = "actuator8"
-    finger_joints: tuple[str, str] = ("finger_joint1", "finger_joint2")
-    finger_bodies: tuple[str, str] = ("left_finger", "right_finger")
-    hand_body: str = "hand"
-    base_body: str = "link0"
-    # menagerie home with joint7 turned +90 deg so the tcp starts at quat (0, 1, 0, 0): pointing
-    # down, fingers closing along world y
-    home: tuple[float, ...] = (0.0, 0.0, 0.0, -1.57079, 0.0, 1.57079, 0.7853)
 
 
 class MujocoEnv:
@@ -123,10 +104,11 @@ class MujocoEnv:
         ik_iters: int = 8,
         damping: float = 0.05,
         arm_armature: float = 0.5,  # kg m^2 floor on arm joint armature; see _index
-        closed_pad_gap: float = 0.0,  # metres between the fingertip pads when fully closed; see _build
+        closed_pad_gap: float = 0.0,  # metres between the fingertip pads when fully closed (Panda; see robots.py)
+        profile: RobotProfile | None = None,  # default: the one registered for task.scene.robot.source
     ):
         self.task = task
-        self.profile = PandaProfile()
+        self.profile = profile or profile_for(task.scene.robot.source)
         self.render_size = render_size
         # the ctor's cameras plus the ones the task asks for, in order, no repeats
         self.obs_cameras = tuple(dict.fromkeys((*obs_cameras, *task.scene.obs_cameras)))
@@ -163,10 +145,8 @@ class MujocoEnv:
         path = resolve_robot_source(rs.source)
         spec = mujoco.MjSpec.from_file(str(path))
         p = self.profile
-        if spec.body(p.base_body) is None or spec.actuator(p.gripper_actuator) is None:
-            raise NotImplementedError(
-                f"{rs.source}: only Franka-Panda-structured models (menagerie panda.xml naming) are supported"
-            )
+        p.check(spec, rs.source)
+        p.prepare(spec, closed_pad_gap=self.closed_pad_gap)  # gripper gains, pads; may add bodies
         # Physics: the step divides the control period exactly (see MAX_TIMESTEP). Elliptic friction
         # cones + impratio 10 make grasps behave.
         dt = 1.0 / self.task.control_hz
@@ -180,26 +160,9 @@ class MujocoEnv:
         for b in spec.bodies:  # gravity compensation on every robot body (the real arm has it)
             b.gravcomp = 1.0
         spec.add_exclude(bodyname1=p.base_body, bodyname2="world")  # base bolted to the table
-        # Fingertips: menagerie has the finger mesh, one 17 x 17 mm pad box and four 6 mm knob boxes
-        # per finger. The knobs doubled the contact count on a grasp (~16 -> ~8 contacts) for no
-        # behavioural gain we could measure, so only the mesh and the pad collide.
-        # The menagerie pads (17 x 8 x 17 mm boxes at finger-local y = 5.5 mm) stop 3.0 mm apart when
-        # the fingers are fully closed, so nothing thinner than 3 mm (a mug wall) can be pinched. The
-        # real Franka Hand closes its fingertips fully. Each pad is moved toward the other finger so
-        # the closed gap is `closed_pad_gap` (0.003 reproduces the menagerie model).
-        for fb in p.finger_bodies:
-            for g in spec.body(fb).geoms:
-                if g.type == mujoco.mjtGeom.mjGEOM_BOX and g.size[0] < 0.008 and g.contype:
-                    g.contype = g.conaffinity = 0
-                elif g.type == mujoco.mjtGeom.mjGEOM_BOX and g.contype:  # the pad
-                    g.pos[1] = g.size[1] + self.closed_pad_gap / 2
-        grip = spec.actuator(p.gripper_actuator)
-        lo, hi = grip.ctrlrange  # menagerie: 0..255 -> tendon length 0..0.04 m
-        grip.gainprm[0] = 0.04 * GRIP_KP / (hi - lo)
-        grip.biasprm[1], grip.biasprm[2] = -GRIP_KP, -GRIP_KV
         hand = spec.body(p.hand_body)
         if spec.site(rs.ee_site) is None:
-            hand.add_site(name=rs.ee_site, pos=[0, 0, TCP_OFFSET], size=[0.004, 0, 0], rgba=[1, 0, 1, 0.6], group=4)
+            hand.add_site(name=rs.ee_site, pos=[0, 0, p.tcp_offset], size=[0.004, 0, 0], rgba=[1, 0, 1, 0.6], group=4)
         # wrist camera: on the hand, offset along hand x (out of the fingers' path), looking along hand +z
         hand.add_camera(name="wrist", pos=[0.07, 0, 0.04], quat=[0, 1, 0, 0], fovy=70)
 
@@ -266,10 +229,13 @@ class MujocoEnv:
         self._arm_v = np.array([m.joint(j).dofadr[0] for j in p.arm_joints])
         self._arm_act = np.array([m.actuator(a).id for a in p.arm_actuators])
         self._grip_act = m.actuator(p.gripper_actuator).id
-        self._grip_ctrl = m.actuator_ctrlrange[self._grip_act].copy()  # [closed, open]
-        self._finger_q = np.array([m.joint(j).qposadr[0] for j in p.finger_joints])
-        self._jnt_lo = np.array([m.jnt_range[m.joint(j).id][0] for j in p.arm_joints]) + 1e-3
-        self._jnt_hi = np.array([m.jnt_range[m.joint(j).id][1] for j in p.arm_joints]) - 1e-3
+        self._grip_ctrl = m.actuator_ctrlrange[self._grip_act].copy()
+        # a continuous joint (no range in the model, e.g. Gen3 joints 1/3/5/7) is kept within one turn
+        # each way of zero, so the IK cannot wind it up
+        rng_ = np.array([m.jnt_range[m.joint(j).id] if m.jnt_limited[m.joint(j).id] else (-2 * np.pi, 2 * np.pi)
+                         for j in p.arm_joints])
+        self._jnt_lo = rng_[:, 0] + 1e-3
+        self._jnt_hi = rng_[:, 1] - 1e-3
         self._site = m.site(self.task.scene.robot.ee_site).id
         self._home = np.array(p.home)
         # The menagerie Panda has armature 0.1 on every arm joint against position servos with
@@ -286,7 +252,11 @@ class MujocoEnv:
         self._is_robot = np.zeros(m.nbody, dtype=bool)
         self._is_robot[list(self._robot_bodies)] = True
         self._rec: list[tuple[int, int, int, int, bool]] = []
-        self._finger_bodies = {m.body(n).id: n for n in p.finger_bodies}
+        # a finger's sub-bodies (e.g. a silicone pad) count as that finger
+        fingers = {m.body(n).id: n for n in p.finger_bodies}
+        self._finger_bodies = {
+            b: n for f, n in fingers.items() for b in range(m.nbody) if self._is_descendant(b, f)
+        }
         self._ee_bodies = self._finger_bodies.keys() | {m.body(p.hand_body).id}
         self._obj_bodies = {m.body(o.name).id: o.name for o in self.task.scene.objects}
         # every geom of every object body (a mug has many; the rest have one, named after the object)
@@ -390,7 +360,7 @@ class MujocoEnv:
 
         mujoco.mj_resetData(m, d)
         d.qpos[self._arm_q] = self._home
-        d.qpos[self._finger_q] = self.task.scene.robot.max_gripper_width / 2
+        self.profile.open_gripper(m, d, self.task.scene.robot.max_gripper_width)
         for o in self.task.scene.objects:
             if o.fixed:
                 continue
@@ -508,8 +478,7 @@ class MujocoEnv:
     def _apply_ctrl(self) -> None:
         d = self.data
         d.ctrl[self._arm_act] = self._q_des
-        lo, hi = self._grip_ctrl  # menagerie: lo = closed, hi = open
-        d.ctrl[self._grip_act] = hi + (lo - hi) * self._grip_cmd
+        d.ctrl[self._grip_act] = self.profile.gripper_ctrl(self._grip_cmd, self._grip_ctrl)
 
     def _control(self, act: Action) -> list[str]:
         self._grip_cmd = float(act.gripper)
@@ -843,7 +812,7 @@ class MujocoEnv:
         return events
 
     def _gripper_width(self) -> float:
-        return float(np.sum(self.data.qpos[self._finger_q]))
+        return self.profile.gripper_width(self.model, self.data)
 
     def _ee_force(self) -> np.ndarray:
         """Net contact force on hand + fingers from the environment, world frame."""

@@ -77,7 +77,7 @@ def fetch_menagerie(robots: tuple[str, ...] = DEFAULT_ROBOTS) -> Path:
 
 
 # Default model file per menagerie dir, for `menagerie:<dir>` sources without an explicit file.
-MENAGERIE_MODEL_FILES = {"franka_emika_panda": "panda.xml"}
+MENAGERIE_MODEL_FILES = {"franka_emika_panda": "panda.xml", "kinova_gen3": "gen3.xml", "robotiq_2f85": "2f85.xml"}
 
 
 def resolve_robot_source(source: str, fetch: bool | None = None) -> Path:
