@@ -75,7 +75,7 @@ def test_lab_env_resets_and_steps_with_names_on_the_placed_cans(server, tmp_path
         scene.close()
         pytest.skip("no GL context")
     cam, placer = SimCamera(scene), SimPlacer(scene)
-    env = make_lab_env(task, extrinsics="unused", robot=FrankaBridgeRobotIO(port=server), frames=cam, operator=placer,
+    env = make_lab_env(task, extrinsics="unused", background=False, robot=FrankaBridgeRobotIO(port=server), frames=cam, operator=placer,
                        picture=None)
     try:
         obs = env.reset(4)

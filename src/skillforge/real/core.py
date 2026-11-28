@@ -168,6 +168,8 @@ class _Arm:
     it in T6's `PerceivedEnv`, which fills the objects in from the cameras."""
 
     report_contact_force = True  # set by RealEnv; False hides the arm's force estimate from skills
+    resync_rad = 0.05  # watchdog: restart the reference from the measured joints only beyond this ...
+    resync_after = 1.0  # ... and only after a gap this long (s), when the arm has settled
 
     def __init__(self, task, robot, controller, safety, operator, measure, realtime, clock, sleep):
         self.task: TaskSpec = task
@@ -218,10 +220,19 @@ class _Arm:
             return self.observe(self.robot.read_state()), StepInfo(success=False, terminated=True)
         events: list[str] = []
         if self.realtime and self.watchdog.expired():
-            # The arm has been holding its last target. Restart the reference from where it is.
+            # A late step. The arm has been holding the last target meanwhile (the bridge holds it),
+            # so the command is still right. Restart the reference from the measured joints only
+            # after a LONG gap, once the arm has settled, and only if it is really elsewhere (moved
+            # by hand, stopped by a reflex). Re-syncing on every late step pulled the reference back
+            # to wherever the arm was mid-motion and the command went back and forth (lab,
+            # 2026-11-27, third pyramid trial: steps of ~270 ms, the arm jerked; reproduced on the
+            # twin with a 270 ms step clock: backward jumps with the old rule, none with this one).
             events.append("safety:watchdog")
-            self._q_cmd = np.asarray(self.robot.read_state().q, dtype=float).copy()
-            self.controller.sync(self._q_cmd)
+            if self.watchdog.age() > self.resync_after:
+                q_meas = np.asarray(self.robot.read_state().q, dtype=float)
+                if self._q_cmd.size != q_meas.size or np.max(np.abs(q_meas - self._q_cmd)) > self.resync_rad:
+                    self._q_cmd = q_meas.copy()
+                    self.controller.sync(self._q_cmd)
         self.watchdog.feed()
         act, ev = self.safety.check_action(action, self.controller.fk)
         events += ev
@@ -389,6 +400,8 @@ class RealEnv:
         return None if frame is None else frame.rgb
 
     def close(self) -> None:
+        if hasattr(self.estimator, "close"):  # e.g. a BackgroundEstimator's thread
+            self.estimator.close()
         self._env.close()
 
     # -- real-robot extras -------------------------------------------------

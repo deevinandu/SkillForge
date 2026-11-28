@@ -139,7 +139,7 @@ def test_lab_env_with_free_placement(tmp_path):
         return ""
 
     try:
-        env = make_lab_env(t, extrinsics="unused", robot=FrankaBridgeRobotIO(port=port), frames=cam, picture=None,
+        env = make_lab_env(t, extrinsics="unused", background=False, robot=FrankaBridgeRobotIO(port=port), frames=cam, picture=None,
                            free_placement=True, predict=lambda p: Prediction(5, 5, 0.57, 1.0, {}), layout_dir=tmp_path)
         env._arm.operator.ask = person_places
         env._arm.operator.say = lambda s: None

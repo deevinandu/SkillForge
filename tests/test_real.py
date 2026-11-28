@@ -790,3 +790,29 @@ def test_hiding_contact_force_from_the_skill_keeps_the_safety_limit(stub_task):
     cell.force = np.array([0.0, 0.0, -50.0])  # above SafetyLimits.force
     obs, info = env.step(go(obs.ee_pos))
     assert info.terminated and "safety:force" in info.events
+
+
+def test_late_steps_do_not_chase_the_measured_arm(stub_task):
+    """Lab, 2026-11-27, third pyramid trial (bridge log): steps took ~270 ms, the watchdog fired on
+    each and reset the reference to the MEASURED joints; the arm, moving in stop-go bursts,
+    overshot, the command chased it a step late, and the arm swung +-5 cm at ~2 Hz, growing.
+    A late step must not follow a displaced arm; only a long stall (arm settled elsewhere) may."""
+    now = [0.0]
+    env, cell = cell_env(stub_task, realtime=True, clock=lambda: now[0], sleep=lambda s: None)
+    obs = env.reset(0)
+    goal = obs.ee_pos + [0.0, 0.08, 0.0]
+    for _ in range(3):
+        now[0] += 0.05
+        obs, _ = env.step(go(goal))
+    for _ in range(5):  # late steps while the arm overshoots by 3 cm
+        cmd_before = env._arm._q_cmd.copy()
+        cell.q = cmd_before + [0.0, 0.03, 0.0]
+        now[0] += 0.27
+        obs, info = env.step(go(goal))
+        assert "safety:watchdog" in info.events
+        step = env._arm._q_cmd - cmd_before
+        assert np.linalg.norm(step) < 0.006, step  # one ordinary step on, not a jump to the arm
+    cell.q = env._arm._q_cmd + [0.0, 0.0, 0.05]  # now a long stall with the arm really elsewhere
+    now[0] += 2.0
+    obs, info = env.step(go(goal))
+    assert np.linalg.norm(env._arm._q_cmd - cell.q) < 0.006  # restarted from where the arm is

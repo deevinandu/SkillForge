@@ -96,6 +96,10 @@ class Watchdog:
     def expired(self) -> bool:
         return self._last is not None and self.clock() - self._last > self.timeout
 
+    def age(self) -> float:
+        """Seconds since the last `feed()` (0 before the first)."""
+        return 0.0 if self._last is None else self.clock() - self._last
+
 
 class Safety:
     def __init__(self, limits: SafetyLimits, workspace: Workspace):

@@ -172,9 +172,11 @@ def _caption(img: np.ndarray, lines: list[str], ok: bool) -> np.ndarray:
 def make_lab_env(task: TaskSpec, *, extrinsics: str | Path, port: int = 8765, speed: float = 0.1,
                  serial: str | None = None, picture: str | Path | None = "runs/real/placement.png",
                  free_placement: bool = False, predict=None, layout_dir: str | Path | None = None,
-                 robot=None, frames=None, estimator=None, operator=None) -> RealEnv:
+                 background: bool = True, robot=None, frames=None, estimator=None, operator=None) -> RealEnv:
     """The lab cell as a `RealEnv`. `speed`: tool speed limit (m/s); 0.1 until 10 clean trials (T7 brief).
 
+    background: run the estimator in its own thread (real camera; a MuJoCo-rendered camera can only
+    render in its own thread, so tests with one pass False).
     free_placement: objects go anywhere in the start area (`FreePlacementOperator`); `predict`
     (pinned task -> Prediction) is the per-layout sim prediction, `layout_dir` where layouts are saved."""
     if estimator is None:
@@ -184,8 +186,10 @@ def make_lab_env(task: TaskSpec, *, extrinsics: str | Path, port: int = 8765, sp
         estimator = IdenticalCylinderEstimator()
         estimator.reset(task)
     if frames is None:
+        # 640x480: the can estimator takes ~110 ms per frame here, ~350 ms at 1280x720 (same positions
+        # within 1 mm on the lab frame). It runs in a background thread during trials anyway.
         frames = RealSenseFrameSource([RealSenseCamera(CAMERA, load_extrinsics(extrinsics), serial=serial,
-                                                       width=1280, height=720)])
+                                                       width=640, height=480)])
     if operator is None:
         pic = PlacementPicture(task, frames, estimator, picture) if picture else None
         if free_placement:
@@ -200,6 +204,12 @@ def make_lab_env(task: TaskSpec, *, extrinsics: str | Path, port: int = 8765, sp
     if robot is None:
         robot = FrankaBridgeRobotIO(port=port)
     limits = SafetyLimits(ee_speed=speed)
+    # The trial's estimator runs in its own thread (see real/background.py): a control step must
+    # not wait ~0.1-0.3 s for the camera. Placement still measures synchronously (first call after reset).
+    from .background import BackgroundEstimator
+
+    if background and not isinstance(estimator, BackgroundEstimator) and getattr(estimator, "needs_frames", False):
+        estimator = BackgroundEstimator(estimator, frames, CAMERA)
     # report_contact_force=False: the Franka's force estimate is not a contact sensor (see RealEnv).
     return RealEnv(task, robot, frames, estimator, controller=MujocoController(task, max_ee_speed=speed),
                    operator=operator, limits=limits, cameras=(CAMERA,), realtime=True, report_contact_force=False)
