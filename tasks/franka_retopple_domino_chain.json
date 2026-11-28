@@ -10,6 +10,10 @@
       "max_gripper_width": 0.08,
       "fingertips": "foam"
     },
+    "table": {
+      "width": 0.75,
+      "shelves": true
+    },
     "objects": [
       {
         "name": "domino_1",
@@ -285,7 +289,11 @@
       {
         "kind": "knock",
         "objects": [
-          "domino_1"
+          "domino_1",
+          "domino_2",
+          "domino_3",
+          "domino_4",
+          "domino_5"
         ],
         "at_step": {
           "lo": 1,
@@ -298,7 +306,8 @@
         "knock_dir": [
           1.0,
           0.0
-        ]
+        ],
+        "count": 5
       }
     ]
   },

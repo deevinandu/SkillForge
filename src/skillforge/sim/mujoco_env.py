@@ -228,10 +228,20 @@ class MujocoEnv:
             name="floor", type=mujoco.mjtGeom.mjGEOM_PLANE, size=[3, 3, 0.05],
             pos=[0, 0, TABLE_TOP_Z - 0.75], rgba=[0.3, 0.33, 0.36, 1],
         )
+        tb = sc.table
+        tx = bx - tb.back + tb.depth / 2  # table centre (x)
         wb.add_geom(
-            name="table", type=mujoco.mjtGeom.mjGEOM_BOX, size=[0.6, 0.6, TABLE_THICKNESS / 2],
-            pos=[bx + 0.35, by, TABLE_TOP_Z - TABLE_THICKNESS / 2], rgba=[0.62, 0.5, 0.38, 1],
+            name="table", type=mujoco.mjtGeom.mjGEOM_BOX, size=[tb.depth / 2, tb.width / 2, TABLE_THICKNESS / 2],
+            pos=[tx, by, TABLE_TOP_Z - TABLE_THICKNESS / 2], rgba=[0.62, 0.5, 0.38, 1],
         )
+        if tb.shelves:  # side panels of the shelf units on both sides of the table
+            for side, sgn in (("shelf_l", 1.0), ("shelf_r", -1.0)):
+                wb.add_geom(
+                    name=side, type=mujoco.mjtGeom.mjGEOM_BOX,
+                    size=[tb.depth / 2, tb.shelf_thickness / 2, tb.shelf_height / 2],
+                    pos=[tx, by + sgn * (tb.width / 2 + tb.shelf_thickness / 2), TABLE_TOP_Z + tb.shelf_height / 2],
+                    rgba=[0.55, 0.56, 0.6, 1],
+                )
         front = wb.add_camera(name="front", pos=[bx + 1.9, by, 0.95], fovy=50)
         front.alt.type = mujoco.mjtOrientation.mjORIENTATION_XYAXES
         front.alt.xyaxes = [0, 1, 0, -0.42, 0, 0.91]  # looking back at the robot, tilted down
@@ -299,6 +309,7 @@ class MujocoEnv:
             o.name: m.joint(f"{o.name}_free").dofadr[0] for o in self.task.scene.objects if not o.fixed
         }
         self._table_geom = m.geom("table").id
+        self._shelf_geoms = {m.geom(n).id: n for n in ("shelf_l", "shelf_r") if self.task.scene.table.shelves}
         self._obj_body = {name: b for b, name in self._obj_bodies.items()}
         self._topple_watch = sorted(
             {c.object for c in success_conditions(self.task.success) if isinstance(c, ObjectToppled)}
@@ -735,6 +746,8 @@ class MujocoEnv:
                 pairs.add((self._body_name(rb), self._obj_bodies[ob]))
             elif og == self._table_geom:
                 pairs.add((self._body_name(rb), "table"))
+            elif og in self._shelf_geoms:
+                pairs.add((self._body_name(rb), self._shelf_geoms[og]))
         for a, b in sorted(pairs - self._contacts):
             events.append(f"collision:{a}-{b}")
         self._contacts = pairs

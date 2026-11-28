@@ -180,8 +180,24 @@ class Disturbance(Spec):
         return self
 
 
+class TableSpec(Spec):
+    """The table the robot is bolted to. `width` is across the robot (world y, centred on the
+    robot base), `depth` along it (world x, from `back` behind the base). With `shelves`, the
+    table stands between two shelf units: solid side panels `shelf_height` tall just outside the
+    width, which the arm can collide with. Every region of the scene must then lie inside the
+    width, and skills keep the hand inside it."""
+
+    width: float = Field(1.2, gt=0.2, description="metres, world y")
+    depth: float = Field(1.2, gt=0.2, description="metres, world x")
+    back: float = Field(0.25, ge=0.0, description="metres of table behind the robot base")
+    shelves: bool = False
+    shelf_height: float = Field(0.6, gt=0.0, description="metres above the table top")
+    shelf_thickness: float = Field(0.02, gt=0.0)
+
+
 class SceneSpec(Spec):
     robot: RobotSpec
+    table: TableSpec = TableSpec()
     objects: tuple[ObjectSpec, ...] = ()
     regions: tuple[Region, ...] = ()
     randomization: RandomizationSpec = RandomizationSpec()
@@ -210,6 +226,11 @@ class SceneSpec(Spec):
                     raise ValueError(f"disturbance {i} names unknown regions: {list(d.regions)}")
                 if any(f != "upright" for f in d.faces) and [n for n in (d.objects or movable) if n not in boxes]:
                     raise ValueError(f"disturbance {i}: faces other than upright need box objects")
+        if self.table.shelves:
+            y0, hw = self.robot.base_pose.pos[1], self.table.width / 2
+            out = [r.name for r in self.regions if abs(r.center[1] - y0) + r.half_extents[1] > hw]
+            if out:
+                raise ValueError(f"regions reach past the shelves (table width {self.table.width} m): {out}")
         if self.scatter is not None:
             sc = self.scatter
             bad = [n for n in sc.objects if n not in movable]

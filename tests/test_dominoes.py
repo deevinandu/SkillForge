@@ -244,10 +244,9 @@ def test_builds_the_chain_from_scattered_dominoes(seed):
 
 
 def test_retopples_a_knocked_down_chain():
-    """Start: the chain is knocked over at step 1. It only counts once every domino stood again.
-    The kinematic world lays the knocked dominoes flat on their own spots, overlapping, so its
-    grasp sometimes takes the neighbour: about half the seeds work there (the decisions are what
-    this checks; MuJoCo is the real test)."""
+    """Start: all five are knocked over at step 1, so they lie on each other like the end of a run.
+    It only counts once every domino stood again. Dominoes resting on another are first relayed
+    to a clear bench point (Relay), then stood up."""
     t = load("franka_retopple_domino_chain")
     wins = []
     for seed in range(6):
@@ -255,8 +254,9 @@ def test_retopples_a_knocked_down_chain():
         if ep.success:
             assert sum(e.startswith("restood:") for e in ep.events) == 5
             assert sum(":standup:" in e for e in sk.log) >= 5
+            assert any(":relay:" in e and "resting on something" in e for e in sk.log)
         wins.append(ep.success)
-    assert sum(wins) >= 2, wins
+    assert sum(wins) >= 5, wins
 
 
 def test_retopple_does_not_count_the_first_fall():
@@ -340,3 +340,57 @@ def test_stand_turn_tries_the_next_pose_when_stuck():
         if status.done or status.failed:
             break
     assert status.done and c.bb.get("stand_tries") == 2 and np.allclose(c.quat, near)
+
+
+# ---------------------------------------------------------------- judging what is feasible (v0.3)
+
+
+def test_hand_stays_between_the_shelves():
+    t = load("franka_retopple_domino_chain")
+    assert t.scene.table.shelves and t.scene.table.width == 0.75
+    sk = ToppleChain()
+    sk.reset(t)
+    assert sk.y_max + 0.105 < 0.375
+    pos = {k: np.array([0.45 + 0.03 * i, 0.0, 0.008]) for i, k in enumerate(sk.order)}
+    quat = {k: np.array([math.cos(math.pi / 4), 0.0, math.sin(math.pi / 4), 0.0]) for k in sk.order}  # flat
+    for k in sk.order:
+        spot = sk.standup_spot(k, pos, list(sk.order))
+        assert spot is not None and abs(spot[1]) <= sk.y_max
+        plan = sk.relay_plan(k, pos, quat)
+        assert plan is not None and abs(plan[0][1]) <= sk.y_max
+
+
+def _lying_at(t: TaskSpec, name: str, xy) -> TaskSpec:
+    objs = []
+    for o in t.scene.objects:
+        if o.name == name:
+            q = (math.cos(math.pi / 4), 0.0, -math.sin(math.pi / 4), 0.0)  # flat, top toward the robot
+            o = o.model_copy(update={"pose": o.pose.model_copy(update={"pos": (xy[0], xy[1], o.size[0]), "quat": q})})
+        objs.append(o)
+    sc = t.scene.model_copy(update={"objects": tuple(objs), "scatter": None, "disturbances": ()})
+    return t.model_copy(update={"scene": sc})
+
+
+def test_gives_up_on_a_domino_out_of_reach_and_still_topples_the_rest():
+    t = _lying_at(load("franka_topple_domino_chain"), "domino_3", (0.80, 0.0))
+    t = t.model_copy(update={"max_steps": 4000})
+    ep, sk = run(t, 0)
+    assert any("giving up on domino_3: out of reach" in e for e in sk.log), sk.log
+    assert not any(":standup:domino_3" in e or ":relay:domino_3" in e for e in sk.log)
+    assert any(":report:" in e and "domino_3" in e for e in sk.log)
+    assert sum(":pushed:" in e for e in sk.log) >= 2  # the row has a gap: both halves are pushed
+    assert not ep.success
+
+
+def test_relays_a_domino_that_lies_against_another():
+    t = _lying_at(load("franka_topple_domino_chain"), "domino_5", (0.57, 0.02))
+    ep, sk = run(t, 0)
+    assert any(":relay:domino_5" in e and "next to" in e for e in sk.log), sk.log
+    assert ep.success, (ep.failure_detail, sk.log)
+
+
+def test_stops_rebuilding_when_out_of_time():
+    t = load("franka_rebuild_fallen_dominoes").model_copy(update={"max_steps": 1200})
+    ep, sk = run(t, 0)
+    assert any("out of time" in e for e in sk.log), sk.log
+    assert sum(":standup:" in e for e in sk.log) <= 2

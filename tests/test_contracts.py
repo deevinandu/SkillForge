@@ -245,3 +245,15 @@ def test_bad_scatter_rejected(stub_task, change, match):
     change(d)
     with pytest.raises(ValidationError, match=match):
         TaskSpec.model_validate(d)
+
+
+def test_shelves_keep_regions_inside_the_table_width():
+    import json
+    from pathlib import Path
+
+    t = json.loads((Path(__file__).resolve().parents[1] / "tasks" / "franka_topple_domino_chain.json").read_text())
+    t["scene"]["regions"].append({"name": "far_side", "center": [0.4, 0.36, 0.02], "half_extents": [0.05, 0.05, 0.02]})
+    with pytest.raises(ValueError, match="past the shelves"):
+        TaskSpec.model_validate(t)
+    t["scene"]["table"]["shelves"] = False
+    TaskSpec.model_validate(t)
